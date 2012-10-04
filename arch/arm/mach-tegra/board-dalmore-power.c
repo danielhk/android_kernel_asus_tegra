@@ -228,6 +228,7 @@ static struct regulator_consumer_supply max77663_sd2_supply[] = {
 	REGULATOR_SUPPLY("vdd_gps_1v8", NULL),
 	REGULATOR_SUPPLY("vddio_bt_1v8", NULL),
 	REGULATOR_SUPPLY("vdd_dtv_1v8", NULL),
+	REGULATOR_SUPPLY("vlogic", "0-0069"),
 };
 
 static struct regulator_consumer_supply max77663_sd3_supply[] = {
@@ -253,6 +254,7 @@ static struct regulator_consumer_supply max77663_ldo2_supply[] = {
 	REGULATOR_SUPPLY("vdd_sensor_2v85", NULL),
 	REGULATOR_SUPPLY("vdd_als", NULL),
 	REGULATOR_SUPPLY("vdd", "0-004c"),
+	REGULATOR_SUPPLY("vdd", "0-0069"),
 };
 
 static struct regulator_consumer_supply max77663_ldo3_supply[] = {
