@@ -49,9 +49,18 @@ static const u32 kbd_keymap[] = {
 	KEY(2, 2, KEY_2),
 };
 
+static const u32 kbd_dummy_keymap[] = {
+	KEY(0, 0, KEY_POWER),
+};
+
 static const struct matrix_keymap_data keymap_data = {
 	.keymap		= kbd_keymap,
 	.keymap_size	= ARRAY_SIZE(kbd_keymap),
+};
+
+static const struct matrix_keymap_data dummy_keymap_data = {
+	.keymap		= kbd_dummy_keymap,
+	.keymap_size	= ARRAY_SIZE(kbd_dummy_keymap),
 };
 
 static struct tegra_kbc_wake_key dalmore_wake_cfg[] = {
@@ -67,6 +76,20 @@ static struct tegra_kbc_platform_data dalmore_kbc_platform_data = {
 	.scan_count = 30,
 	.wakeup = true,
 	.keymap_data = &keymap_data,
+	.wake_cnt = 2,
+	.wake_cfg = &dalmore_wake_cfg[0],
+	.wakeup_key = KEY_POWER,
+#ifdef CONFIG_ANDROID
+	.disable_ev_rep = true,
+#endif
+};
+
+static struct tegra_kbc_platform_data dalmore_dummy_kbc_platform_data = {
+	.debounce_cnt = 20 * 32, /* 20 ms debaunce time */
+	.repeat_cnt = 1,
+	.scan_count = 30,
+	.wakeup = true,
+	.keymap_data = &dummy_keymap_data,
 	.wake_cnt = 2,
 	.wake_cfg = &dalmore_wake_cfg[0],
 	.wakeup_key = KEY_POWER,
@@ -197,6 +220,22 @@ static void __init dalmore_register_kbc(void)
 	pr_info("Registering successful tegra-kbc\n");
 }
 
+static void __init dalmore_register_dummy_kbc(void)
+{
+	struct tegra_kbc_platform_data *data = &dalmore_dummy_kbc_platform_data;
+
+	tegra_kbc_device.dev.platform_data = &dalmore_dummy_kbc_platform_data;
+	pr_info("Registering dummy tegra-kbc\n");
+
+	data->pin_cfg[0].num = 0;
+	data->pin_cfg[0].type = PIN_CFG_ROW;
+	data->pin_cfg[KBC_PIN_GPIO_11].num = 0;
+	data->pin_cfg[KBC_PIN_GPIO_11].type = PIN_CFG_COL;
+
+	platform_device_register(&tegra_kbc_device);
+	pr_info("Successfully registered dummy tegra-kbc\n");
+}
+
 int __init dalmore_kbc_init(void)
 {
 	struct board_info board_info;
@@ -212,6 +251,7 @@ int __init dalmore_kbc_init(void)
 			platform_device_register(
 				&dalmore_e1611_1000_keys_device);
 		} else {
+			dalmore_register_dummy_kbc();
 			platform_device_register(
 				&dalmore_e1611_1001_keys_device);
 		}
