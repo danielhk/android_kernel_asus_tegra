@@ -17,7 +17,6 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
  *****************************************************************************/
-
 #include <linux/module.h>
 #include <linux/kmod.h>
 #include <linux/init.h>
@@ -233,6 +232,7 @@ static int smsc95xx_eeprom_confirm_not_busy(struct usbnet *dev)
 	} while (!time_after(jiffies, start_time + HZ));
 
 	netdev_warn(dev->net, "EEPROM is busy\n");
+
 	return -EIO;
 }
 
@@ -309,12 +309,16 @@ static int smsc95xx_write_eeprom(struct usbnet *dev, u32 offset, u32 length,
 
 static void smsc95xx_async_cmd_callback(struct urb *urb)
 {
-	struct usb_context *usb_context = urb->context;
-	struct usbnet *dev = usb_context->dev;
-	int status = urb->status;
+	struct usb_context *usb_context;
+	int status;
 
-	if (status < 0)
-		netdev_warn(dev->net, "async callback failed with %d\n", status);
+	if (!urb)
+		return;
+	usb_context = urb->context;
+	status = urb->status;
+
+	if ((status < 0) && usb_context->dev)
+		netdev_warn(usb_context->dev->net, "async callback failed with %d\n", status);
 
 	kfree(usb_context);
 	usb_free_urb(urb);
