@@ -1052,6 +1052,7 @@ static struct tegra_dc_sd_settings dalmore_sd_settings = {
 	.bin_width = -1,
 	.aggressiveness = 5,
 	.use_vid_luma = false,
+	.phase_in_adjustments = 0,
 	.k_limit_enable = true,
 	.k_limit = 200,
 	.sd_window_enable = false,
