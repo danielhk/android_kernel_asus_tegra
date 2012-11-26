@@ -214,4 +214,5 @@ struct max17042_platform_data {
 };
 
 extern int maxim_get_temp(void);
+extern void max17042_update_status(int status);
 #endif /* __MAX17042_BATTERY_H_ */
