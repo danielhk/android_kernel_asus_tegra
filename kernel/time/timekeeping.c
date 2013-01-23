@@ -1155,6 +1155,9 @@ void get_monotonic_boottime(struct timespec *ts)
 	struct timespec tomono, sleep;
 	unsigned int seq;
 	s64 nsecs;
+	s64 ts_64;
+	s64 tomono_64;
+	s64 sleep_64;
 
 	WARN_ON(timekeeping_suspended);
 
@@ -1167,8 +1170,11 @@ void get_monotonic_boottime(struct timespec *ts)
 
 	} while (read_seqretry(&timekeeper.lock, seq));
 
-	set_normalized_timespec(ts, ts->tv_sec + tomono.tv_sec + sleep.tv_sec,
-			ts->tv_nsec + tomono.tv_nsec + sleep.tv_nsec + nsecs);
+	ts_64 = timespec_to_ns(ts);
+	tomono_64 = timespec_to_ns(&tomono);
+	sleep_64 = timespec_to_ns(&sleep);
+
+	*ts = ns_to_timespec(ts_64 + tomono_64 + sleep_64 + nsecs);
 }
 EXPORT_SYMBOL_GPL(get_monotonic_boottime);
 
