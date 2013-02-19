@@ -2,7 +2,7 @@
  * arch/arm/mach-tegra/common.c
  *
  * Copyright (C) 2010 Google, Inc.
- * Copyright (C) 2010-2012 NVIDIA Corporation
+ * Copyright (c) 2012-2013, NVIDIA CORPORATION.  All rights reserved.
  *
  * Author:
  *	Colin Cross <ccross@android.com>
@@ -34,6 +34,7 @@
 #include <linux/persistent_ram.h>
 #include <linux/dma-mapping.h>
 #include <linux/sys_soc.h>
+#include <linux/export.h>
 
 #include <trace/events/nvsecurity.h>
 
@@ -140,6 +141,10 @@ static int pmu_core_edp;
 static int board_panel_type;
 static enum power_supply_type pow_supply_type = POWER_SUPPLY_TYPE_MAINS;
 static int pwr_i2c_clk = 400;
+
+atomic_t __maybe_unused sd_brightness = ATOMIC_INIT(255);
+EXPORT_SYMBOL(sd_brightness);
+
 /*
  * Storage for debug-macro.S's state.
  *
