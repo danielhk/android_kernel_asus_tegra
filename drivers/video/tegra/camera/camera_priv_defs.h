@@ -93,7 +93,7 @@ struct clock_data {
 	int index;
 	char *name;
 	bool init;
-	int freq;
+	unsigned long freq;
 };
 
 struct tegra_camera *tegra_camera_register(struct platform_device *ndev);

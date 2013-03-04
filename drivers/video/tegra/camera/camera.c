@@ -34,7 +34,7 @@ static struct clock_data clock_init[] = {
 	{ CAMERA_CILE_CLK, "cile", true, 0},
 	{ CAMERA_PLL_D2_CLK, "pll_d2", false, 0},
 #endif
-	{ CAMERA_SCLK, "sclk", true, 204000000},
+	{ CAMERA_SCLK, "sclk", true, 80000000},
 };
 
 static long tegra_camera_ioctl(struct file *file,
