@@ -47,6 +47,7 @@ static bool emc_enable;
 module_param(emc_enable, bool, 0644);
 
 u8 tegra_emc_bw_efficiency = 100;
+u8 tegra_emc_iso_alloc_with_gpu = 35;
 
 #define PLL_C_DIRECT_FLOOR		333500000
 #define EMC_STATUS_UPDATE_TIMEOUT	100
@@ -1333,6 +1334,21 @@ static int efficiency_set(void *data, u64 val)
 DEFINE_SIMPLE_ATTRIBUTE(efficiency_fops, efficiency_get,
 			efficiency_set, "%llu\n");
 
+static int iso_alloc_get(void *data, u64 *val)
+{
+	*val = tegra_emc_iso_alloc_with_gpu;
+	return 0;
+}
+static int iso_alloc_set(void *data, u64 val)
+{
+	tegra_emc_iso_alloc_with_gpu = (val > 100) ? 100 : val;
+	if (emc)
+		tegra_clk_shared_bus_update(emc);
+
+	return 0;
+}
+DEFINE_SIMPLE_ATTRIBUTE(iso_alloc_fops, iso_alloc_get, iso_alloc_set, "%llu\n");
+
 static int __init tegra_emc_debug_init(void)
 {
 	if (!tegra_emc_table)
@@ -1356,6 +1372,10 @@ static int __init tegra_emc_debug_init(void)
 
 	if (!debugfs_create_file("efficiency", S_IRUGO | S_IWUSR,
 				 emc_debugfs_root, NULL, &efficiency_fops))
+		goto err_out;
+
+	if (!debugfs_create_file("iso_alloc", S_IRUGO | S_IWUSR,
+				 emc_debugfs_root, NULL, &iso_alloc_fops))
 		goto err_out;
 
 	return 0;

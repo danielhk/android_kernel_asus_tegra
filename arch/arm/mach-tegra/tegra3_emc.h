@@ -27,8 +27,6 @@
 #define TEGRA_EMC_BRIDGE_RATE_MIN	300000000
 #define TEGRA_EMC_BRIDGE_MVOLTS_MIN	1200
 
-extern u8 tegra_emc_bw_efficiency_boost;
-
 int tegra30_init_emc(void);
 
 #define EMC_INTSTATUS				0x0

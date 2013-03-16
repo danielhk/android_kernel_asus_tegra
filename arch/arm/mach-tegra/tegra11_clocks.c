@@ -5076,6 +5076,12 @@ static unsigned long tegra11_clk_shared_bus_update(struct clk *bus,
 			unsigned long request_rate = c->u.shared_bus_user.rate *
 				(c->div ? : 1);
 
+			if (bus->flags & PERIPH_EMC_ENB) {
+				if (!strcmp(c->name, "3d.emc"))
+					emc_bw_efficiency =
+						tegra_emc_iso_alloc_with_gpu;
+			}
+
 			switch (c->u.shared_bus_user.mode) {
 			case SHARED_BW:
 				bw += request_rate;

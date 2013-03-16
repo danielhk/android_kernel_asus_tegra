@@ -46,6 +46,11 @@ void tegra_emc_timing_invalidate(void);
 #ifdef CONFIG_ARCH_TEGRA_3x_SOC
 int tegra_emc_backup(unsigned long rate);
 void tegra_init_dram_bit_map(const u32 *bit_map, int map_size);
+extern u8 tegra_emc_bw_efficiency_boost;
+#endif
+
+#ifdef CONFIG_ARCH_TEGRA_11x_SOC
+extern u8 tegra_emc_iso_alloc_with_gpu;
 #endif
 
 #ifdef CONFIG_PM_SLEEP
