@@ -2072,13 +2072,17 @@ static void logpacket(char chip, uint32_t type, const u8 *data, u32 sz,
 	aahlog("%s", x);
 }
 
+#ifdef CONFIG_SND_MIC_BTLE_SBC
 /*
  * Function in Wolfie audio ALSA driver that decodes SBC.
  * TODO put this prototype in a header file.
  */
+void athome_bt_audio_dec(int which, int format, const uint8_t *data, unsigned len);
+#else
 void athome_bt_audio_dec(int which, int format, const uint8_t *data, unsigned len)
 {
 }
+#endif
 
 /* returns 1 if we've been asked to quit */
 static int athome_bt_data_rx(int which, uint8_t *in_data, uint32_t len)
