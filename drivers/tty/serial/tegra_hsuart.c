@@ -1031,8 +1031,8 @@ static void tegra_shutdown(struct uart_port *u)
 				DMA_TO_DEVICE);
 		t->xmit_dma_addr = 0;
 	}
-
 	free_irq(u->irq, t);
+	tasklet_kill(&t->tlet);
 	dev_vdbg(u->dev, "-tegra_shutdown\n");
 }
 
