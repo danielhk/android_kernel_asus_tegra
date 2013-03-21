@@ -3,7 +3,7 @@
  *
  * High-speed serial driver for NVIDIA Tegra SoCs
  *
- * Copyright (C) 2009-2012 NVIDIA Corporation
+ * Copyright (C) 2009-2013 NVIDIA Corporation
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -1031,7 +1031,7 @@ static void tegra_shutdown(struct uart_port *u)
 				DMA_TO_DEVICE);
 		t->xmit_dma_addr = 0;
 	}
-
+	tasklet_kill(&t->tlet);
 	free_irq(u->irq, t);
 	dev_vdbg(u->dev, "-tegra_shutdown\n");
 }
