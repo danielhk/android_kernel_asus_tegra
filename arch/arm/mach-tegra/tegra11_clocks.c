@@ -5077,9 +5077,9 @@ static unsigned long tegra11_clk_shared_bus_update(struct clk *bus,
 				(c->div ? : 1);
 
 			if (bus->flags & PERIPH_EMC_ENB) {
-				if (!strcmp(c->name, "3d.emc"))
+				if (!strcmp(c->name, "camera.emc"))
 					emc_bw_efficiency =
-						tegra_emc_iso_alloc_with_gpu;
+						tegra_emc_iso_alloc_with_vi;
 			}
 
 			switch (c->u.shared_bus_user.mode) {

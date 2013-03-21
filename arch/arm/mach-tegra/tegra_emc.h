@@ -50,7 +50,7 @@ extern u8 tegra_emc_bw_efficiency_boost;
 #endif
 
 #ifdef CONFIG_ARCH_TEGRA_11x_SOC
-extern u8 tegra_emc_iso_alloc_with_gpu;
+extern u8 tegra_emc_iso_alloc_with_vi;
 #endif
 
 #ifdef CONFIG_PM_SLEEP

@@ -47,7 +47,7 @@ static bool emc_enable;
 module_param(emc_enable, bool, 0644);
 
 u8 tegra_emc_bw_efficiency = 100;
-u8 tegra_emc_iso_alloc_with_gpu = 35;
+u8 tegra_emc_iso_alloc_with_vi = 35;
 
 #define PLL_C_DIRECT_FLOOR		333500000
 #define EMC_STATUS_UPDATE_TIMEOUT	100
@@ -1336,12 +1336,12 @@ DEFINE_SIMPLE_ATTRIBUTE(efficiency_fops, efficiency_get,
 
 static int iso_alloc_get(void *data, u64 *val)
 {
-	*val = tegra_emc_iso_alloc_with_gpu;
+	*val = tegra_emc_iso_alloc_with_vi;
 	return 0;
 }
 static int iso_alloc_set(void *data, u64 val)
 {
-	tegra_emc_iso_alloc_with_gpu = (val > 100) ? 100 : val;
+	tegra_emc_iso_alloc_with_vi = (val > 100) ? 100 : val;
 	if (emc)
 		tegra_clk_shared_bus_update(emc);
 
