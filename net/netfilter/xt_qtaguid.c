@@ -1416,8 +1416,9 @@ static void if_tag_stat_update(const char *ifname, uid_t uid,
 
 	iface_entry = get_iface_entry(ifname);
 	if (!iface_entry) {
-		pr_err("qtaguid: iface_stat: stat_update() %s not found\n",
-		       ifname);
+		if (net_ratelimit())
+			pr_err("qtaguid: iface_stat: stat_update() %s not found\n",
+			       ifname);
 		return;
 	}
 	/* It is ok to process data when an iface_entry is inactive */
