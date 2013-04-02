@@ -2,6 +2,7 @@
  * TI Palmas
  *
  * Copyright 2011 Texas Instruments Inc.
+ * Copyright (c) 2013, NVIDIA CORPORATION.  All rights reserved.
  *
  * Author: Graeme Gregory <gg@slimlogic.co.uk>
  *
@@ -305,6 +306,7 @@ struct palmas_pmic {
 	unsigned int current_mode_reg[PALMAS_NUM_REGS];
 
 	int range[PALMAS_REG_SMPS10];
+	unsigned long roof_floor[PALMAS_NUM_REGS];
 };
 
 /* defines so we can store the mux settings */
