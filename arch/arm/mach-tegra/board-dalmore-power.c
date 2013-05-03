@@ -1187,7 +1187,7 @@ static int __init dalmore_fixed_regulator_init(void)
 	struct board_info board_info;
 	u8 power_config;
 
-	if (!machine_is_dalmore())
+	if (!machine_is_dalmore() && !machine_is_molly())
 		return 0;
 
 	power_config = get_power_config();

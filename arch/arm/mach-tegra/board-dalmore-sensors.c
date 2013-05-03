@@ -132,7 +132,7 @@ static struct balanced_throttle tj_throttle = {
 
 static int __init dalmore_throttle_init(void)
 {
-	if (machine_is_dalmore())
+	if (machine_is_dalmore() || machine_is_molly())
 		balanced_throttle_register(&tj_throttle, "tegra-balanced");
 	return 0;
 }
@@ -775,7 +775,7 @@ static struct balanced_throttle skin_throttle = {
 
 static int __init dalmore_skin_init(void)
 {
-	if (machine_is_dalmore()) {
+	if (machine_is_dalmore() || machine_is_molly()) {
 		balanced_throttle_register(&skin_throttle, "skin-balanced");
 		tegra_skin_therm_est_device.dev.platform_data = &skin_data;
 		platform_device_register(&tegra_skin_therm_est_device);

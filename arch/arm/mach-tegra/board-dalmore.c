@@ -813,7 +813,10 @@ static void __init tegra_dalmore_init(void)
 	tegra_get_display_board_info(&board_info);
 	tegra_clk_init_from_table(dalmore_clk_init_table);
 	tegra_clk_verify_parents();
-	tegra_soc_device_init("dalmore");
+	if (machine_is_molly())
+		tegra_soc_device_init("molly");
+	else
+		tegra_soc_device_init("dalmore");
 	tegra_enable_pinmux();
 	dalmore_pinmux_init();
 	dalmore_i2c_init();
@@ -885,6 +888,11 @@ static const char * const dalmore_dt_board_compat[] = {
 	NULL
 };
 
+static const char * const molly_dt_board_compat[] = {
+	"nvidia,molly",
+	NULL
+};
+
 MACHINE_START(DALMORE, "dalmore")
 	.atag_offset	= 0x100,
 	.soc		= &tegra_soc_desc,
@@ -897,4 +905,18 @@ MACHINE_START(DALMORE, "dalmore")
 	.init_machine	= tegra_dalmore_dt_init,
 	.restart	= tegra_assert_system_reset,
 	.dt_compat	= dalmore_dt_board_compat,
+MACHINE_END
+
+MACHINE_START(MOLLY, "molly")
+	.atag_offset	= 0x100,
+	.soc		= &tegra_soc_desc,
+	.map_io		= tegra_map_common_io,
+	.reserve	= tegra_dalmore_reserve,
+	.init_early	= tegra11x_init_early,
+	.init_irq	= tegra_init_irq,
+	.handle_irq	= gic_handle_irq,
+	.timer		= &tegra_timer,
+	.init_machine	= tegra_dalmore_dt_init,
+	.restart	= tegra_assert_system_reset,
+	.dt_compat	= molly_dt_board_compat,
 MACHINE_END

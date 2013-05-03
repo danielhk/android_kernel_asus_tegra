@@ -381,7 +381,7 @@ static int __init dalmore_wifi_init(void)
 #ifdef CONFIG_TEGRA_PREPOWER_WIFI
 static int __init dalmore_wifi_prepower(void)
 {
-	if (!machine_is_dalmore())
+	if (!machine_is_dalmore() && !machine_is_molly())
 		return 0;
 
 	dalmore_wifi_power(1);
