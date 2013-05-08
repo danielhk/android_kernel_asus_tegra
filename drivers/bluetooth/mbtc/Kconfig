@@ -1,0 +1,8 @@
+config MBT_SD_CHAR
+	tristate "Marvell Bluetooth SD Char driver"
+	depends on MMC_SDHCI
+	help
+	  This driver supports Marvell Bluetooth SD8797 device.
+
+	  Say Y here to compile Marvell Bluetooth SD Char driver
+	  into the kernel or say M to compile it as module (mbt8xxx).
