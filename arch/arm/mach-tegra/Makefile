@@ -289,6 +289,17 @@ obj-${CONFIG_MACH_DALMORE}              += panel-a-1080p-11-6.o
 obj-${CONFIG_MACH_DALMORE}              += panel-p-wuxga-10-1.o
 obj-${CONFIG_MACH_DALMORE}              += panel-s-wqxga-10-1.o
 
+obj-${CONFIG_MACH_MOLLY}                += board-molly.o
+obj-${CONFIG_MACH_MOLLY}                += board-molly-memory.o
+obj-${CONFIG_MACH_MOLLY}                += board-molly-pinmux.o
+obj-${CONFIG_MACH_MOLLY}                += board-molly-power.o
+obj-${CONFIG_MACH_MOLLY}                += board-molly-powermon.o
+obj-${CONFIG_MACH_MOLLY}                += board-molly-sdhci.o
+obj-${CONFIG_MACH_MOLLY}                += board-molly-panel.o
+obj-${CONFIG_MACH_MOLLY}                += panel-a-1080p-11-6.o
+obj-${CONFIG_MACH_MOLLY}                += panel-p-wuxga-10-1.o
+obj-${CONFIG_MACH_MOLLY}                += panel-s-wqxga-10-1.o
+
 obj-${CONFIG_MACH_MACALLAN}             += board-macallan.o
 obj-${CONFIG_MACH_MACALLAN}             += board-macallan-memory.o
 obj-${CONFIG_MACH_MACALLAN}             += board-macallan-pinmux.o
