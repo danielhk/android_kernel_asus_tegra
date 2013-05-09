@@ -52,4 +52,5 @@ mbt8xxx-y := bt_main.o bt_proc.o mbt_char.o
 mbt8xxx-y += bt_init.o
 mbt8xxx-y += bt_sdiommc.o
 obj-$(CONFIG_MBT_SD_CHAR) += mbt8xxx.o
+obj-$(CONFIG_ATHOME_BT_REMOTE) += bt_athomeremote.o
 mbt8xxx-objs := $(mbt8xxx-y)

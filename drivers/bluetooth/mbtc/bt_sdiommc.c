@@ -24,6 +24,7 @@
 
 #include "bt_drv.h"
 #include "bt_sdio.h"
+#include "bt_athomeremote.h"
 
 /** define marvell vendor id */
 #define MARVELL_VENDOR_ID 0x02df
@@ -753,6 +754,26 @@ sd_download_firmware_w_helper(bt_private * priv)
     return ret;
 }
 
+#ifdef CONFIG_ATHOME_BT_REMOTE
+void athome_bt_pkt_to_user(void *_priv, uint32_t pkt_type,
+				uint8_t *data, uint32_t len)
+{
+	bt_private *priv = (bt_private *) _priv;
+	struct sk_buff *skb;
+
+	skb = bt_skb_alloc(len, GFP_ATOMIC);
+	if (!skb)
+		return;
+
+	memcpy(skb->data, data, len);
+	bt_cb(skb)->pkt_type = pkt_type;
+	skb_put(skb, len);
+	skb->dev = (void *)(&(priv->bt_dev.m_dev[BT_SEQ]));
+
+	hci_recv_frame(skb);
+}
+#endif
+
 /**
  *  @brief This function reads data from the card.
  *
@@ -849,6 +870,26 @@ sd_card_to_host(bt_private * priv)
         goto exit;
     }
     DBG_HEXDUMP(DAT_D, "BT: SDIO Blk Rd", payload, buf_len);
+
+#ifdef CONFIG_ATHOME_BT_REMOTE
+    {
+        uint32_t len = buf_len - 4;
+        int action = athome_bt_remote_filter_rx_data(priv, type,
+                                payload + 4,
+                                &len);
+
+        if (action == AAH_BT_PKT_DROP) {
+            kfree_skb(skb);
+            skb = NULL;
+            goto exit;
+        }
+        else {
+            type = payload[3];
+            buf_len = len + 4;
+        }
+    }
+#endif
+
     switch (type) {
     case HCI_ACLDATA_PKT:
         bt_cb(skb)->pkt_type = type;
@@ -1633,6 +1674,30 @@ sbi_host_to_card(bt_private * priv, u8 * payload, u16 nb)
     LEAVE();
     return ret;
 }
+
+#ifdef CONFIG_ATHOME_BT_REMOTE
+void athome_bt_pkt_to_chip(void *_priv, uint32_t pkt_type,
+					uint8_t *data, uint32_t len)
+{
+	bt_private *priv = (bt_private *)_priv;
+	uint8_t* buf;
+
+	buf = kmalloc(len + 4, GFP_ATOMIC);
+	if (!buf)
+		return;
+
+	buf[0] = len;
+	buf[1] = len >> 8;
+	buf[2] = len >> 16;
+	buf[3] = pkt_type;
+	memcpy(buf + 4, data, len);
+
+	sbi_host_to_card(priv, buf, len + 4);
+
+	kfree(buf);
+}
+
+#endif
 
 /**
  *  @brief This function downloads firmware

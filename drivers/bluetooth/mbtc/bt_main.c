@@ -38,6 +38,7 @@
 #include "bt_drv.h"
 #include "mbt_char.h"
 #include "bt_sdio.h"
+#include "bt_athomeremote.h"
 
 /** Version */
 #define VERSION "M2614110"
@@ -1485,10 +1486,20 @@ bt_service_main_thread(void *data)
             if (!skb_queue_empty(&priv->adapter->tx_queue)) {
                 skb = skb_dequeue(&priv->adapter->tx_queue);
                 if (skb) {
-                    if (SendSinglePacket(priv, skb))
-                        ((struct m_dev *) skb->dev)->stat.err_tx++;
-                    else
-                        ((struct m_dev *) skb->dev)->stat.byte_tx += skb->len;
+
+                    int dosend = AAH_BT_PKT_PROCEED;
+                    #ifdef CONFIG_ATHOME_BT_REMOTE
+                    dosend = athome_bt_pkt_send_req(priv, skb);
+                    #endif
+                    if (dosend == AAH_BT_PKT_PROCEED) {
+                        if (SendSinglePacket(priv, skb))
+                            ((struct m_dev *)skb->dev)->stat.err_tx++;
+                        else
+                            ((struct m_dev *)skb->dev)->stat.byte_tx += skb->len;
+                    } else if (dosend != AAH_BT_PKT_DROP) {
+                        aahlog("Unknown action on send packet: "
+					"%d\n", dosend);
+                    }
                     kfree_skb(skb);
                 }
             }
