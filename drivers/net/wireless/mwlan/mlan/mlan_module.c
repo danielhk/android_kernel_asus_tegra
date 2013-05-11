@@ -23,7 +23,6 @@ Change log:
     12/08/2008: initial version
 ******************************************************/
 
-
 #ifdef LINUX
 #include <linux/module.h>
 #include "mlan_decl.h"

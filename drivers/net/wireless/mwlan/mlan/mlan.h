@@ -25,7 +25,6 @@ Change log:
     11/07/2008: split mlan.h into mlan_decl.h & mlan_ioctl.h
 ******************************************************/
 
-
 #ifndef _MLAN_H_
 #define _MLAN_H_
 

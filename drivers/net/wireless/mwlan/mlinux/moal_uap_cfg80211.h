@@ -24,7 +24,6 @@
 
 #include    "moal_uap.h"
 
-
 mlan_status woal_register_uap_cfg80211(struct net_device *dev, t_u8 bss_type);
 
 #endif /* _MOAL_UAP_CFG80211_H_ */

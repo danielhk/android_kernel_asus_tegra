@@ -27,7 +27,6 @@ Change log:
 #ifndef _MOAL_UAP_PRIV_H_
 #define _MOAL_UAP_PRIV_H_
 
-
 /** Private command ID */
 #define WOAL_UAP_IOCTL                          0x8BE0
 

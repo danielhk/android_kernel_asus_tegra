@@ -87,27 +87,28 @@ Change log:
 typedef struct _wapi_msg
 {
     /** message type */
-	t_u16  msg_type;
+    t_u16 msg_type;
     /** message len */
-	t_u16  msg_len;
+    t_u16 msg_len;
     /** message */
-	t_u8   msg[96];
+    t_u8 msg[96];
 } wapi_msg;
 
 /* wapi key msg */
 typedef struct _wapi_key_msg
 {
     /** mac address */
-	t_u8	mac_addr[MLAN_MAC_ADDR_LENGTH];
+    t_u8 mac_addr[MLAN_MAC_ADDR_LENGTH];
     /** pad */
-	t_u8	pad;
+    t_u8 pad;
     /** key id */
-	t_u8	key_id;
+    t_u8 key_id;
     /** key */
-	t_u8	key[32];
+    t_u8 key[32];
 } wapi_key_msg;
 
-typedef struct _tx_rate_cfg_t {
+typedef struct _tx_rate_cfg_t
+{
     /** sub command */
     int subcmd;
     /** Action */
@@ -119,15 +120,16 @@ typedef struct _tx_rate_cfg_t {
 } tx_rate_cfg_t;
 
 /** ant_cfg structure */
-typedef struct _ant_cfg_t {
+typedef struct _ant_cfg_t
+{
    /** Subcommand */
-   int subcmd;
+    int subcmd;
    /** Action */
-   int action;
+    int action;
    /** TX mode configured */
-   int tx_mode;
+    int tx_mode;
    /** RX mode configured */
-   int rx_mode;
+    int rx_mode;
 } ant_cfg_t;
 
 /** Private command ID to set wapi info */
@@ -179,7 +181,8 @@ typedef struct _ant_cfg_t {
 #define HS_CFG_CONDITION_MASK   0x0f
 
 /** ds_hs_cfg */
-typedef struct _ds_hs_cfg {
+typedef struct _ds_hs_cfg
+{
     /** subcmd */
     t_u32 subcmd;
     /** Bit0: 0 - Get, 1 Set
@@ -194,11 +197,11 @@ typedef struct _ds_hs_cfg {
      *  Bit2: mac events
      *  Bit3: magic packet
      */
-    t_u32  conditions;
+    t_u32 conditions;
     /** GPIO */
-    t_u32  gpio;
+    t_u32 gpio;
     /** Gap in milliseconds */
-    t_u32  gap;
+    t_u32 gap;
 } ds_hs_cfg;
 
 /** Private command ID to get BSS type */
@@ -218,31 +221,33 @@ typedef struct _addba_param
     /** Buffer size for ADDBA response */
     t_u32 rxwinsize;
     /** amsdu for ADDBA request */
-    t_u8  txamsdu;
+    t_u8 txamsdu;
     /** amsdu for ADDBA response */
-    t_u8  rxamsdu;
+    t_u8 rxamsdu;
 } addba_param;
 
 /** aggr_prio_tbl */
-typedef struct _aggr_prio_tbl {
+typedef struct _aggr_prio_tbl
+{
     /** subcmd */
     t_u32 subcmd;
     /** Set/Get */
     t_u32 action;
     /** ampdu priority table */
-    t_u8	ampdu[MAX_NUM_TID];
+    t_u8 ampdu[MAX_NUM_TID];
     /** amsdu priority table */
-    t_u8	amsdu[MAX_NUM_TID];
+    t_u8 amsdu[MAX_NUM_TID];
 } aggr_prio_tbl;
 
 /** addba_reject parameters */
-typedef struct _addba_reject_para {
+typedef struct _addba_reject_para
+{
     /** subcmd */
     t_u32 subcmd;
     /** Set/Get */
     t_u32 action;
     /** BA Reject paramters */
-    t_u8  addba_reject[MAX_NUM_TID];
+    t_u8 addba_reject[MAX_NUM_TID];
 } addba_reject_para;
 
 /** fw_info */
@@ -253,32 +258,35 @@ typedef struct _fw_info
     /** Get */
     t_u32 action;
     /** Firmware release number */
-    t_u32   fw_release_number;
+    t_u32 fw_release_number;
     /** Device support for MIMO abstraction of MCSs */
-    t_u8    hw_dev_mcs_support;
+    t_u8 hw_dev_mcs_support;
     /** Region Code */
-    t_u16   region_code;
+    t_u16 region_code;
 } fw_info;
 
-typedef struct _tx_bf_cfg_para_hdr {
+typedef struct _tx_bf_cfg_para_hdr
+{
     /** Sub command */
-    t_u32   subcmd;
+    t_u32 subcmd;
     /** Action: Set/Get */
-    t_u32   action;
+    t_u32 action;
 } tx_bf_cfg_para_hdr;
 
 /** sdcmd52rw parameters */
-typedef struct _sdcmd52_para {
+typedef struct _sdcmd52_para
+{
     /** subcmd */
     t_u32 subcmd;
     /** Write /Read */
     t_u32 action;
     /** Command 52 paramters */
-    t_u8  cmd52_params[3];
+    t_u8 cmd52_params[3];
 } sdcmd52_para;
 
 /** deep_sleep parameters */
-typedef struct _deep_sleep_para {
+typedef struct _deep_sleep_para
+{
     /** subcmd */
     t_u32 subcmd;
     /** Set/Get */
@@ -286,11 +294,12 @@ typedef struct _deep_sleep_para {
     /** enable/disable deepsleep*/
     t_u16 deep_sleep;
     /** idle_time */
-    t_u16  idle_time;
+    t_u16 idle_time;
 } deep_sleep_para;
 
 /** tx_data_pause parameters */
-typedef struct _tx_data_pause_para {
+typedef struct _tx_data_pause_para
+{
     /** subcmd */
     t_u32 subcmd;
     /** Set/Get */
@@ -310,9 +319,10 @@ typedef struct _mgmt_frame_ctrl
     t_u32 action;
     /** mask */
     t_u32 mask;
-}mgmt_frame_ctrl;
+} mgmt_frame_ctrl;
 
-typedef struct _snmp_mib_para {
+typedef struct _snmp_mib_para
+{
     /** subcmd */
     t_u32 subcmd;
     /** Set/Get */
@@ -335,7 +345,8 @@ typedef struct _snmp_mib_para {
 
 #ifdef DFS_TESTING_SUPPORT
 /** dfs_testing parameters */
-typedef struct _dfs_testing_param {
+typedef struct _dfs_testing_param
+{
     /** subcmd */
     t_u32 subcmd;
     /** Set/Get */
@@ -345,20 +356,21 @@ typedef struct _dfs_testing_param {
     /** user NOP period (sec) */
     t_u16 usr_nop_period;
     /** don't change channel on radar */
-    t_u8  no_chan_change;
+    t_u8 no_chan_change;
     /** fixed channel to change to on radar */
-    t_u8  fixed_new_chan;
+    t_u8 fixed_new_chan;
 } dfs_testing_para;
 #endif
 
 /** domain_info parameters */
-typedef struct _domain_info_param {
+typedef struct _domain_info_param
+{
     /** subcmd */
     t_u32 subcmd;
     /** Set/Get */
     t_u32 action;
     /** domain_param TLV (incl. header) */
-    t_u8  tlv[0];
+    t_u8 tlv[0];
 } domain_info_para;
 
 /** DOMAIN_INFO param sizes */
@@ -372,11 +384,12 @@ typedef struct _domain_info_param {
 
 void woal_uap_set_multicast_list(struct net_device *dev);
 int woal_uap_do_ioctl(struct net_device *dev, struct ifreq *req, int cmd);
-int woal_uap_bss_ctrl(moal_private *priv, t_u8 wait_option, int data);
+int woal_uap_bss_ctrl(moal_private * priv, t_u8 wait_option, int data);
 #ifdef CONFIG_PROC_FS
-void woal_uap_get_version(moal_private	*priv, char *version, int max_len);
+void woal_uap_get_version(moal_private * priv, char *version, int max_len);
 #endif
-mlan_status woal_uap_get_stats(moal_private	*priv, t_u8 wait_option, mlan_ds_uap_stats* ustats);
+mlan_status woal_uap_get_stats(moal_private * priv, t_u8 wait_option,
+                               mlan_ds_uap_stats * ustats);
 #if defined(UAP_WEXT) || defined(UAP_CFG80211)
 extern struct iw_handler_def woal_uap_handler_def;
 struct iw_statistics *woal_get_uap_wireless_stats(struct net_device *dev);
@@ -384,15 +397,16 @@ struct iw_statistics *woal_get_uap_wireless_stats(struct net_device *dev);
 int woal_uap_do_priv_ioctl(struct net_device *dev, struct ifreq *req, int cmd);
 #endif
 /** Set invalid data for each member of mlan_uap_bss_param */
-void woal_set_sys_config_invalid_data(mlan_uap_bss_param *config);
+void woal_set_sys_config_invalid_data(mlan_uap_bss_param * config);
 /** Set/Get system configuration parameters */
 mlan_status woal_set_get_sys_config(moal_private * priv,
                                     t_u16 action, t_u8 wait_option,
-                                    mlan_uap_bss_param *sys_cfg);
-int woal_uap_set_ap_cfg(moal_private *priv, t_u8 *data, int len);
-mlan_status woal_uap_set_11n_status(mlan_uap_bss_param *sys_cfg, t_u8 action);
+                                    mlan_uap_bss_param * sys_cfg);
+int woal_uap_set_ap_cfg(moal_private * priv, t_u8 * data, int len);
+mlan_status woal_uap_set_11n_status(mlan_uap_bss_param * sys_cfg, t_u8 action);
 #ifdef UAP_WEXT
-void woal_ioctl_get_uap_info_resp(moal_private * priv, mlan_ds_get_info* info);
-int woal_set_get_custom_ie(moal_private * priv, t_u16 mask, t_u8 *ie, int ie_len);
+void woal_ioctl_get_uap_info_resp(moal_private * priv, mlan_ds_get_info * info);
+int woal_set_get_custom_ie(moal_private * priv, t_u16 mask, t_u8 * ie,
+                           int ie_len);
 #endif /* UAP_WEXT */
 #endif /* _MOAL_UAP_H */

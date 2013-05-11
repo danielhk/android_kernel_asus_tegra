@@ -70,13 +70,10 @@ Change log:
 /** Host Control Registers : Host interrupt status */
 #define HOST_INT_STATUS_REG		0x03
 
-
 /** Host Control Registers : Upload host interrupt status */
 #define UP_LD_HOST_INT_STATUS		(0x1U)
 /** Host Control Registers : Download host interrupt status */
 #define DN_LD_HOST_INT_STATUS		(0x2U)
-
-
 
 /** Port for registers */
 #define REG_PORT			0
@@ -199,7 +196,6 @@ Change log:
 /** Host Control Registers : I/O port 2 */
 #define IO_PORT_2_REG			0x7A
 
-
 /** Event header Len*/
 #define MLAN_EVENT_HEADER_LEN           8
 
@@ -242,7 +238,6 @@ Change log:
 			a->mpa_tx.start_port) && (((MAX_PORT - \
 			a->mpa_tx.start_port) + a->curr_wr_port) >= \
 				SDIO_MP_AGGR_DEF_PKT_LIMIT))
-
 
 /** Reset SDIO Tx aggregation buffer parameters */
 #define MP_TX_AGGR_BUF_RESET(a) do{         \
@@ -302,19 +297,19 @@ mlan_status wlan_enable_host_int(pmlan_adapter pmadapter);
 /** Probe and initialization function */
 mlan_status wlan_sdio_probe(pmlan_adapter pmadapter);
 /** multi interface download check */
-mlan_status wlan_check_winner_status(mlan_adapter * pmadapter, t_u32 *val);
+mlan_status wlan_check_winner_status(mlan_adapter * pmadapter, t_u32 * val);
 /** Firmware status check */
-mlan_status wlan_check_fw_status(mlan_adapter *pmadapter, t_u32 pollnum);
+mlan_status wlan_check_fw_status(mlan_adapter * pmadapter, t_u32 pollnum);
 /** Read interrupt status */
 t_void wlan_interrupt(pmlan_adapter pmadapter);
 /** Process Interrupt Status */
-mlan_status wlan_process_int_status(mlan_adapter *pmadapter);
+mlan_status wlan_process_int_status(mlan_adapter * pmadapter);
 /** Transfer data to card */
-mlan_status wlan_sdio_host_to_card(mlan_adapter *pmadapter, t_u8 type, mlan_buffer *mbuf, mlan_tx_param * tx_param);
-mlan_status wlan_set_sdio_gpio_int(IN  pmlan_private   priv);
-mlan_status wlan_cmd_sdio_gpio_int(
-    pmlan_private           pmpriv,
-    IN HostCmd_DS_COMMAND   *cmd,
-    IN t_u16                cmd_action,
-    IN t_void               *pdata_buf);
+mlan_status wlan_sdio_host_to_card(mlan_adapter * pmadapter, t_u8 type,
+                                   mlan_buffer * mbuf,
+                                   mlan_tx_param * tx_param);
+mlan_status wlan_set_sdio_gpio_int(IN pmlan_private priv);
+mlan_status wlan_cmd_sdio_gpio_int(pmlan_private pmpriv,
+                                   IN HostCmd_DS_COMMAND * cmd,
+                                   IN t_u16 cmd_action, IN t_void * pdata_buf);
 #endif /* _MLAN_SDIO_H */

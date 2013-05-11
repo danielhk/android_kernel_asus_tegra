@@ -28,10 +28,8 @@ Change log:
     10/13/2008: initial version
 ******************************************************/
 
-
 #ifndef _MLAN_JOIN_H_
 #define _MLAN_JOIN_H_
-
 
 /** Size of buffer allocated to store the association response from firmware */
 #define MRVDRV_ASSOC_RSP_BUF_SIZE  500

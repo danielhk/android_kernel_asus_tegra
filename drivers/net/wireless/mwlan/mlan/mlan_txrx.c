@@ -57,27 +57,30 @@ Change Log:
  *
  *   @return        MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
-mlan_status wlan_handle_rx_packet(pmlan_adapter pmadapter, pmlan_buffer pmbuf)
+mlan_status
+wlan_handle_rx_packet(pmlan_adapter pmadapter, pmlan_buffer pmbuf)
 {
-    mlan_status    ret = MLAN_STATUS_SUCCESS;
-    pmlan_private  priv = wlan_get_priv(pmadapter,MLAN_BSS_ROLE_ANY);
+    mlan_status ret = MLAN_STATUS_SUCCESS;
+    pmlan_private priv = MNULL;
     RxPD *prx_pd;
 #ifdef DEBUG_LEVEL1
-    t_u32          sec, usec;
+    t_u32 sec = 0, usec = 0;
 #endif
 
     ENTER();
 
-    prx_pd  = (RxPD *)(pmbuf->pbuf + pmbuf->data_offset);
+    prx_pd = (RxPD *) (pmbuf->pbuf + pmbuf->data_offset);
     /* Get the BSS number from RxPD, get corresponding priv */
-    priv = wlan_get_priv_by_id(pmadapter, prx_pd->bss_num & BSS_NUM_MASK, prx_pd->bss_type);
+    priv =
+        wlan_get_priv_by_id(pmadapter, prx_pd->bss_num & BSS_NUM_MASK,
+                            prx_pd->bss_type);
     if (!priv)
-        priv = wlan_get_priv(pmadapter,MLAN_BSS_ROLE_ANY);
+        priv = wlan_get_priv(pmadapter, MLAN_BSS_ROLE_ANY);
     pmbuf->bss_index = priv->bss_index;
     PRINTM_GET_SYS_TIME(MDATA, &sec, &usec);
     PRINTM_NETINTF(MDATA, priv);
     PRINTM(MDATA, "%lu.%06lu : Data <= FW\n", sec, usec);
-    ret = priv->ops.process_rx_packet(pmadapter,pmbuf);
+    ret = priv->ops.process_rx_packet(pmadapter, pmbuf);
 
     LEAVE();
     return ret;
@@ -92,37 +95,38 @@ mlan_status wlan_handle_rx_packet(pmlan_adapter pmadapter, pmlan_buffer pmbuf)
  *
  *  @return	    MLAN_STATUS_SUCCESS/MLAN_STATUS_PENDING --success, otherwise failure
  */
-mlan_status wlan_process_tx(pmlan_private priv, pmlan_buffer pmbuf, mlan_tx_param*  tx_param)
+mlan_status
+wlan_process_tx(pmlan_private priv, pmlan_buffer pmbuf,
+                mlan_tx_param * tx_param)
 {
-    mlan_status    ret     = MLAN_STATUS_SUCCESS;
-    pmlan_adapter  pmadapter = priv->adapter;
-    t_u8*          head_ptr = MNULL;
+    mlan_status ret = MLAN_STATUS_SUCCESS;
+    pmlan_adapter pmadapter = priv->adapter;
+    t_u8 *head_ptr = MNULL;
 #ifdef DEBUG_LEVEL1
-    t_u32	  sec, usec;
+    t_u32 sec = 0, usec = 0;
 #endif
 #ifdef STA_SUPPORT
-    TxPD*          plocal_tx_pd = MNULL;
+    TxPD *plocal_tx_pd = MNULL;
 #endif
 
     ENTER();
-    head_ptr = (t_u8 *)priv->ops.process_txpd(priv,pmbuf);
-    if(!head_ptr) {
+    head_ptr = (t_u8 *) priv->ops.process_txpd(priv, pmbuf);
+    if (!head_ptr) {
         pmbuf->status_code = MLAN_ERROR_PKT_INVALID;
         ret = MLAN_STATUS_FAILURE;
         goto done;
     }
 #ifdef STA_SUPPORT
-    if(GET_BSS_ROLE(priv) == MLAN_BSS_ROLE_STA)
-         plocal_tx_pd = (TxPD *)(head_ptr + INTF_HEADER_LEN);
+    if (GET_BSS_ROLE(priv) == MLAN_BSS_ROLE_STA)
+        plocal_tx_pd = (TxPD *) (head_ptr + INTF_HEADER_LEN);
 #endif
     ret = wlan_sdio_host_to_card(pmadapter, MLAN_TYPE_DATA, pmbuf, tx_param);
-done:
+  done:
     switch (ret) {
     case MLAN_STATUS_RESOURCE:
 #ifdef STA_SUPPORT
-        if((GET_BSS_ROLE(priv) == MLAN_BSS_ROLE_STA) &&
-            pmadapter->pps_uapsd_mode &&
-            (pmadapter->tx_lock_flag == MTRUE)) {
+        if ((GET_BSS_ROLE(priv) == MLAN_BSS_ROLE_STA) &&
+            pmadapter->pps_uapsd_mode && (pmadapter->tx_lock_flag == MTRUE)) {
             pmadapter->tx_lock_flag = MFALSE;
             plocal_tx_pd->flags = 0;
         }
@@ -140,18 +144,18 @@ done:
 
         pmadapter->data_sent = MFALSE;
         DBG_HEXDUMP(MDAT_D, "Tx", head_ptr + INTF_HEADER_LEN,
-                MIN(pmbuf->data_len + sizeof(TxPD), MAX_DATA_DUMP_LEN));
+                    MIN(pmbuf->data_len + sizeof(TxPD), MAX_DATA_DUMP_LEN));
         break;
     case MLAN_STATUS_SUCCESS:
         DBG_HEXDUMP(MDAT_D, "Tx", head_ptr + INTF_HEADER_LEN,
-                MIN(pmbuf->data_len + sizeof(TxPD), MAX_DATA_DUMP_LEN));
+                    MIN(pmbuf->data_len + sizeof(TxPD), MAX_DATA_DUMP_LEN));
         wlan_write_data_complete(pmadapter, pmbuf, ret);
         break;
     default:
         break;
     }
 
-    if((ret == MLAN_STATUS_SUCCESS) || (ret == MLAN_STATUS_PENDING)) {
+    if ((ret == MLAN_STATUS_SUCCESS) || (ret == MLAN_STATUS_PENDING)) {
         PRINTM_GET_SYS_TIME(MDATA, &sec, &usec);
         PRINTM_NETINTF(MDATA, priv);
         PRINTM(MDATA, "%lu.%06lu : Data => FW\n", sec, usec);
@@ -159,7 +163,6 @@ done:
     LEAVE();
     return ret;
 }
-
 
 /**
  *  @brief Packet send completion handling
@@ -170,12 +173,11 @@ done:
  *
  *  @return			MLAN_STATUS_SUCCESS
  */
-mlan_status wlan_write_data_complete (
-    IN pmlan_adapter    pmadapter,
-    IN pmlan_buffer     pmbuf,
-    IN mlan_status      status
-) {
-    mlan_status     ret = MLAN_STATUS_SUCCESS;
+mlan_status
+wlan_write_data_complete(IN pmlan_adapter pmadapter,
+                         IN pmlan_buffer pmbuf, IN mlan_status status)
+{
+    mlan_status ret = MLAN_STATUS_SUCCESS;
     pmlan_callbacks pcb;
 
     ENTER();
@@ -183,14 +185,14 @@ mlan_status wlan_write_data_complete (
     MASSERT(pmadapter && pmbuf);
 
     pcb = &pmadapter->callbacks;
-    if ((pmbuf->buf_type == MLAN_BUF_TYPE_DATA) || (pmbuf->buf_type == MLAN_BUF_TYPE_RAW_DATA)) {
-        PRINTM(MINFO, "wlan_write_data_complete: DATA %p\n",pmbuf);
-        if(pmbuf->flags & MLAN_BUF_FLAG_MOAL_TX_BUF) {
+    if ((pmbuf->buf_type == MLAN_BUF_TYPE_DATA) ||
+        (pmbuf->buf_type == MLAN_BUF_TYPE_RAW_DATA)) {
+        PRINTM(MINFO, "wlan_write_data_complete: DATA %p\n", pmbuf);
+        if (pmbuf->flags & MLAN_BUF_FLAG_MOAL_TX_BUF) {
             /* pmbuf was allocated by MOAL */
-                pcb->moal_send_packet_complete(pmadapter->pmoal_handle,
-                            pmbuf, status);
-        }
-        else {
+            pcb->moal_send_packet_complete(pmadapter->pmoal_handle,
+                                           pmbuf, status);
+        } else {
             /* pmbuf was allocated by MLAN */
             wlan_free_mlan_buffer(pmadapter, pmbuf);
         }
@@ -209,15 +211,14 @@ mlan_status wlan_write_data_complete (
  *
  *  @return			MLAN_STATUS_SUCCESS
  */
-mlan_status wlan_recv_packet_complete (
-    IN pmlan_adapter    pmadapter,
-    IN pmlan_buffer     pmbuf,
-    IN mlan_status      status
-) {
-    mlan_status     ret = MLAN_STATUS_SUCCESS;
-    pmlan_private   pmp;
+mlan_status
+wlan_recv_packet_complete(IN pmlan_adapter pmadapter,
+                          IN pmlan_buffer pmbuf, IN mlan_status status)
+{
+    mlan_status ret = MLAN_STATUS_SUCCESS;
+    pmlan_private pmp;
     pmlan_callbacks pcb;
-    pmlan_buffer    pmbuf_parent;
+    pmlan_buffer pmbuf_parent;
 
     ENTER();
 
@@ -228,20 +229,22 @@ mlan_status wlan_recv_packet_complete (
     pmp = pmadapter->priv[pmbuf->bss_index];
 
     if (pmbuf->pparent) {
-	    pmbuf_parent = pmbuf->pparent;
+        pmbuf_parent = pmbuf->pparent;
 
-	    pmadapter->callbacks.moal_spin_lock(pmadapter->pmoal_handle, pmp->rx_pkt_lock);
-	    --pmbuf_parent->use_count;
-	    if (!pmbuf_parent->use_count) {
-	        pmadapter->callbacks.moal_spin_unlock(pmadapter->pmoal_handle, pmp->rx_pkt_lock);
-			wlan_free_mlan_buffer(pmadapter,
-				    pmbuf_parent);
-	    } else {
-	    pmadapter->callbacks.moal_spin_unlock(pmadapter->pmoal_handle, pmp->rx_pkt_lock);
-	    }
-            wlan_free_mlan_buffer(pmadapter, pmbuf);
+        pmadapter->callbacks.moal_spin_lock(pmadapter->pmoal_handle,
+                                            pmp->rx_pkt_lock);
+        --pmbuf_parent->use_count;
+        if (!pmbuf_parent->use_count) {
+            pmadapter->callbacks.moal_spin_unlock(pmadapter->pmoal_handle,
+                                                  pmp->rx_pkt_lock);
+            wlan_free_mlan_buffer(pmadapter, pmbuf_parent);
+        } else {
+            pmadapter->callbacks.moal_spin_unlock(pmadapter->pmoal_handle,
+                                                  pmp->rx_pkt_lock);
+        }
+        wlan_free_mlan_buffer(pmadapter, pmbuf);
     } else {
-		wlan_free_mlan_buffer(pmadapter, pmbuf);
+        wlan_free_mlan_buffer(pmadapter, pmbuf);
     }
 
     LEAVE();
@@ -256,19 +259,22 @@ mlan_status wlan_recv_packet_complete (
  *
  *  @return         N/A
  */
-t_void wlan_add_buf_bypass_txqueue(mlan_adapter *pmadapter, pmlan_buffer pmbuf)
+t_void
+wlan_add_buf_bypass_txqueue(mlan_adapter * pmadapter, pmlan_buffer pmbuf)
 {
-    pmlan_private priv= pmadapter->priv[pmbuf->bss_index];
+    pmlan_private priv = pmadapter->priv[pmbuf->bss_index];
     ENTER();
 
     if (pmbuf->buf_type != MLAN_BUF_TYPE_RAW_DATA) {
         pmbuf->buf_type = MLAN_BUF_TYPE_DATA;
     }
-    pmadapter->callbacks.moal_spin_lock(pmadapter->pmoal_handle, priv->wmm.ra_list_spinlock);
+    pmadapter->callbacks.moal_spin_lock(pmadapter->pmoal_handle,
+                                        priv->wmm.ra_list_spinlock);
     pmadapter->bypass_pkt_count++;
     util_enqueue_list_tail(pmadapter->pmoal_handle, &priv->bypass_txq,
-            (pmlan_linked_list)pmbuf,MNULL,MNULL);
-    pmadapter->callbacks.moal_spin_unlock(pmadapter->pmoal_handle, priv->wmm.ra_list_spinlock);
+                           (pmlan_linked_list) pmbuf, MNULL, MNULL);
+    pmadapter->callbacks.moal_spin_unlock(pmadapter->pmoal_handle,
+                                          priv->wmm.ra_list_spinlock);
     LEAVE();
 }
 
@@ -279,9 +285,10 @@ t_void wlan_add_buf_bypass_txqueue(mlan_adapter *pmadapter, pmlan_buffer pmbuf)
  *
  *  @return         MFALSE if not empty; MTRUE if empty
  */
-INLINE t_u8 wlan_bypass_tx_list_empty(mlan_adapter *pmadapter)
+INLINE t_u8
+wlan_bypass_tx_list_empty(mlan_adapter * pmadapter)
 {
-    return ((pmadapter->bypass_pkt_count)? MFALSE : MTRUE);
+    return ((pmadapter->bypass_pkt_count) ? MFALSE : MTRUE);
 }
 
 /**
@@ -291,20 +298,24 @@ INLINE t_u8 wlan_bypass_tx_list_empty(mlan_adapter *pmadapter)
  *
  *  @return      N/A
  */
-t_void wlan_cleanup_bypass_txq(mlan_private *priv)
+t_void
+wlan_cleanup_bypass_txq(mlan_private * priv)
 {
     pmlan_buffer pmbuf;
     mlan_adapter *pmadapter = priv->adapter;
     ENTER();
-    pmadapter->callbacks.moal_spin_lock(pmadapter->pmoal_handle, priv->wmm.ra_list_spinlock);
-    while ((pmbuf = (pmlan_buffer) util_peek_list(pmadapter->pmoal_handle, &priv->bypass_txq,
-                    MNULL, MNULL))) {
+    pmadapter->callbacks.moal_spin_lock(pmadapter->pmoal_handle,
+                                        priv->wmm.ra_list_spinlock);
+    while ((pmbuf =
+            (pmlan_buffer) util_peek_list(pmadapter->pmoal_handle,
+                                          &priv->bypass_txq, MNULL, MNULL))) {
         util_unlink_list(pmadapter->pmoal_handle, &priv->bypass_txq,
-                (pmlan_linked_list)pmbuf, MNULL, MNULL);
-        wlan_write_data_complete(pmadapter,pmbuf,MLAN_STATUS_FAILURE);
+                         (pmlan_linked_list) pmbuf, MNULL, MNULL);
+        wlan_write_data_complete(pmadapter, pmbuf, MLAN_STATUS_FAILURE);
         pmadapter->bypass_pkt_count--;
     }
-    pmadapter->callbacks.moal_spin_unlock(pmadapter->pmoal_handle, priv->wmm.ra_list_spinlock);
+    pmadapter->callbacks.moal_spin_unlock(pmadapter->pmoal_handle,
+                                          priv->wmm.ra_list_spinlock);
     LEAVE();
 }
 
@@ -315,37 +326,48 @@ t_void wlan_cleanup_bypass_txq(mlan_private *priv)
  *
  *  @return        N/A
  */
-t_void wlan_process_bypass_tx(pmlan_adapter pmadapter)
+t_void
+wlan_process_bypass_tx(pmlan_adapter pmadapter)
 {
     pmlan_buffer pmbuf;
     mlan_tx_param tx_param;
-    mlan_status     status = MLAN_STATUS_SUCCESS;
+    mlan_status status = MLAN_STATUS_SUCCESS;
     pmlan_private priv;
     int j = 0;
     ENTER();
     for (j = 0; j < pmadapter->priv_num; ++j) {
         if ((priv = pmadapter->priv[j])) {
-            if ((pmbuf = (pmlan_buffer) util_dequeue_list(pmadapter->pmoal_handle,
-                    &priv->bypass_txq,
-                    pmadapter->callbacks.moal_spin_lock,
-                    pmadapter->callbacks.moal_spin_unlock))) {
+            if ((pmbuf =
+                 (pmlan_buffer) util_dequeue_list(pmadapter->pmoal_handle,
+                                                  &priv->bypass_txq,
+                                                  pmadapter->callbacks.
+                                                  moal_spin_lock,
+                                                  pmadapter->callbacks.
+                                                  moal_spin_unlock))) {
                 PRINTM(MINFO, "Dequeuing bypassed packet %p\n", pmbuf);
                 /* XXX: nex_pkt_len ??? */
                 tx_param.next_pkt_len = 0;
-                status = wlan_process_tx(pmadapter->priv[pmbuf->bss_index], pmbuf, &tx_param);
+                status =
+                    wlan_process_tx(pmadapter->priv[pmbuf->bss_index], pmbuf,
+                                    &tx_param);
 
                 if (status == MLAN_STATUS_RESOURCE) {
                     /* Queue the packet again so that it will be TX'ed later */
                     util_enqueue_list_head(pmadapter->pmoal_handle,
-                        &priv->bypass_txq,
-                        (pmlan_linked_list)pmbuf,
-                        pmadapter->callbacks.moal_spin_lock,
-                        pmadapter->callbacks.moal_spin_unlock);
-                }
-                else {
-                    pmadapter->callbacks.moal_spin_lock(pmadapter->pmoal_handle,priv->wmm.ra_list_spinlock);
+                                           &priv->bypass_txq,
+                                           (pmlan_linked_list) pmbuf,
+                                           pmadapter->callbacks.moal_spin_lock,
+                                           pmadapter->callbacks.
+                                           moal_spin_unlock);
+                } else {
+                    pmadapter->callbacks.moal_spin_lock(pmadapter->pmoal_handle,
+                                                        priv->wmm.
+                                                        ra_list_spinlock);
                     pmadapter->bypass_pkt_count--;
-                    pmadapter->callbacks.moal_spin_unlock(pmadapter->pmoal_handle,priv->wmm.ra_list_spinlock);
+                    pmadapter->callbacks.moal_spin_unlock(pmadapter->
+                                                          pmoal_handle,
+                                                          priv->wmm.
+                                                          ra_list_spinlock);
                 }
                 break;
             } else {

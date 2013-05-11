@@ -46,6 +46,6 @@ Change log:
 #define IWE_STREAM_ADD_VALUE(i, c, v, e, w, l)  iwe_stream_add_value((c), (v), (e), (w), (l))
 #endif
 
-extern  struct iw_handler_def woal_handler_def;
+extern struct iw_handler_def woal_handler_def;
 struct iw_statistics *woal_get_wireless_stats(struct net_device *dev);
 #endif /* _WOAL_WEXT_H_ */
