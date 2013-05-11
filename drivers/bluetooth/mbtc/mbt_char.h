@@ -37,12 +37,13 @@
 #define DEBUGCHAR_MINOR_BASE         (30)
 
 /** Declaration of char_dev struct */
-struct char_dev {
-	struct list_head list;
-	int minor;
-	int dev_type;
-	struct cdev cdev;
-	struct m_dev *m_dev;
+struct char_dev
+{
+    struct list_head list;
+    int minor;
+    int dev_type;
+    struct cdev cdev;
+    struct m_dev *m_dev;
 };
 
 /** Changes permissions of the dev */
@@ -53,11 +54,11 @@ int mbtchar_chown(char *name, uid_t user, gid_t group);
 
 /**	This function creates the char dev */
 int register_char_dev(struct char_dev *dev, struct class *char_class,
-					  char *mod_name, char *dev_name);
+                      char *mod_name, char *dev_name);
 
 /**	This function deletes the char dev */
 int unregister_char_dev(struct char_dev *dev, struct class *char_class,
-						char *dev_name);
+                        char *dev_name);
 
 /**	This function cleans module */
 void chardev_cleanup(struct class *char_class);

@@ -22,6 +22,7 @@
 #ifndef _BT_SDIO_H_
 #define _BT_SDIO_H_
 
+#include <linux/irqreturn.h>
 
 /** IRQ return type */
 typedef irqreturn_t IRQ_RET_TYPE;
@@ -29,7 +30,7 @@ typedef irqreturn_t IRQ_RET_TYPE;
 #define IRQ_RET		return IRQ_HANDLED
 /** ISR notifier function */
 typedef IRQ_RET_TYPE(*isr_notifier_fn_t) (s32 irq, void *dev_id,
-										  struct pt_regs * reg);
+                                          struct pt_regs * reg);
 
 /** SDIO header length */
 #define SDIO_HEADER_LEN			4
@@ -222,13 +223,12 @@ typedef IRQ_RET_TYPE(*isr_notifier_fn_t) (s32 irq, void *dev_id,
 /** Chip Id Register 1 */
 #define CARD_CHIP_ID_1_REG		0x801d
 
-
 struct sdio_mmc_card
 {
-	/** sdio_func structure pointer */
-	struct sdio_func *func;
-	/** bt_private structure pointer */
-	bt_private *priv;
+        /** sdio_func structure pointer */
+    struct sdio_func *func;
+        /** bt_private structure pointer */
+    bt_private *priv;
 };
 /** DMA alignment value */
 #define DMA_ALIGNMENT	64
@@ -241,16 +241,15 @@ struct sdio_mmc_card
 	((((t_ptr)(p)) + (((t_ptr)(a)) - 1)) & ~(((t_ptr)(a)) - 1))
 
 /** This function reads the Cmd52 value in dev structure */
-int sd_read_cmd52_val(bt_private *priv);
+int sd_read_cmd52_val(bt_private * priv);
 /** This function updates card reg based on the Cmd52 value in dev structure */
-int sd_write_cmd52_val(bt_private *priv, int func, int reg, int val);
-
+int sd_write_cmd52_val(bt_private * priv, int func, int reg, int val);
 
 #ifdef SDIO_SUSPEND_RESUME
 #ifdef MMC_PM_KEEP_POWER
 #ifdef MMC_PM_FUNC_SUSPENDED
 /** This function tells lower driver that BT is suspended */
-void bt_is_suspended(bt_private *priv);
+void bt_is_suspended(bt_private * priv);
 #endif
 #endif
 #endif
