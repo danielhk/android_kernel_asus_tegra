@@ -541,8 +541,8 @@ static void molly_usb_init(void)
 		if (tegra_get_chipid() == TEGRA_CHIPID_TEGRA11 &&
 			tegra_revision == TEGRA_REVISION_A02) {
 			tegra_ehci1_utmi_pdata \
-			.unaligned_dma_buf_supported = true;
-			tegra_udc_pdata.unaligned_dma_buf_supported = true;
+			.unaligned_dma_buf_supported = false;
+			tegra_udc_pdata.unaligned_dma_buf_supported = false;
 		}
 		tegra_otg_device.dev.platform_data = &tegra_otg_pdata;
 		platform_device_register(&tegra_otg_device);
@@ -554,7 +554,7 @@ static void molly_usb_init(void)
 		if (tegra_get_chipid() == TEGRA_CHIPID_TEGRA11 &&
 			tegra_revision == TEGRA_REVISION_A02) {
 			tegra_ehci3_utmi_pdata \
-			.unaligned_dma_buf_supported = true;
+			.unaligned_dma_buf_supported = false;
 		}
 		tegra_ehci3_device.dev.platform_data = &tegra_ehci3_utmi_pdata;
 		platform_device_register(&tegra_ehci3_device);
@@ -683,7 +683,7 @@ static void molly_modem_init(void)
 			if ((tegra_get_chipid() == TEGRA_CHIPID_TEGRA11) &&
 				(tegra_revision == TEGRA_REVISION_A02))
 				tegra_ehci2_hsic_baseband_pdata \
-				.unaligned_dma_buf_supported = true;
+				.unaligned_dma_buf_supported = false;
 			platform_device_register(&icera_nemo_device);
 		}
 		break;
