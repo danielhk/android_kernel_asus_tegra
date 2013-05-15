@@ -64,6 +64,7 @@
 #include <mach/gpio-tegra.h>
 #include <mach/tegra_fiq_debugger.h>
 #include <linux/aah_io.h>
+#include <linux/athome_radio.h>
 #include <mach/hardware.h>
 
 #include "board-touch-raydium.h"
@@ -639,8 +640,74 @@ static void molly_audio_init(void)
 }
 
 
+#define ATHOME_RADIO_INT_GPIO     TEGRA_GPIO_PB6 /* SDMMC3_DAT3/GPIO_PB6 */
+#define ATHOME_RADIO_RESET_N_GPIO TEGRA_GPIO_PB5 /* SDMMC3_DAT2/GPIO_PB5 */
+#define ATHOME_RADIO_SPI_CS_GPIO  TEGRA_GPIO_PA7 /* SDMMC3_CMD/GPIO_PA7 */
+
+static struct athome_platform_data radio_pdata = {
+	.gpio_num_irq = ATHOME_RADIO_INT_GPIO,
+	.gpio_num_rst = ATHOME_RADIO_RESET_N_GPIO,
+	.gpio_spi_cs  = ATHOME_RADIO_SPI_CS_GPIO,
+};
+
+#define ATHOME_RADIO_SPI_BUS_NUM 1 /* bus 1, spi2 */
+#define ATHOME_RADIO_SPI_CS      0
+/* 2MHZ is max for sim3 right now.  Need to verify
+ * clock values available to SPI for Tegra.
+ * Depends on clks (dalmore pll_p is 408MHz and clk_m is 12MHz)
+ * and dividers available.
+ * 1.5MHz was setting we used in wolfie.
+ */
+#define ATHOME_RADIO_SPI_MAX_HZ  1500000
+
+static struct spi_board_info molly_radio_spi_info[] __initdata = {
+	{
+		.modalias	= ATHOME_RADIO_MOD_NAME,
+		.platform_data  = &radio_pdata,
+		.irq		= -1,
+		.max_speed_hz   = ATHOME_RADIO_SPI_MAX_HZ,
+		.bus_num	= ATHOME_RADIO_SPI_BUS_NUM,
+		.chip_select	= ATHOME_RADIO_SPI_CS,
+		.mode           = SPI_MODE_0,
+	},
+};
+
+static struct platform_device athome_radio_dev = {
+	.name = ATHOME_RADIO_MOD_NAME,
+	.num_resources = 0,
+	.dev = {
+		.platform_data	 = &radio_pdata,
+	},
+};
+
+static void __init molly_radio_init(void)
+{
+#if 0
+	/* must enable input too or else rx doesn't work when we're master */
+	omap_mux_init_signal("mcspi4_clk", OMAP_MUX_MODE0 | OMAP_PIN_INPUT);
+
+	omap_mux_init_signal("mcspi4_somi", OMAP_MUX_MODE0 | OMAP_PIN_INPUT);
+
+	omap_mux_init_signal("mcspi4_simo", OMAP_MUX_MODE0);
+
+	/* cs is manually controlled by the athome_radio driver because
+	 * it needs to be held low (active low) through the entire
+	 * transaction which may involve multiple spi transfers.
+	 */
+	omap_mux_init_gpio(ATHOME_RADIO_SPI_CS_GPIO, OMAP_PIN_OUTPUT);
+
+	omap_mux_init_gpio(ATHOME_RADIO_INT_GPIO, OMAP_PIN_INPUT_PULLUP);
+	omap_mux_init_gpio(ATHOME_RADIO_RESET_N_GPIO, OMAP_PIN_OUTPUT);
+#endif
+
+	spi_register_board_info(molly_radio_spi_info,
+				ARRAY_SIZE(molly_radio_spi_info));
+
+	platform_device_register(&athome_radio_dev);
+}
+
 static struct platform_device *molly_spi_devices[] __initdata = {
-        &tegra11_spi_device4,
+        &tegra11_spi_device2,
 };
 
 struct spi_clk_parent spi_parent_clk_molly[] = {
@@ -657,16 +724,13 @@ static struct tegra_spi_platform_data molly_spi_pdata = {
 	.max_dma_buffer         = 16 * 1024,
         .is_clkon_always        = false,
         .max_rate               = 25000000,
+	.is_dma_based           = true,
 };
 
 static void __init molly_spi_init(void)
 {
         int i;
         struct clk *c;
-        struct board_info board_info, display_board_info;
-
-        tegra_get_board_info(&board_info);
-        tegra_get_display_board_info(&display_board_info);
 
         for (i = 0; i < ARRAY_SIZE(spi_parent_clk_molly); ++i) {
                 c = tegra_get_clock_by_name(spi_parent_clk_molly[i].name);
@@ -677,66 +741,15 @@ static void __init molly_spi_init(void)
                 }
                 spi_parent_clk_molly[i].parent_clk = c;
                 spi_parent_clk_molly[i].fixed_clk_rate = clk_get_rate(c);
+		pr_info("%s: clock %s, rate %lu\n",
+			__func__, spi_parent_clk_molly[i].name,
+			spi_parent_clk_molly[i].fixed_clk_rate);
         }
         molly_spi_pdata.parent_clk_list = spi_parent_clk_molly;
         molly_spi_pdata.parent_clk_count = ARRAY_SIZE(spi_parent_clk_molly);
-	molly_spi_pdata.is_dma_based = (tegra_revision == TEGRA_REVISION_A01)
-							? false : true ;
-	tegra11_spi_device4.dev.platform_data = &molly_spi_pdata;
+	tegra11_spi_device2.dev.platform_data = &molly_spi_pdata;
         platform_add_devices(molly_spi_devices,
                                 ARRAY_SIZE(molly_spi_devices));
-}
-
-static __initdata struct tegra_clk_init_table touch_clk_init_table[] = {
-	/* name         parent          rate            enabled */
-	{ "extern2",    "pll_p",        41000000,       false},
-	{ "clk_out_2",  "extern2",      40800000,       false},
-	{ NULL,         NULL,           0,              0},
-};
-
-struct rm_spi_ts_platform_data rm31080ts_molly_data = {
-	.gpio_reset = TOUCH_GPIO_RST_RAYDIUM_SPI,
-	.config = 0,
-	.platform_id = RM_PLATFORM_D010,
-	.name_of_clock = "clk_out_2",
-	.name_of_clock_con = "extern2",
-};
-
-static struct tegra_spi_device_controller_data dev_cdata = {
-	.rx_clk_tap_delay = 0,
-	.tx_clk_tap_delay = 16,
-};
-
-struct spi_board_info rm31080a_molly_spi_board[1] = {
-	{
-	 .modalias = "rm_ts_spidev",
-	 .bus_num = 3,
-	 .chip_select = 2,
-	 .max_speed_hz = 12 * 1000 * 1000,
-	 .mode = SPI_MODE_0,
-	 .controller_data = &dev_cdata,
-	 .platform_data = &rm31080ts_molly_data,
-	 },
-};
-
-static int __init molly_touch_init(void)
-{
-	struct board_info board_info;
-
-	tegra_get_display_board_info(&board_info);
-	tegra_clk_init_from_table(touch_clk_init_table);
-	if (board_info.board_id == BOARD_E1582)
-		rm31080ts_molly_data.platform_id = RM_PLATFORM_P005;
-	else
-		rm31080ts_molly_data.platform_id = RM_PLATFORM_D010;
-	mdelay(20);
-	rm31080a_molly_spi_board[0].irq = gpio_to_irq(TOUCH_GPIO_IRQ_RAYDIUM_SPI);
-	touch_init_raydium(TOUCH_GPIO_IRQ_RAYDIUM_SPI,
-				TOUCH_GPIO_RST_RAYDIUM_SPI,
-				&rm31080ts_molly_data,
-				&rm31080a_molly_spi_board[0],
-				ARRAY_SIZE(rm31080a_molly_spi_board));
-	return 0;
 }
 
 static void __init tegra_molly_init(void)
@@ -751,6 +764,7 @@ static void __init tegra_molly_init(void)
 	molly_pinmux_init();
 	molly_i2c_init();
 	molly_spi_init();
+	molly_radio_init();
 	molly_usb_init();
 	molly_xusb_init();
 	molly_uart_init();
@@ -763,7 +777,6 @@ static void __init tegra_molly_init(void)
 	molly_suspend_init();
 	molly_emc_init();
 	molly_edp_init();
-	molly_touch_init();
 	molly_panel_init();
 	molly_pmon_init();
 #if defined(CONFIG_BT_BLUESLEEP) || defined(CONFIG_BT_BLUESLEEP_MODULE)
