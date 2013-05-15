@@ -70,3 +70,4 @@ obj-$(CONFIG_FAN_THERM_EST)	+= therm_fan_est.o
 obj-$(CONFIG_BLUEDROID_PM)      += bluedroid_pm.o
 obj-$(CONFIG_CPULOAD_MONITOR)	+= cpuload.o
 obj-$(CONFIG_AAH_IO)		+= aah_io.o
+obj-$(CONFIG_ATHOME_RADIO)	+= athome_radio.o athome_transport_spi.o
