@@ -38,15 +38,11 @@
 #include <linux/tegra_uart.h>
 #include <linux/memblock.h>
 #include <linux/spi-tegra.h>
-#include <linux/nfc/pn544.h>
 #include <linux/rfkill-gpio.h>
 #include <linux/skbuff.h>
-#include <linux/ti_wilink_st.h>
 #include <linux/regulator/consumer.h>
 #include <linux/smb349-charger.h>
 #include <linux/max17048_battery.h>
-#include <linux/leds.h>
-#include <linux/i2c/at24.h>
 #include <linux/of_platform.h>
 #include <linux/edp.h>
 
@@ -68,7 +64,6 @@
 #include <mach/gpio-tegra.h>
 #include <mach/tegra_fiq_debugger.h>
 #include <linux/aah_io.h>
-#include <linux/platform_data/tegra_usb_modem_power.h>
 #include <mach/hardware.h>
 
 #include "board-touch-raydium.h"
@@ -285,21 +280,6 @@ static struct i2c_board_info __initdata i2c_bus2[] = {
 	},
 };
 
-static struct i2c_board_info __initdata rt5640_board_info = {
-	I2C_BOARD_INFO("rt5640", 0x1c),
-};
-
-static struct pn544_i2c_platform_data nfc_pdata = {
-	.irq_gpio = TEGRA_GPIO_PW2,
-	.ven_gpio = TEGRA_GPIO_PQ3,
-	.firm_gpio = TEGRA_GPIO_PH0,
-};
-
-static struct i2c_board_info __initdata nfc_board_info = {
-	I2C_BOARD_INFO("pn544", 0x28),
-	.platform_data = &nfc_pdata,
-};
-
 static void molly_i2c_init(void)
 {
 	struct board_info board_info;
@@ -324,16 +304,11 @@ static void molly_i2c_init(void)
 	tegra11_i2c_device4.dev.platform_data = &molly_i2c4_platform_data;
 	tegra11_i2c_device5.dev.platform_data = &molly_i2c5_platform_data;
 
-	nfc_board_info.irq = gpio_to_irq(TEGRA_GPIO_PW2);
-	i2c_register_board_info(0, &nfc_board_info, 1);
-
 	platform_device_register(&tegra11_i2c_device5);
 	platform_device_register(&tegra11_i2c_device4);
 	platform_device_register(&tegra11_i2c_device3);
 	platform_device_register(&tegra11_i2c_device2);
 	platform_device_register(&tegra11_i2c_device1);
-
-	i2c_register_board_info(0, &rt5640_board_info, 1);
 
 	i2c_register_board_info(2, i2c_bus2, ARRAY_SIZE(i2c_bus2));
 }
@@ -648,88 +623,8 @@ static void molly_xusb_init(void)
 	}
 }
 
-static struct gpio modem_gpios[] = { /* Nemo modem */
-	{MODEM_EN, GPIOF_OUT_INIT_HIGH, "MODEM EN"},
-	{MDM_RST, GPIOF_OUT_INIT_LOW, "MODEM RESET"},
-};
-
-static struct tegra_usb_platform_data tegra_ehci2_hsic_baseband_pdata = {
-	.port_otg = false,
-	.has_hostpc = true,
-	.unaligned_dma_buf_supported = false,
-	.phy_intf = TEGRA_USB_PHY_INTF_HSIC,
-	.op_mode = TEGRA_USB_OPMODE_HOST,
-	.u_data.host = {
-		.vbus_gpio = -1,
-		.hot_plug = false,
-		.remote_wakeup_supported = true,
-		.power_off_on_suspend = true,
-	},
-};
-
-static int baseband_init(void)
-{
-	int ret;
-
-	ret = gpio_request_array(modem_gpios, ARRAY_SIZE(modem_gpios));
-	if (ret) {
-		pr_warn("%s:gpio request failed\n", __func__);
-		return ret;
-	}
-
-	/* enable pull-down for MDM_COLD_BOOT */
-	tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_KB_COL5,
-				    TEGRA_PUPD_PULL_DOWN);
-
-	/* export GPIO for user space access through sysfs */
-	gpio_export(MDM_RST, false);
-
-	return 0;
-}
-
-static const struct tegra_modem_operations baseband_operations = {
-	.init = baseband_init,
-};
-
-static struct tegra_usb_modem_power_platform_data baseband_pdata = {
-	.ops = &baseband_operations,
-	.wake_gpio = -1,
-	.boot_gpio = MDM_COLDBOOT,
-	.boot_irq_flags = IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
-	.autosuspend_delay = 2000,
-	.short_autosuspend_delay = 50,
-	.tegra_ehci_device = &tegra_ehci2_device,
-	.tegra_ehci_pdata = &tegra_ehci2_hsic_baseband_pdata,
-};
-
-static struct platform_device icera_nemo_device = {
-	.name = "tegra_usb_modem_power",
-	.id = -1,
-	.dev = {
-		.platform_data = &baseband_pdata,
-	},
-};
-
-static void molly_modem_init(void)
-{
-	int modem_id = tegra_get_modem_id();
-	int usb_port_owner_info = tegra_get_usb_port_owner_info();
-	switch (modem_id) {
-	case TEGRA_BB_NEMO: /* on board i500 HSIC */
-		if (!(usb_port_owner_info & HSIC1_PORT_OWNER_XUSB)) {
-			if ((tegra_get_chipid() == TEGRA_CHIPID_TEGRA11) &&
-				(tegra_revision == TEGRA_REVISION_A02))
-				tegra_ehci2_hsic_baseband_pdata \
-				.unaligned_dma_buf_supported = false;
-			platform_device_register(&icera_nemo_device);
-		}
-		break;
-	}
-}
-
 #else
 static void molly_usb_init(void) { }
-static void molly_modem_init(void) { }
 static void molly_xusb_init(void) { }
 #endif
 
@@ -870,7 +765,6 @@ static void __init tegra_molly_init(void)
 	molly_edp_init();
 	molly_touch_init();
 	molly_panel_init();
-//	molly_kbc_init();
 	molly_pmon_init();
 #if defined(CONFIG_BT_BLUESLEEP) || defined(CONFIG_BT_BLUESLEEP_MODULE)
 	molly_setup_bluesleep();
@@ -879,7 +773,6 @@ static void __init tegra_molly_init(void)
 	molly_setup_bluedroid_pm();
 #endif
 	tegra_release_bootloader_fb();
-	molly_modem_init();
 #ifdef CONFIG_TEGRA_WDT_RECOVERY
 	tegra_wdt_recovery_init();
 #endif
