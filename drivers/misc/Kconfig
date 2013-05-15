@@ -616,4 +616,10 @@ source "drivers/misc/carma/Kconfig"
 source "drivers/misc/altera-stapl/Kconfig"
 source "drivers/misc/tegra-baseband/Kconfig"
 source "drivers/misc/tegra-cec/Kconfig"
+
+config AAH_IO
+	depends on I2C && INPUT_GPIO
+	tristate "Android@Home I/O Driver"
+	default n
+
 endmenu
