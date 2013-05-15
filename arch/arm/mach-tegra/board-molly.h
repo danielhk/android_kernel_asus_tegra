@@ -117,7 +117,6 @@ int molly_emc_init(void);
 int molly_edp_init(void);
 int molly_panel_init(void);
 //int roth_panel_init(int board_id);
-//int molly_kbc_init(void);
 int molly_pmon_init(void);
 int molly_soctherm_init(void);
 

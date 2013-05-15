@@ -67,6 +67,7 @@
 #include <mach/usb_phy.h>
 #include <mach/gpio-tegra.h>
 #include <mach/tegra_fiq_debugger.h>
+#include <linux/aah_io.h>
 #include <linux/platform_data/tegra_usb_modem_power.h>
 #include <mach/hardware.h>
 
@@ -229,7 +230,7 @@ static struct tegra_i2c_platform_data molly_i2c1_platform_data = {
 static struct tegra_i2c_platform_data molly_i2c2_platform_data = {
 	.adapter_nr	= 1,
 	.bus_count	= 1,
-	.bus_clk_rate	= { 100000, 0 },
+	.bus_clk_rate	= { 400000, 0 },
 	.is_clkon_always = true,
 	.scl_gpio		= {TEGRA_GPIO_I2C2_SCL, 0},
 	.sda_gpio		= {TEGRA_GPIO_I2C2_SDA, 0},
@@ -263,6 +264,27 @@ static struct tegra_i2c_platform_data molly_i2c5_platform_data = {
 	.arb_recovery = arb_lost_recovery,
 };
 
+/******************************************************************************
+ *                                                                            *
+ *           aah_io driver platform data                                      *
+ *                                                                            *
+ ******************************************************************************/
+static struct aah_io_platform_data aah_io_data = {
+#if 0
+	.key_gpio          = TEGRA_GPIO_PQ5, /* molly's UI_SWITCH, KB_COL5/GPIO_PQ5 */
+#else
+	.key_gpio          = TEGRA_GPIO_PR2, /* dalmore's volume+ button for now */
+#endif
+	.key_code          = KEY_MUTE,/* TBD, easiest to test as mute for now */
+};
+
+static struct i2c_board_info __initdata i2c_bus2[] = {
+	{
+		I2C_BOARD_INFO("aah-io", 0x32),
+		.platform_data = &aah_io_data,
+	},
+};
+
 static struct i2c_board_info __initdata rt5640_board_info = {
 	I2C_BOARD_INFO("rt5640", 0x1c),
 };
@@ -282,6 +304,19 @@ static void molly_i2c_init(void)
 {
 	struct board_info board_info;
 
+	/* Tegra4 has five i2c controllers:
+	 * I2C_1 is called GEN1_I2C in pinmux/schematics
+	 * I2C_2 is called GEN2_I2C in pinmux/schematics
+	 * I2C_3 is called CAM_I2C in pinmux/schematics
+	 * I2C_4 is called DDC_I2C in pinmux/schematics
+	 * I2C_5/PMU is called PWR_I2C in pinmux/schematics
+	 *
+	 * I2C1/GEN1 is for INA3221 current and bus voltage monitor
+	 * I2C2/GEN2 is for LED
+	 * I2C3/CAM is for TMP451
+	 * I2C5/PWR is for PMIC TPS65913B2B5
+	 */
+
 	tegra_get_board_info(&board_info);
 	tegra11_i2c_device1.dev.platform_data = &molly_i2c1_platform_data;
 	tegra11_i2c_device2.dev.platform_data = &molly_i2c2_platform_data;
@@ -299,6 +334,8 @@ static void molly_i2c_init(void)
 	platform_device_register(&tegra11_i2c_device1);
 
 	i2c_register_board_info(0, &rt5640_board_info, 1);
+
+	i2c_register_board_info(2, i2c_bus2, ARRAY_SIZE(i2c_bus2));
 }
 
 static struct platform_device *molly_uart_devices[] __initdata = {
