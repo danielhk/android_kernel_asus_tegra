@@ -760,18 +760,62 @@ void athome_bt_pkt_to_user(void *_priv, uint32_t pkt_type,
 {
 	bt_private *priv = (bt_private *) _priv;
 	struct sk_buff *skb;
+	struct hci_dev *hdev = NULL;
+	struct mbt_dev *mbt_dev = NULL;
 
 	skb = bt_skb_alloc(len, GFP_ATOMIC);
-	if (!skb)
+	if (!skb) {
+		pr_err("%s: failed bt_skb_alloc() %d bytes\n",
+		       __func__, len);
 		return;
+	}
 
 	memcpy(skb->data, data, len);
 	bt_cb(skb)->pkt_type = pkt_type;
 	skb_put(skb, len);
-	skb->dev = (void *)(&(priv->bt_dev.m_dev[BT_SEQ]));
+	if (priv->bt_dev.m_dev[BT_SEQ].spec_type == BLUEZ_SPEC)
+		hdev = (struct hci_dev *) priv->bt_dev.m_dev[BT_SEQ].dev_pointer;
+	else
+		mbt_dev = (struct mbt_dev *) priv->bt_dev.m_dev[BT_SEQ].dev_pointer;
 
-	hci_recv_frame(skb);
+        if (hdev) {
+            skb->dev = (void *) hdev;
+            hci_recv_frame(skb);
+            hdev->stat.byte_rx += len;
+        }
+
+        if (mbt_dev) {
+            struct m_dev *mdev_bt = &(priv->bt_dev.m_dev[BT_SEQ]);
+            skb->dev = (void *) mdev_bt;
+            mdev_recv_frame(skb);
+            mdev_bt->stat.byte_rx += len;
+        }
 }
+
+/* we can use sbi_host_to_card because it is thread safe */
+void athome_bt_pkt_to_chip(void *_priv, uint32_t pkt_type, uint8_t *data, uint32_t len)
+{
+	/* make the buffer DMA friendly so sbi_host_to_card() doesn't
+	 * have to do a copy
+	 */
+	bt_private *priv = (bt_private *)_priv;
+	uint32_t new_len = ALIGN_SZ(len + 4, DMA_ALIGNMENT);
+	uint8_t* buf = kmalloc(new_len, GFP_ATOMIC);
+
+	if (!buf)
+		return;
+
+	buf[0] = len;
+	buf[1] = len >> 8;
+	buf[2] = len >> 16;
+	buf[3] = pkt_type;
+	memcpy(buf + 4, data, len);
+
+	sbi_host_to_card(priv, buf, len + 4);
+
+	kfree(buf);
+}
+
 #endif
 
 /**
@@ -882,10 +926,13 @@ sd_card_to_host(bt_private * priv)
             kfree_skb(skb);
             skb = NULL;
             goto exit;
-        }
-        else {
-            type = payload[3];
-            buf_len = len + 4;
+        } else {
+            /* filter_rx_data() may have adjusted length */
+            if ((len + 4) != buf_len) {
+               pr_info("%s: after filter, len = %d, oldlen = %d\n",
+                       __func__, len + 4, buf_len);
+               buf_len = len + 4;
+            }
         }
     }
 #endif
@@ -1632,6 +1679,7 @@ sbi_host_to_card(bt_private * priv, u8 * payload, u16 nb)
 
     /* Allocate buffer and copy payload */
     if ((t_ptr) payload & (DMA_ALIGNMENT - 1)) {
+	    pr_info("%s: copying payload to dma'able tmp buf\n", __func__);
         tmpbufsz = ALIGN_SZ(nb, DMA_ALIGNMENT);
         tmpbuf = kmalloc(tmpbufsz, GFP_KERNEL);
         if (!tmpbuf) {
@@ -1674,30 +1722,6 @@ sbi_host_to_card(bt_private * priv, u8 * payload, u16 nb)
     LEAVE();
     return ret;
 }
-
-#ifdef CONFIG_ATHOME_BT_REMOTE
-void athome_bt_pkt_to_chip(void *_priv, uint32_t pkt_type,
-					uint8_t *data, uint32_t len)
-{
-	bt_private *priv = (bt_private *)_priv;
-	uint8_t* buf;
-
-	buf = kmalloc(len + 4, GFP_ATOMIC);
-	if (!buf)
-		return;
-
-	buf[0] = len;
-	buf[1] = len >> 8;
-	buf[2] = len >> 16;
-	buf[3] = pkt_type;
-	memcpy(buf + 4, data, len);
-
-	sbi_host_to_card(priv, buf, len + 4);
-
-	kfree(buf);
-}
-
-#endif
 
 /**
  *  @brief This function downloads firmware

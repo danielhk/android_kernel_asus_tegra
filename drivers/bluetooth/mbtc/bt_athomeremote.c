@@ -438,8 +438,8 @@ static void athome_bt_reset(void)
 
 static void athome_bt_shutdown(void)
 {
-	aahlog("shutting down thread\n");
 	if (aah_thread) {
+		aahlog("shutting down thread\n");
 		atomic_set(&in_shutdown, 1);
 		atomic_set(&state_chg, 1); /* force wake */
 		up(&cmd_wait);	/* make sure we're not waiting for a reply */
@@ -654,7 +654,7 @@ static int athome_bt_filter_num_comp_pkt(void *dataP, uint32_t *rx_len)
 	while (new_creds--)
 		up(&tx_wait);
 
-	rx_len -= num_skipped * 4;
+	*rx_len = *rx_len - (num_skipped * 4);
 	evt->num_hndl -= num_skipped;
 
 	return !evt->num_hndl;
@@ -1381,6 +1381,20 @@ static int athome_bt_thread(void *unusedData)
 	unsigned long flags;
 	unsigned i;
 	int ret = 0;
+
+	/* We've seen the chip not respond to our packet if the
+	 * bluedroid stack was in the middle of a multipacket
+	 * sequence (unknown what it was) or maybe the chip
+	 * is doing something after reset that it can't respond
+	 * to turning on le right away.  Either way, seems to
+	 * work if we delay sending our packets.  Otherwise,
+	 * if we don't get a response, we're hung, and all
+	 * subsequent bluetooth traffic is hung too since our
+	 * filter is stuck.
+	 */
+	aahlog("delaying thread to let bluedroid settle\n");
+	mdelay(1000);
+	aahlog("after mdelay\n");
 
 	if (!devices_exist) {
 		aahlog("devices_created\n");
@@ -2788,8 +2802,6 @@ static ssize_t aah_bt_write(struct file *file, const char __user *userbuf,
 	struct bt_athome_dev_stats *stats = (struct bt_athome_dev_stats*)buf;
 	ssize_t ret, orig_bytes = bytes;
 	unsigned long flags, i;
-
-	pr_info("%s: bytes = %d\n", __func__, bytes);
 
 	if (!bytes)	/* empty commands do nothing */
 		return 0;

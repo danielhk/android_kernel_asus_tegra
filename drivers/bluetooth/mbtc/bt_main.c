@@ -561,12 +561,6 @@ bt_send_module_cfg_cmd(bt_private * priv, int subcmd)
     priv->adapter->cmd_complete = FALSE;
     PRINTM(CMD, "Queue module cfg Command(0x%x)\n", pCmd->ocf_ogf);
     wake_up_interruptible(&priv->MainThread.waitQ);
-    /*
-       On some Android platforms certain delay is needed for HCI daemon to
-       remove this module and close itself gracefully. Otherwise it hangs. This
-       10ms delay is a workaround for such platforms as the root cause has not
-       been found yet. */
-    mdelay(10);
     if (!os_wait_interruptible_timeout
         (priv->adapter->cmd_wait_q, priv->adapter->cmd_complete,
          WAIT_UNTIL_CMD_RESP)) {
