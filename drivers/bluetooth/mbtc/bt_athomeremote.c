@@ -161,6 +161,7 @@ static unsigned int aah_bt_poll(struct file *file,
 static int aah_bt_release(struct inode *, struct file *);
 
 static long aah_bt_ioctl(struct file *, unsigned int, unsigned long);
+static int athome_bt_thread(void *unusedData);
 
 static const struct file_operations aah_bt_fops =
 {
@@ -578,6 +579,24 @@ static int athome_bt_filter_cmd_complete(uint8_t *rx_buf, uint32_t len,
 		for (i = 0; i < ((uint8_t*)rx_buf)[-1]; i++)
 			aahlog_continue(" %02X", ((uint8_t*)rx_buf)[i]);
 		aahlog_continue("\n");
+	} else if (ogf == HCI_OGF_Controller_And_Baseband &&
+				ocf == HCI_Set_Event_Mask) {
+
+		struct task_struct *thread;
+
+		/* it is now safe to start our stack */
+		if (!aah_thread) {
+			aahlog("starting LE stack!\n");
+			atomic_set(&in_shutdown, 0);
+			thread = kthread_run(athome_bt_thread, NULL,
+						"athome_bt");
+			if (IS_ERR(thread)) {
+				aahlog("Failed to start stack "
+					"thread\n");
+				thread = NULL;
+			}
+			aah_thread = thread;
+		}
 	}
 
 	return forus;
@@ -1382,19 +1401,6 @@ static int athome_bt_thread(void *unusedData)
 	unsigned i;
 	int ret = 0;
 
-	/* We've seen the chip not respond to our packet if the
-	 * bluedroid stack was in the middle of a multipacket
-	 * sequence (unknown what it was) or maybe the chip
-	 * is doing something after reset that it can't respond
-	 * to turning on le right away.  Either way, seems to
-	 * work if we delay sending our packets.  Otherwise,
-	 * if we don't get a response, we're hung, and all
-	 * subsequent bluetooth traffic is hung too since our
-	 * filter is stuck.
-	 */
-	aahlog("delaying thread to let bluedroid settle\n");
-	mdelay(1000);
-	aahlog("after mdelay\n");
 
 	if (!devices_exist) {
 		aahlog("devices_created\n");
@@ -2447,7 +2453,6 @@ int athome_bt_pkt_send_req(void *priv, struct sk_buff *skb)
 		} else if (ogf == HCI_OGF_Controller_And_Baseband &&
 				ocf == HCI_Set_Event_Mask) {
 
-			struct task_struct *thread;
 			uint64_t mask = read64(((uint8_t*)skb->data) +
 						HCI_COMMAND_HDR_SIZE);
 			uint64_t oldmask = mask;
@@ -2469,20 +2474,6 @@ int athome_bt_pkt_send_req(void *priv, struct sk_buff *skb)
 				"\n", (uint32_t)(oldmask >> 32),
 				(uint32_t)oldmask, (uint32_t)(mask >> 32),
 				(uint32_t)mask);
-
-			/* it is now safe to start our stack */
-			if (!aah_thread) {
-				aahlog("starting LE stack!\n");
-				atomic_set(&in_shutdown, 0);
-				thread = kthread_run(athome_bt_thread, NULL,
-							"athome_bt");
-				if (IS_ERR(thread)) {
-					aahlog("Failed to start stack "
-						"thread\n");
-					thread = NULL;
-				}
-				aah_thread = thread;
-			}
 		} else if (ogf == HCI_OGF_LE && !wasours) {
 
 			uint8_t buf[64];
