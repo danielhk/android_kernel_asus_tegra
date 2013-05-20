@@ -929,8 +929,6 @@ sd_card_to_host(bt_private * priv)
         } else {
             /* filter_rx_data() may have adjusted length */
             if ((len + 4) != buf_len) {
-               pr_info("%s: after filter, len = %d, oldlen = %d\n",
-                       __func__, len + 4, buf_len);
                buf_len = len + 4;
             }
         }
@@ -1679,7 +1677,6 @@ sbi_host_to_card(bt_private * priv, u8 * payload, u16 nb)
 
     /* Allocate buffer and copy payload */
     if ((t_ptr) payload & (DMA_ALIGNMENT - 1)) {
-	    pr_info("%s: copying payload to dma'able tmp buf\n", __func__);
         tmpbufsz = ALIGN_SZ(nb, DMA_ALIGNMENT);
         tmpbuf = kmalloc(tmpbufsz, GFP_KERNEL);
         if (!tmpbuf) {
