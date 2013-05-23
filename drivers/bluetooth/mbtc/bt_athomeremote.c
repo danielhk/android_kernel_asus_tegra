@@ -1353,6 +1353,12 @@ static void athome_bt_start_encr(uint8_t* MAC, int i)
 
 static int athome_bt_modeswitch(int which, unsigned mode)
 {
+	/* TODO:
+	 * Re-enable this functionality once we have figured out why it takes so
+	 * long to change from a long slave-latency to a short one while waking
+	 * up.
+	 */
+#if 0
 	const uint16_t intr = mode_conn_intervals[mode];
 	const uint16_t slat = mode_slave_latencies[mode];
 	const uint16_t svto = mode_svc_timeouts[mode];
@@ -1381,6 +1387,15 @@ static int athome_bt_modeswitch(int which, unsigned mode)
 
 	if (stat->status)
 		aahlog("failed conn update try.\n");
+#else
+	if (LOG_MODESWITCH) {
+		aahlog("Skipping conn parameter update for modeswitch to %d for"
+				" conn %d\n", mode, which);
+		aahlog("TODO: re-enable connection parameter update once it has"
+				"been debugged.\n");
+	}
+	conns[which].pwr = conns[which].next_pwr;
+#endif
 
 	return 0;
 }
@@ -2285,7 +2300,10 @@ static int athome_bt_data_rx(int which, uint8_t *in_data, uint32_t len)
 		if (LOG_MODESWITCH)
 			aahlog("Requested modeswitch to %d for conn %d\n",
 								msw->mode, which);
-		break;
+		/* Deliberate fall-through to the default case in order to send
+		 * the mode switch packet to user-land for further
+		 * logging/backend analysis.
+		 */
 
 	default:
 		aah_bt_usr_enqueue(BT_ATHOME_EVT_DATA, data_buf,

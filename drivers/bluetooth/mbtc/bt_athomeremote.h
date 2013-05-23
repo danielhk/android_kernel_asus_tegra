@@ -211,6 +211,7 @@ struct athome_bt_stats {
 	} __packed;
 #define ATHOME_PKT_RX_MODESWITCH	7
 	struct athome_pkt_rx_modeswitch {
+		uint16_t voltage;
 		/* see ATHOME_MODE_* */
 		uint8_t mode;
 	} __packed;
