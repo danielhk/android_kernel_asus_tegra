@@ -12,11 +12,24 @@
  * GNU General Public License for more details.
  */
 
-#ifndef _BT_ATHOME_REMOTE_PRIV_H_
-#define _BT_ATHOME_REMOTE_PRIV_H_
+#ifndef _BT_ATHOME_SPLITTER_PRIV_H_
+#define _BT_ATHOME_SPLITTER_PRIV_H_
 
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci.h>
+
+/*
+ * ACL packets on LE transport have a maximum payload of 27 bytes. However, the
+ * BTLE chip we use on the remote (for now) has issues sending 27-byte packets
+ * with encryption quickly at 7.5 connection interval. This issue goes away if
+ * 26-byte packets are used. Therefore for our protocol all packets are limited
+ * to 26 bytes.
+ */
+#define ACL_LE_PKT_SZ					27
+#define ACL_AAH_PKT_SZ					26
+
+#define ACL_CONN_MASK					0x0FFF
+
 
 #define HCI_ERR_Success					0x00
 #define HCI_ERR_Unknown_HCI_Command			0x01
@@ -37,7 +50,7 @@
 
 
 #define HCI_OGF_Link_Control				1
-# define HCI_CMD_Disconnect				0x0006	//terminate the existing connection to a device
+# define HCI_CMD_Disconnect				0x0006
 
 #define HCI_OGF_Controller_And_Baseband			0x03
 # define HCI_Set_Event_Mask				0x0001
@@ -91,6 +104,8 @@
 #define SCAN_EVT_ADV_NONCONN_IND			3
 #define SCAN_EVT_SCAN_RSP				4
 
+
+#define HCI_LE_ADV_DATA_MAX_LEN				31
 
 #define HCI_EV_ENCR_REFRESH		0x30
 struct hci_ev_encrypt_refresh {
@@ -146,6 +161,15 @@ struct read_support_ext_ftrs_reply {
 	__u8     features[8];
 } __packed;
 
+struct comp_pkts_info {
+	__le16   handle;
+	__le16   count;
+} __packed;
+
+struct num_comp_pkts {
+	__u8     num_hndl;
+	struct comp_pkts_info handles[0];
+} __packed;
 
 
 #endif

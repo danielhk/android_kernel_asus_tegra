@@ -12,31 +12,34 @@
  * GNU General Public License for more details.
  */
 
-#ifndef _BT_ATHOME_REMOTE_H_
-#define _BT_ATHOME_REMOTE_H_
+#ifndef _BT_ATHOME_PROTO_H_
+#define _BT_ATHOME_PROTO_H_
 
 
 #include <linux/skbuff.h>
 #include <linux/ioctl.h>
+#include "bt_athome_hci_extra.h"
 
 
-#define aahlog(...)			printk("AahBtRemote: " __VA_ARGS__)
-#define aahlog_continue(...)		printk(__VA_ARGS__)
 
-#define AAH_BT_KEY_DPAD_CENTER			353
-#define AAH_BT_KEY_POWER			177
-#define AAH_BT_KEY_INPUT			178
+#define ENCR_RND_NUM			0x474A204143204744ULL
+#define ENCR_DIV			0x6F67
+#define MIN_PROTO_VERSION		0x00010000
+#define CONNECT_TIMEOUT			5000 /* try for 5 seconds to connect */
+#define ENCRYPT_DAT_TIMEOUT		1000 /* 1 sec for encrypt data echo */
+#define ENCRYPT_TIMEOUT			1000 /* 1 sec for encryption */
 
-
-/* a type val BT will not use */
-#define AAH_BT_PKT_TYPE_CMD			5
-
-#define AAH_BT_PKT_PROCEED			0
-#define AAH_BT_PKT_DROP				1
+/*
+ * Clock accuracy of the chip in this device. Setting this higher is always
+ * safer, but wastes battery on the remotes. Setting this lower than actual
+ * accuracy will cause connections to randomly fail with long intervals.
+ */
+#define AAH_BT_MARVELL_MCA		HCI_Marvell_MCA_30_ppm
 
 #define AAH_BT_MAC_SZ				6
 #define AAH_BT_LTK_SZ				16
 #define AAH_BT_ENTROPY_SZ			16
+#define AAH_BT_SLEN_MAX				20
 
 
 /*  ====== userspace-relevant defines ====== */
@@ -118,6 +121,7 @@ struct athome_bt_stats {
 	} __packed;
 
 /* events FROM driver */
+#define BT_ATHOME_EVT_DEPRECATED_0		0x80
 #define BT_ATHOME_EVT_STATE			0x81
 	struct bt_athome_state {
 		uint8_t num;
@@ -151,13 +155,13 @@ struct athome_bt_stats {
 		uint8_t pkt_typ;
 		uint8_t pkt_data[]; /* len <= 25 */
 	} __packed;
-#define BT_ATHOME_EVT_DISCOVERED_V1		0x86
-	struct bt_athome_discovered_v1 {
+#define BT_ATHOME_EVT_DISCOVERED		0x86
+	struct bt_athome_discovered {
 		uint8_t MAC[AAH_BT_MAC_SZ];
 		uint8_t ver[4];
 		int8_t RSSI;
 		uint8_t RFU[8];
-		uint8_t ser_num[]; /* len <= 20 */
+		uint8_t ser_num[]; /* len <= AAH_BT_SLEN_MAX */
 	} __packed;
 #define BT_ATHOME_EVT_DEV_STATS			0x87
 	struct bt_athome_dev_stats {
@@ -170,7 +174,7 @@ struct athome_bt_stats {
 		uint8_t key;
 	} __packed;
 
-#define BT_ATHOME_IOCTL_GETSTATE 		_IOR(0, 0, struct bt_athome_state)
+#define BT_ATHOME_IOCTL_GETSTATE 	_IOR(0, 0, struct bt_athome_state)
 /* param is pointer to state struct to fill out */
 
 /*  ============= air protocol ============= */
@@ -188,10 +192,10 @@ struct athome_bt_stats {
 	struct athome_pkt_rx_input {
 		uint8_t info;
 	} __packed;
-	#define ATHOME_PAIR_BTN_CHAR			0x40000000
-	#define ATHOME_PAIR_BTN_BKSP			0x80000000
-	#define SECURE_BTN_MASK				(ATHOME_PAIR_BTN_CHAR | \
-							 ATHOME_PAIR_BTN_BKSP)
+	#define ATHOME_PAIR_BTN_CHAR		0x40000000
+	#define ATHOME_PAIR_BTN_BKSP		0x80000000
+	#define SECURE_BTN_MASK			(ATHOME_PAIR_BTN_CHAR | \
+						 ATHOME_PAIR_BTN_BKSP)
 	struct athome_pkt_rx_input_btn {
 		uint32_t btn_mask;
 	} __packed;
@@ -235,44 +239,6 @@ struct athome_bt_stats {
 	} __packed;
 #define ATHOME_PKT_TX_NFC		5
 
-
-
-/*  ========== functions provided ========== */
-
-/*
-	Process an incoming data packet. The options are:
-	return AAH_BT_PKT_*
-*/
-int athome_bt_remote_filter_rx_data(void *priv, u32 pkt_type, u8 *rx_buf, u32 *rx_len);
-
-
-/*
-	Called when driver about to send a packet to chip.
-	return AAH_BT_PKT_*
-*/
-int athome_bt_pkt_send_req(void *priv, struct sk_buff *skb);
-
-
-
-/*  ========== functions needed ========== */
-
-/*
-	Send packet to user, as if it came from the chip
-*/
-void athome_bt_pkt_to_user(void *priv, uint32_t pkt_type, uint8_t *data, uint32_t len);
-
-/*
-	Send packet to chip, as if it came from the user
-*/
-void athome_bt_pkt_to_chip(void *priv, uint32_t pkt_type, uint8_t *data, uint32_t len);
-
-/*
-	Wake up the main thread of the bt driver (if we had previously refused
-	to send a packet, this should retry it)
-
-	//TODO: use wake_up_interruptible(&priv->MainThread.waitQ);
-*/
-void athome_bt_main_thread_wake(void *priv);
 
 
 #endif

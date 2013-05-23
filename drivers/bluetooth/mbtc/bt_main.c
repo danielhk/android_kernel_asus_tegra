@@ -38,7 +38,8 @@
 #include "bt_drv.h"
 #include "mbt_char.h"
 #include "bt_sdio.h"
-#include "bt_athomeremote.h"
+#include "bt_athome_logging.h"
+#include "bt_athome_splitter.h"
 
 /** Version */
 #define VERSION "M2614110"
