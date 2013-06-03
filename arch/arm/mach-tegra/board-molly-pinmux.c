@@ -163,6 +163,18 @@
 
 #define USB_PINMUX CEC_PINMUX
 
+#define GPIO_PINMUX(_pingroup, _pupd, _tri, _io, _od)   \
+	{                                                   \
+		.pingroup   = TEGRA_PINGROUP_##_pingroup,       \
+		.func       = TEGRA_MUX_SAFE,                   \
+		.pupd       = TEGRA_PUPD_##_pupd,               \
+		.tristate   = TEGRA_TRI_##_tri,                 \
+		.io         = TEGRA_PIN_##_io,                  \
+		.lock       = TEGRA_PIN_LOCK_DEFAULT,           \
+		.od         = TEGRA_PIN_OD_##_od,               \
+		.ioreset    = TEGRA_PIN_IO_RESET_DEFAULT,       \
+	}
+
 #define GPIO_INIT_PIN_MODE(_gpio, _is_input, _value)	\
 	{					\
 		.gpio_nr	= _gpio,	\
@@ -174,9 +186,6 @@ static __initdata struct tegra_drive_pingroup_config molly_drive_pinmux[] = {
 	/* DEFAULT_DRIVE(<pin_group>), */
 	/* SDMMC1 */
 	SET_DRIVE(SDIO1, ENABLE, DISABLE, DIV_1, 36, 20, SLOW, SLOW),
-
-	/* SDMMC3 */
-	SET_DRIVE(SDIO3, ENABLE, DISABLE, DIV_1, 22, 36, FASTEST, FASTEST),
 
 	/* SDMMC4 */
 	SET_DRIVE_WITH_TYPE(GMA, ENABLE, DISABLE, DIV_1, 2, 2, FASTEST,

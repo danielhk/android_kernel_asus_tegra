@@ -640,7 +640,7 @@ static void molly_audio_init(void)
 }
 
 
-#define ATHOME_RADIO_INT_GPIO     TEGRA_GPIO_PB6 /* SDMMC3_DAT3/GPIO_PB6 */
+#define ATHOME_RADIO_INT_GPIO     TEGRA_GPIO_PB4 /* SDMMC3_DAT3/GPIO_PB4 */
 #define ATHOME_RADIO_RESET_N_GPIO TEGRA_GPIO_PB5 /* SDMMC3_DAT2/GPIO_PB5 */
 #define ATHOME_RADIO_SPI_CS_GPIO  TEGRA_GPIO_PA7 /* SDMMC3_CMD/GPIO_PA7 */
 
@@ -650,7 +650,7 @@ static struct athome_platform_data radio_pdata = {
 	.gpio_spi_cs  = ATHOME_RADIO_SPI_CS_GPIO,
 };
 
-#define ATHOME_RADIO_SPI_BUS_NUM 1 /* bus 1, spi2 */
+#define ATHOME_RADIO_SPI_BUS_NUM 2 /* bus 2 == spi3 */
 #define ATHOME_RADIO_SPI_CS      0
 /* 2MHZ is max for sim3 right now.  Need to verify
  * clock values available to SPI for Tegra.
@@ -707,7 +707,7 @@ static void __init molly_radio_init(void)
 }
 
 static struct platform_device *molly_spi_devices[] __initdata = {
-        &tegra11_spi_device2,
+        &tegra11_spi_device3,
 };
 
 struct spi_clk_parent spi_parent_clk_molly[] = {
@@ -747,7 +747,7 @@ static void __init molly_spi_init(void)
         }
         molly_spi_pdata.parent_clk_list = spi_parent_clk_molly;
         molly_spi_pdata.parent_clk_count = ARRAY_SIZE(spi_parent_clk_molly);
-	tegra11_spi_device2.dev.platform_data = &molly_spi_pdata;
+	tegra11_spi_device3.dev.platform_data = &molly_spi_pdata;
         platform_add_devices(molly_spi_devices,
                                 ARRAY_SIZE(molly_spi_devices));
 }
@@ -790,7 +790,6 @@ static void __init tegra_molly_init(void)
 	tegra_wdt_recovery_init();
 #endif
 	tegra_serial_debug_init(TEGRA_UARTD_BASE, INT_WDT_CPU, NULL, -1, -1);
-//	molly_sensors_init();
 	molly_soctherm_init();
 	tegra_register_fuse();
 }
