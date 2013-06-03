@@ -343,7 +343,9 @@ static void athome_radio_tx_work(struct work_struct *w)
 	msg = st->tx_msg[st->posTXR];
 
 	/* send msg */
-	athome_transport_start();
+	if (athome_transport_start())
+		return;
+
 	athome_radio_packet_init(hdr, PKT_TYP_DATA, msg.len);
 
 	if (athome_transport_send(hdr, 3))
@@ -362,7 +364,7 @@ static void athome_radio_tx_work(struct work_struct *w)
 
 	atomic_dec(&st->tx_num_used);
 
-	/* wateup writers */
+	/* wakeup writers */
 	wake_up_interruptible(&st->wr_waitqh);
 
 	/* requeue ourself */
@@ -388,7 +390,8 @@ Again:
 	}
 
 	/* grab the bus  */
-	athome_transport_start();
+	if (athome_transport_start())
+		return;
 
 	/* read header   */
 	athome_radio_packet_init(hdr, PKT_TYP_RTR, 0);

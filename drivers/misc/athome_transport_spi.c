@@ -42,7 +42,7 @@ is exactly what we need here */
 static struct spi_device *spi_dev;
 static int cs_gpio;
 
-static int athome_radio_spi_probe(struct spi_device *spi_device)
+static int __devinit athome_radio_spi_probe(struct spi_device *spi_device)
 {
 	spi_dev = spi_device;
 	return 0;
@@ -94,11 +94,16 @@ void athome_transport_close(void)
 
 int athome_transport_start(void)
 {
-	int ret = spi_bus_lock(spi_dev->master);
-	gpio_set_value(cs_gpio, 0);
-	udelay(10);
+	if (spi_dev) {
+		int ret = spi_bus_lock(spi_dev->master);
+		gpio_set_value(cs_gpio, 0);
+		udelay(10);
 
-	return ret;
+		return ret;
+	} else {
+		pr_err("%s: no spi_dev\n", __func__);
+		return -ENODEV;
+	}
 }
 
 static int athome_transport_op(const unsigned char *out,
@@ -106,6 +111,11 @@ static int athome_transport_op(const unsigned char *out,
 {
 	struct spi_message m;
 	struct spi_transfer t = {0};
+
+	if (!spi_dev) {
+		pr_err("%s: no spi_dev\n", __func__);
+		return -ENODEV;
+	}
 
 	t.tx_buf = out;
 	t.rx_buf = in;
@@ -129,6 +139,10 @@ int athome_transport_recv(unsigned char *buf, unsigned len)
 
 int athome_transport_stop(void)
 {
+	if (!spi_dev) {
+		pr_err("%s: no spi_dev\n", __func__);
+		return -ENODEV;
+	}
 	gpio_set_value(cs_gpio, 1);
 	udelay(50);
 	return spi_bus_unlock(spi_dev->master);
