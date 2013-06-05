@@ -59,14 +59,14 @@ static struct wifi_platform_data molly_wifi_control = {
 
 static struct resource wifi_resource[] = {
 	[0] = {
-		.name	= "bcm4329_wlan_irq",
+		.name	= "wlan_irq",
 		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHLEVEL
 				| IORESOURCE_IRQ_SHAREABLE,
 	},
 };
 
 static struct platform_device molly_wifi_device = {
-	.name		= "bcm4329_wlan",
+	.name		= "wlan",
 	.id		= 1,
 	.num_resources	= 1,
 	.resource	= wifi_resource,
@@ -281,11 +281,11 @@ static int molly_wifi_power(int on)
 	int ret = 0;
 
 	pr_debug("%s: %d\n", __func__, on);
-	/* Enable COM's regulators on wi-fi poer on*/
+	/* Enable regulators on wi-fi power on*/
 	if (on == 1) {
 		ret = molly_wifi_regulator_enable();
 		if (ret < 0) {
-			pr_err("Failed to enable COM regulators\n");
+			pr_err("Failed to enable wifi regulators\n");
 			return ret;
 		}
 	}

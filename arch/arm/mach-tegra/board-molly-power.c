@@ -26,10 +26,8 @@
 #include <linux/regulator/machine.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/fixed.h>
-#include <linux/mfd/max77663-core.h>
 #include <linux/mfd/palmas.h>
 #include <linux/mfd/tps65090.h>
-#include <linux/regulator/max77663-regulator.h>
 #include <linux/regulator/tps65090-regulator.h>
 #include <linux/regulator/tps51632-regulator.h>
 #include <linux/gpio.h>
@@ -47,7 +45,6 @@
 
 #include "cpu-tegra.h"
 #include "pm.h"
-#include "tegra-board-id.h"
 #include "board-pmu-defines.h"
 #include "board.h"
 #include "gpio-names.h"
@@ -65,9 +62,6 @@
 /*TPS65090 consumer rails */
 static struct regulator_consumer_supply tps65090_dcdc1_supply[] = {
 	REGULATOR_SUPPLY("vdd_sys_5v0", NULL),
-	REGULATOR_SUPPLY("vdd_spk", NULL),
-	REGULATOR_SUPPLY("vdd_sys_modem_5v0", NULL),
-	REGULATOR_SUPPLY("vdd_sys_cam_5v0", NULL),
 };
 
 static struct regulator_consumer_supply tps65090_dcdc2_supply[] = {
@@ -75,39 +69,27 @@ static struct regulator_consumer_supply tps65090_dcdc2_supply[] = {
 	REGULATOR_SUPPLY("vddio_hv", "tegradc.1"),
 	REGULATOR_SUPPLY("pwrdet_hv", NULL),
 	REGULATOR_SUPPLY("vdd_sys_ds_3v3", NULL),
-	REGULATOR_SUPPLY("vdd_sys_nfc_3v3", NULL),
-	REGULATOR_SUPPLY("vdd_hv_nfc_3v3", NULL),
-	REGULATOR_SUPPLY("vdd_sys_cam_3v3", NULL),
-	REGULATOR_SUPPLY("vdd_sys_sensor_3v3", NULL),
-	REGULATOR_SUPPLY("vdd_sys_audio_3v3", NULL),
-	REGULATOR_SUPPLY("vdd_sys_dtv_3v3", NULL),
 	REGULATOR_SUPPLY("vcc", "0-007c"),
 	REGULATOR_SUPPLY("vcc", "0-0030"),
 	REGULATOR_SUPPLY("vin", "2-0030"),
 };
 
 static struct regulator_consumer_supply tps65090_dcdc3_supply[] = {
-	REGULATOR_SUPPLY("vdd_ao", NULL),
 };
 
 static struct regulator_consumer_supply tps65090_ldo1_supply[] = {
-	REGULATOR_SUPPLY("vdd_sby_5v0", NULL),
 };
 
 static struct regulator_consumer_supply tps65090_ldo2_supply[] = {
-	REGULATOR_SUPPLY("vdd_sby_3v3", NULL),
 };
 
 static struct regulator_consumer_supply tps65090_fet1_supply[] = {
-	REGULATOR_SUPPLY("vdd_lcd_bl", NULL),
 };
 
 static struct regulator_consumer_supply tps65090_fet3_supply[] = {
-	REGULATOR_SUPPLY("vdd_modem_3v3", NULL),
 };
 
 static struct regulator_consumer_supply tps65090_fet4_supply[] = {
-	REGULATOR_SUPPLY("avdd_lcd", NULL),
 	REGULATOR_SUPPLY("avdd", "spi3.2"),
 };
 
@@ -120,8 +102,7 @@ static struct regulator_consumer_supply tps65090_fet6_supply[] = {
 };
 
 static struct regulator_consumer_supply tps65090_fet7_supply[] = {
-	REGULATOR_SUPPLY("vdd_wifi_3v3", "bcm4329_wlan.1"),
-	REGULATOR_SUPPLY("vdd_gps_3v3", "reg-userspace-consumer.2"),
+	REGULATOR_SUPPLY("vdd_wifi_3v3", "wlan.1"),
 	REGULATOR_SUPPLY("vdd_bt_3v3", "bluedroid_pm.0"),
 };
 
@@ -196,322 +177,6 @@ static struct tps65090_platform_data tps65090_pdata = {
 	.charger_pdata = &bcharger_pdata,
 };
 
-/* MAX77663 consumer rails */
-static struct regulator_consumer_supply max77663_sd0_supply[] = {
-	REGULATOR_SUPPLY("vdd_core", NULL),
-	REGULATOR_SUPPLY("vdd_core", "sdhci-tegra.0"),
-	REGULATOR_SUPPLY("vdd_core", "sdhci-tegra.3"),
-};
-
-static struct regulator_consumer_supply max77663_sd1_supply[] = {
-	REGULATOR_SUPPLY("vddio_ddr", NULL),
-	REGULATOR_SUPPLY("vddio_ddr0", NULL),
-	REGULATOR_SUPPLY("vddio_ddr1", NULL),
-};
-
-static struct regulator_consumer_supply max77663_sd2_supply[] = {
-	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-udc.0"),
-	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-ehci.0"),
-	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-ehci.1"),
-	REGULATOR_SUPPLY("vddio_cam", "vi"),
-	REGULATOR_SUPPLY("pwrdet_cam", NULL),
-	REGULATOR_SUPPLY("avdd_osc", NULL),
-	REGULATOR_SUPPLY("vddio_sys", NULL),
-	REGULATOR_SUPPLY("vddio_sdmmc", "sdhci-tegra.0"),
-	REGULATOR_SUPPLY("pwrdet_sdmmc1", NULL),
-	REGULATOR_SUPPLY("vddio_sdmmc", "sdhci-tegra.3"),
-	REGULATOR_SUPPLY("pwrdet_sdmmc4", NULL),
-	REGULATOR_SUPPLY("vdd_emmc", NULL),
-	REGULATOR_SUPPLY("vddio_audio", NULL),
-	REGULATOR_SUPPLY("pwrdet_audio", NULL),
-	REGULATOR_SUPPLY("avdd_audio_1v8", NULL),
-	REGULATOR_SUPPLY("vdd_audio_1v8", NULL),
-	REGULATOR_SUPPLY("vddio_modem", NULL),
-	REGULATOR_SUPPLY("vddio_modem_1v8", NULL),
-	REGULATOR_SUPPLY("vddio_bb", NULL),
-	REGULATOR_SUPPLY("pwrdet_bb", NULL),
-	REGULATOR_SUPPLY("vddio_bb_1v8", NULL),
-	REGULATOR_SUPPLY("vddio_uart", NULL),
-	REGULATOR_SUPPLY("pwrdet_uart", NULL),
-	REGULATOR_SUPPLY("vddio_gmi", NULL),
-	REGULATOR_SUPPLY("pwrdet_nand", NULL),
-	REGULATOR_SUPPLY("vdd_sensor_1v8", NULL),
-	REGULATOR_SUPPLY("vdd_mic_1v8", NULL),
-	REGULATOR_SUPPLY("vdd_nfc_1v8", NULL),
-	REGULATOR_SUPPLY("vdd_ds_1v8", NULL),
-	REGULATOR_SUPPLY("vdd_spi_1v8", NULL),
-	REGULATOR_SUPPLY("dvdd_lcd", NULL),
-	REGULATOR_SUPPLY("vdd_com_1v8", NULL),
-	REGULATOR_SUPPLY("vddio_wifi_1v8", "bcm4329_wlan.1"),
-	REGULATOR_SUPPLY("vdd_gps_1v8", "reg-userspace-consumer.2"),
-	REGULATOR_SUPPLY("vddio_bt_1v8", "bluedroid_pm.0"),
-	REGULATOR_SUPPLY("vdd_dtv_1v8", NULL),
-	REGULATOR_SUPPLY("vlogic", "0-0069"),
-	REGULATOR_SUPPLY("vid", "0-000d"),
-	REGULATOR_SUPPLY("vddio", "0-0078"),
-};
-
-static struct regulator_consumer_supply max77663_sd3_supply[] = {
-	REGULATOR_SUPPLY("vcore_emmc", NULL),
-};
-
-static struct regulator_consumer_supply max77663_ldo0_supply[] = {
-	REGULATOR_SUPPLY("avdd_plla_p_c", NULL),
-	REGULATOR_SUPPLY("avdd_pllx", NULL),
-	REGULATOR_SUPPLY("avdd_plle", NULL),
-	REGULATOR_SUPPLY("avdd_pllm", NULL),
-	REGULATOR_SUPPLY("avdd_pllu", NULL),
-	REGULATOR_SUPPLY("avdd_csi_dsi_pll", "tegradc.0"),
-	REGULATOR_SUPPLY("avdd_csi_dsi_pll", "tegradc.1"),
-	REGULATOR_SUPPLY("avdd_csi_dsi_pll", "vi"),
-};
-
-static struct regulator_consumer_supply max77663_ldo1_supply[] = {
-	REGULATOR_SUPPLY("vdd_ddr_hs", NULL),
-};
-
-static struct regulator_consumer_supply max77663_ldo2_supply[] = {
-	REGULATOR_SUPPLY("vdd_sensor_2v85", NULL),
-	REGULATOR_SUPPLY("vdd_als", NULL),
-	REGULATOR_SUPPLY("vdd", "0-004c"),
-	REGULATOR_SUPPLY("vdd", "0-0069"),
-	REGULATOR_SUPPLY("vdd", "0-000d"),
-	REGULATOR_SUPPLY("vdd", "0-0078"),
-};
-
-static struct regulator_consumer_supply max77663_ldo3_supply[] = {
-	REGULATOR_SUPPLY("avdd_hdmi_pll", "tegradc.1"),
-	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-ehci.2"),
-	REGULATOR_SUPPLY("avddio_usb", "tegra-ehci.2"),
-};
-
-static struct regulator_consumer_supply max77663_ldo4_supply[] = {
-	REGULATOR_SUPPLY("vdd_rtc", NULL),
-};
-
-static struct regulator_consumer_supply max77663_ldo5_supply[] = {
-	REGULATOR_SUPPLY("avdd_dsi_csi", "tegradc.0"),
-	REGULATOR_SUPPLY("avdd_dsi_csi", "tegradc.1"),
-	REGULATOR_SUPPLY("avdd_dsi_csi", "vi"),
-	REGULATOR_SUPPLY("vddio_hsic", "tegra-ehci.1"),
-	REGULATOR_SUPPLY("vddio_hsic", "tegra-ehci.2"),
-	REGULATOR_SUPPLY("vddio_hsic", "tegra-xhci"),
-	REGULATOR_SUPPLY("pwrdet_mipi", NULL),
-	REGULATOR_SUPPLY("vddio_bb_hsic", NULL),
-};
-
-static struct regulator_consumer_supply max77663_ldo6_supply[] = {
-	REGULATOR_SUPPLY("vddio_sdmmc", "sdhci-tegra.2"),
-	REGULATOR_SUPPLY("pwrdet_sdmmc3", NULL),
-};
-
-/* FIXME!! Put the device address of camera */
-static struct regulator_consumer_supply max77663_ldo7_supply[] = {
-	REGULATOR_SUPPLY("avdd_cam1", NULL),
-	REGULATOR_SUPPLY("avdd_2v8_cam_af", NULL),
-	REGULATOR_SUPPLY("vana", "2-0036"),
-};
-
-/* FIXME!! Put the device address of camera */
-static struct regulator_consumer_supply max77663_ldo8_supply[] = {
-	REGULATOR_SUPPLY("avdd_cam2", NULL),
-	REGULATOR_SUPPLY("avdd", "2-0010"),
-};
-
-static struct max77663_regulator_fps_cfg max77663_fps_cfgs[] = {
-	{
-		.src = FPS_SRC_0,
-		.en_src = FPS_EN_SRC_EN0,
-		.time_period = FPS_TIME_PERIOD_DEF,
-	},
-	{
-		.src = FPS_SRC_1,
-		.en_src = FPS_EN_SRC_EN1,
-		.time_period = FPS_TIME_PERIOD_DEF,
-	},
-	{
-		.src = FPS_SRC_2,
-		.en_src = FPS_EN_SRC_EN0,
-		.time_period = FPS_TIME_PERIOD_DEF,
-	},
-};
-
-#define MAX77663_PDATA_INIT(_rid, _id, _min_uV, _max_uV, _supply_reg,	\
-		_always_on, _boot_on, _apply_uV,			\
-		_fps_src, _fps_pu_period, _fps_pd_period, _flags)	\
-	static struct regulator_init_data max77663_regulator_idata_##_id = {   \
-		.supply_regulator = _supply_reg,			\
-		.constraints = {					\
-			.name = max77663_rails(_id),			\
-			.min_uV = _min_uV,				\
-			.max_uV = _max_uV,				\
-			.valid_modes_mask = (REGULATOR_MODE_NORMAL |	\
-					     REGULATOR_MODE_STANDBY),	\
-			.valid_ops_mask = (REGULATOR_CHANGE_MODE |	\
-					   REGULATOR_CHANGE_STATUS |	\
-					   REGULATOR_CHANGE_VOLTAGE),	\
-			.always_on = _always_on,			\
-			.boot_on = _boot_on,				\
-			.apply_uV = _apply_uV,				\
-		},							\
-		.num_consumer_supplies =				\
-			ARRAY_SIZE(max77663_##_id##_supply),		\
-		.consumer_supplies = max77663_##_id##_supply,		\
-	};								\
-static struct max77663_regulator_platform_data max77663_regulator_pdata_##_id =\
-{									\
-		.reg_init_data = &max77663_regulator_idata_##_id,	\
-		.id = MAX77663_REGULATOR_ID_##_rid,			\
-		.fps_src = _fps_src,					\
-		.fps_pu_period = _fps_pu_period,			\
-		.fps_pd_period = _fps_pd_period,			\
-		.fps_cfgs = max77663_fps_cfgs,				\
-		.flags = _flags,					\
-	}
-
-MAX77663_PDATA_INIT(SD0, sd0,  900000, 1400000, tps65090_rails(DCDC3), 1, 1, 0,
-		    FPS_SRC_1, -1, -1, SD_FSRADE_DISABLE);
-
-MAX77663_PDATA_INIT(SD1, sd1,  1200000, 1200000, tps65090_rails(DCDC3), 1, 1, 1,
-		    FPS_SRC_1, -1, -1, SD_FSRADE_DISABLE);
-
-MAX77663_PDATA_INIT(SD2, sd2,  1800000, 1800000, tps65090_rails(DCDC3), 1, 1, 1,
-		    FPS_SRC_0, -1, -1, 0);
-
-MAX77663_PDATA_INIT(SD3, sd3,  2850000, 2850000, tps65090_rails(DCDC3), 1, 1, 1,
-		    FPS_SRC_NONE, -1, -1, 0);
-
-MAX77663_PDATA_INIT(LDO0, ldo0, 1050000, 1050000, max77663_rails(sd2), 1, 1, 1,
-		    FPS_SRC_1, -1, -1, 0);
-
-MAX77663_PDATA_INIT(LDO1, ldo1, 1050000, 1050000, max77663_rails(sd2), 0, 0, 1,
-		    FPS_SRC_NONE, -1, -1, 0);
-
-MAX77663_PDATA_INIT(LDO2, ldo2, 2850000, 2850000, tps65090_rails(DCDC2), 1, 1,
-		    1, FPS_SRC_1, -1, -1, 0);
-
-MAX77663_PDATA_INIT(LDO3, ldo3, 1050000, 1050000, max77663_rails(sd2), 1, 1, 1,
-		    FPS_SRC_NONE, -1, -1, 0);
-
-MAX77663_PDATA_INIT(LDO4, ldo4, 1100000, 1100000, tps65090_rails(DCDC2), 1, 1,
-		    1, FPS_SRC_NONE, -1, -1, LDO4_EN_TRACKING);
-
-MAX77663_PDATA_INIT(LDO5, ldo5, 1200000, 1200000, max77663_rails(sd2), 0, 1, 1,
-		    FPS_SRC_NONE, -1, -1, 0);
-
-MAX77663_PDATA_INIT(LDO6, ldo6, 1800000, 3300000, tps65090_rails(DCDC2), 0, 0, 0,
-		    FPS_SRC_NONE, -1, -1, 0);
-
-MAX77663_PDATA_INIT(LDO7, ldo7, 2800000, 2800000, tps65090_rails(DCDC2), 0, 0, 1,
-		    FPS_SRC_NONE, -1, -1, 0);
-
-MAX77663_PDATA_INIT(LDO8, ldo8, 2800000, 2800000, tps65090_rails(DCDC2), 0, 1, 1,
-		    FPS_SRC_1, -1, -1, 0);
-
-#define MAX77663_REG(_id, _data) (&max77663_regulator_pdata_##_data)
-
-static struct max77663_regulator_platform_data *max77663_reg_pdata[] = {
-	MAX77663_REG(SD0, sd0),
-	MAX77663_REG(SD1, sd1),
-	MAX77663_REG(SD2, sd2),
-	MAX77663_REG(SD3, sd3),
-	MAX77663_REG(LDO0, ldo0),
-	MAX77663_REG(LDO1, ldo1),
-	MAX77663_REG(LDO2, ldo2),
-	MAX77663_REG(LDO3, ldo3),
-	MAX77663_REG(LDO4, ldo4),
-	MAX77663_REG(LDO5, ldo5),
-	MAX77663_REG(LDO6, ldo6),
-	MAX77663_REG(LDO7, ldo7),
-	MAX77663_REG(LDO8, ldo8),
-};
-
-static struct max77663_gpio_config max77663_gpio_cfgs[] = {
-	{
-		.gpio = MAX77663_GPIO0,
-		.dir = GPIO_DIR_OUT,
-		.dout = GPIO_DOUT_LOW,
-		.out_drv = GPIO_OUT_DRV_PUSH_PULL,
-		.alternate = GPIO_ALT_DISABLE,
-	},
-	{
-		.gpio = MAX77663_GPIO1,
-		.dir = GPIO_DIR_IN,
-		.dout = GPIO_DOUT_HIGH,
-		.out_drv = GPIO_OUT_DRV_OPEN_DRAIN,
-		.pull_up = GPIO_PU_ENABLE,
-		.alternate = GPIO_ALT_DISABLE,
-	},
-	{
-		.gpio = MAX77663_GPIO2,
-		.dir = GPIO_DIR_OUT,
-		.dout = GPIO_DOUT_HIGH,
-		.out_drv = GPIO_OUT_DRV_OPEN_DRAIN,
-		.pull_up = GPIO_PU_ENABLE,
-		.alternate = GPIO_ALT_DISABLE,
-	},
-	{
-		.gpio = MAX77663_GPIO3,
-		.dir = GPIO_DIR_OUT,
-		.dout = GPIO_DOUT_HIGH,
-		.out_drv = GPIO_OUT_DRV_OPEN_DRAIN,
-		.pull_up = GPIO_PU_ENABLE,
-		.alternate = GPIO_ALT_DISABLE,
-	},
-	{
-		.gpio = MAX77663_GPIO4,
-		.dir = GPIO_DIR_OUT,
-		.dout = GPIO_DOUT_HIGH,
-		.out_drv = GPIO_OUT_DRV_PUSH_PULL,
-		.alternate = GPIO_ALT_ENABLE,
-	},
-	{
-		.gpio = MAX77663_GPIO5,
-		.dir = GPIO_DIR_OUT,
-		.dout = GPIO_DOUT_LOW,
-		.out_drv = GPIO_OUT_DRV_PUSH_PULL,
-		.alternate = GPIO_ALT_DISABLE,
-	},
-	{
-		.gpio = MAX77663_GPIO6,
-		.dir = GPIO_DIR_OUT,
-		.dout = GPIO_DOUT_LOW,
-		.out_drv = GPIO_OUT_DRV_OPEN_DRAIN,
-		.alternate = GPIO_ALT_DISABLE,
-	},
-	{
-		.gpio = MAX77663_GPIO7,
-		.dir = GPIO_DIR_OUT,
-		.dout = GPIO_DOUT_LOW,
-		.out_drv = GPIO_OUT_DRV_OPEN_DRAIN,
-		.alternate = GPIO_ALT_DISABLE,
-	},
-};
-
-static struct max77663_platform_data max77663_pdata = {
-	.irq_base	= MAX77663_IRQ_BASE,
-	.gpio_base	= MAX77663_GPIO_BASE,
-
-	.num_gpio_cfgs	= ARRAY_SIZE(max77663_gpio_cfgs),
-	.gpio_cfgs	= max77663_gpio_cfgs,
-
-	.regulator_pdata = max77663_reg_pdata,
-	.num_regulator_pdata = ARRAY_SIZE(max77663_reg_pdata),
-
-	.rtc_i2c_addr	= 0x68,
-
-	.use_power_off	= false,
-};
-
-static struct i2c_board_info __initdata max77663_regulators[] = {
-	{
-		/* The I2C address was determined by OTP factory setting */
-		I2C_BOARD_INFO("max77663", 0x3c),
-		.irq		= INT_EXTERNAL_PMU,
-		.platform_data	= &max77663_pdata,
-	},
-};
-
 static struct i2c_board_info __initdata tps65090_regulators[] = {
 	{
 		I2C_BOARD_INFO("tps65090", 0x48),
@@ -564,9 +229,41 @@ static struct regulator_consumer_supply palmas_smps12_supply[] = {
 	REGULATOR_SUPPLY("vref2_ddr3l", NULL),
 };
 
-#define palmas_smps3_supply max77663_sd2_supply
-#define palmas_smps45_supply max77663_sd0_supply
-#define palmas_smps457_supply max77663_sd0_supply
+static struct regulator_consumer_supply palmas_smps3_supply[] = {
+	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-udc.0"),
+	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-ehci.0"),
+	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-ehci.1"),
+	REGULATOR_SUPPLY("avdd_osc", NULL),
+	REGULATOR_SUPPLY("vddio_sys", NULL),
+	REGULATOR_SUPPLY("vddio_sdmmc", "sdhci-tegra.0"),
+	REGULATOR_SUPPLY("pwrdet_sdmmc1", NULL),
+	REGULATOR_SUPPLY("vddio_sdmmc", "sdhci-tegra.3"),
+	REGULATOR_SUPPLY("pwrdet_sdmmc4", NULL),
+	REGULATOR_SUPPLY("vdd_emmc", NULL),
+	REGULATOR_SUPPLY("vddio_uart", NULL),
+	REGULATOR_SUPPLY("pwrdet_uart", NULL),
+	REGULATOR_SUPPLY("vddio_gmi", NULL),
+	REGULATOR_SUPPLY("vdd_ds_1v8", NULL),
+	REGULATOR_SUPPLY("vdd_spi_1v8", NULL),
+	REGULATOR_SUPPLY("vdd_com_1v8", NULL),
+	REGULATOR_SUPPLY("vddio_wifi_1v8", "wlan.1"),
+	REGULATOR_SUPPLY("vddio_bt_1v8", "bluedroid_pm.0"),
+	REGULATOR_SUPPLY("vlogic", "0-0069"),
+	REGULATOR_SUPPLY("vid", "0-000d"),
+	REGULATOR_SUPPLY("vddio", "0-0078"),
+};
+
+static struct regulator_consumer_supply palmas_smps45_supply[] = {
+	REGULATOR_SUPPLY("vdd_core", NULL),
+	REGULATOR_SUPPLY("vdd_core", "sdhci-tegra.0"),
+	REGULATOR_SUPPLY("vdd_core", "sdhci-tegra.3"),
+};
+
+static struct regulator_consumer_supply palmas_smps457_supply[] = {
+	REGULATOR_SUPPLY("vdd_core", NULL),
+	REGULATOR_SUPPLY("vdd_core", "sdhci-tegra.0"),
+	REGULATOR_SUPPLY("vdd_core", "sdhci-tegra.3"),
+};
 
 static struct regulator_consumer_supply palmas_smps8_supply[] = {
 	REGULATOR_SUPPLY("avdd_plla_p_c", NULL),
@@ -601,25 +298,30 @@ static struct regulator_consumer_supply palmas_smps9_supply[] = {
 	REGULATOR_SUPPLY("vddio_sd_slot", "sdhci-tegra.3"),
 };
 
-#define palmas_ldo1_supply max77663_ldo7_supply
+static struct regulator_consumer_supply palmas_ldo1_supply[] = {
+	REGULATOR_SUPPLY("vana", "2-0036"),
+};
 
 static struct regulator_consumer_supply palmas_ldo1_config2_supply[] = {
 	REGULATOR_SUPPLY("avddio_usb", "tegra-ehci.2"),
 	REGULATOR_SUPPLY("avddio_usb", "tegra-xhci"),
 };
 
-#define palmas_ldo2_supply max77663_ldo8_supply
+static struct regulator_consumer_supply palmas_ldo2_supply[] = {
+	REGULATOR_SUPPLY("avdd", "2-0010"),
+};
 
 /* FIXME!! Put the device address of camera */
 static struct regulator_consumer_supply palmas_ldo2_config2_supply[] = {
-	REGULATOR_SUPPLY("avdd_cam1", NULL),
-	REGULATOR_SUPPLY("avdd_2v8_cam_af", NULL),
-	REGULATOR_SUPPLY("avdd_cam2", NULL),
 	REGULATOR_SUPPLY("vana", "2-0036"),
 	REGULATOR_SUPPLY("avdd", "2-0010"),
 };
 
-#define palmas_ldo3_supply max77663_ldo5_supply
+static struct regulator_consumer_supply palmas_ldo3_supply[] = {
+	REGULATOR_SUPPLY("avdd_dsi_csi", "tegradc.0"),
+	REGULATOR_SUPPLY("avdd_dsi_csi", "tegradc.1"),
+	REGULATOR_SUPPLY("avdd_dsi_csi", "vi"),
+};
 
 static struct regulator_consumer_supply palmas_ldo4_supply[] = {
 	REGULATOR_SUPPLY("vpp_fuse", NULL),
@@ -631,15 +333,25 @@ static struct regulator_consumer_supply palmas_ldo4_config2_supply[] = {
 	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-xhci"),
 };
 
-#define palmas_ldo6_supply max77663_ldo2_supply
+static struct regulator_consumer_supply palmas_ldo6_supply[] = {
+	REGULATOR_SUPPLY("vdd", "0-004c"),
+	REGULATOR_SUPPLY("vdd", "0-0069"),
+	REGULATOR_SUPPLY("vdd", "0-000d"),
+	REGULATOR_SUPPLY("vdd", "0-0078"),
+};
 
 static struct regulator_consumer_supply palmas_ldo7_supply[] = {
-	REGULATOR_SUPPLY("vdd_af_cam1", NULL),
 	REGULATOR_SUPPLY("vdd", "2-000e"),
 };
 
-#define palmas_ldo8_supply max77663_ldo4_supply
-#define palmas_ldo9_supply max77663_ldo6_supply
+static struct regulator_consumer_supply palmas_ldo8_supply[] = {
+	REGULATOR_SUPPLY("vdd_rtc", NULL),
+};
+
+static struct regulator_consumer_supply palmas_ldo9_supply[] = {
+	REGULATOR_SUPPLY("vddio_sdmmc", "sdhci-tegra.2"),
+	REGULATOR_SUPPLY("pwrdet_sdmmc3", NULL),
+};
 
 static struct regulator_consumer_supply palmas_ldoln_supply[] = {
 	REGULATOR_SUPPLY("hvdd_usb", "tegra-ehci.2"),
@@ -823,48 +535,13 @@ static struct i2c_board_info palma_device[] = {
 	},
 };
 
-/* EN_AVDD_USB_HDMI From PMU GP1 */
-static struct regulator_consumer_supply fixed_reg_avdd_usb_hdmi_supply[] = {
-	REGULATOR_SUPPLY("avdd_hdmi", "tegradc.1"),
-	REGULATOR_SUPPLY("avdd_usb", "tegra-udc.0"),
-	REGULATOR_SUPPLY("avdd_usb", "tegra-ehci.0"),
-	REGULATOR_SUPPLY("avdd_usb", "tegra-ehci.1"),
-	REGULATOR_SUPPLY("avdd_usb", "tegra-ehci.2"),
-	REGULATOR_SUPPLY("hvdd_usb", "tegra-ehci.2"),
-};
-
-/* EN_CAM_1v8 From PMU GP5 */
-static struct regulator_consumer_supply fixed_reg_en_1v8_cam_supply[] = {
-	REGULATOR_SUPPLY("vi2c", "2-0030"),
-	REGULATOR_SUPPLY("vif", "2-0036"),
-	REGULATOR_SUPPLY("dovdd", "2-0010"),
-	REGULATOR_SUPPLY("vdd_i2c", "2-000e"),
-};
-
-/* EN_CAM_1v8 on e1611 From PMU GP6 */
-static struct regulator_consumer_supply fixed_reg_en_1v8_cam_e1611_supply[] = {
-	REGULATOR_SUPPLY("vi2c", "2-0030"),
-	REGULATOR_SUPPLY("vif", "2-0036"),
-	REGULATOR_SUPPLY("dovdd", "2-0010"),
-	REGULATOR_SUPPLY("vdd_i2c", "2-000e"),
-};
-
 static struct regulator_consumer_supply fixed_reg_vdd_hdmi_5v0_supply[] = {
 	REGULATOR_SUPPLY("vdd_hdmi_5v0", "tegradc.1"),
-};
-
-static struct regulator_consumer_supply fixed_reg_lcd_bl_en_supply[] = {
-	REGULATOR_SUPPLY("vdd_lcd_bl_en", NULL),
 };
 
 /* EN_USB1_VBUS From TEGRA GPIO PN4 PR3(T30) */
 static struct regulator_consumer_supply fixed_reg_usb1_vbus_supply[] = {
 	REGULATOR_SUPPLY("usb_vbus", "tegra-ehci.0"),
-};
-
-/* EN_3V3_FUSE From TEGRA GPIO PX4 */
-static struct regulator_consumer_supply fixed_reg_vpp_fuse_supply[] = {
-	REGULATOR_SUPPLY("vpp_fuse", NULL),
 };
 
 /* EN_USB3_VBUS From TEGRA GPIO PM5 */
@@ -921,21 +598,9 @@ static struct regulator_consumer_supply fixed_reg_avdd_hdmi_pll_supply[] = {
 		},							\
 	}
 
-FIXED_REG(1,	avdd_usb_hdmi,	avdd_usb_hdmi,
-	tps65090_rails(DCDC2),	0,	0,
-	MAX77663_GPIO_BASE + MAX77663_GPIO1,	true,	true,	1,	3300);
-
-FIXED_REG(2,	en_1v8_cam,	en_1v8_cam,
-	max77663_rails(sd2),	0,	0,
-	MAX77663_GPIO_BASE + MAX77663_GPIO5,	false,	true,	0,	1800);
-
 FIXED_REG(3,	vdd_hdmi_5v0,	vdd_hdmi_5v0,
 	tps65090_rails(DCDC1),	0,	0,
 	TEGRA_GPIO_PK1,	false,	true,	0,	5000);
-
-FIXED_REG(4,	vpp_fuse,	vpp_fuse,
-	max77663_rails(sd2),	0,	0,
-	TEGRA_GPIO_PX4,	false,	true,	0,	3300);
 
 FIXED_REG(5,	usb1_vbus,	usb1_vbus,
 	tps65090_rails(DCDC1),	0,	0,
@@ -945,17 +610,9 @@ FIXED_REG(6,	usb3_vbus,	usb3_vbus,
 	tps65090_rails(DCDC1),	0,	0,
 	TEGRA_GPIO_PK6,	true,	true,	0,	5000);
 
-FIXED_REG(7,	en_1v8_cam_e1611,	en_1v8_cam_e1611,
-	palmas_rails(smps3),	0,	0,
-	PALMAS_TEGRA_GPIO_BASE + PALMAS_GPIO6,	false,	true,	0,	1800);
-
 FIXED_REG(8,	dvdd_ts,	dvdd_ts,
 	palmas_rails(smps3),	0,	0,
 	TEGRA_GPIO_PH5,	false,	false,	1,	1800);
-
-FIXED_REG(9,	lcd_bl_en,	lcd_bl_en,
-	NULL,	0,	0,
-	TEGRA_GPIO_PH2,	false,	true,	0,	5000);
 
 FIXED_REG(10,	avdd_hdmi_pll,	avdd_hdmi_pll,
 	palmas_rails(ldo3),	0,	0,
@@ -966,36 +623,12 @@ FIXED_REG(10,	avdd_hdmi_pll,	avdd_hdmi_pll,
 
 #define ADD_FIXED_REG(_name)    (&fixed_reg_##_name##_dev)
 
-#define MOLLY_COMMON_FIXED_REG		\
-	ADD_FIXED_REG(usb1_vbus),		\
-	ADD_FIXED_REG(usb3_vbus),		\
-	ADD_FIXED_REG(vdd_hdmi_5v0),		\
-	ADD_FIXED_REG(lcd_bl_en),
-
-#define E1612_FIXED_REG				\
-	ADD_FIXED_REG(avdd_usb_hdmi),		\
-	ADD_FIXED_REG(en_1v8_cam),		\
-	ADD_FIXED_REG(vpp_fuse),		\
-
-#define E1611_FIXED_REG				\
-	ADD_FIXED_REG(en_1v8_cam_e1611), \
+static struct platform_device *fixed_reg_devs_molly[] = {
+	ADD_FIXED_REG(usb1_vbus),
+	ADD_FIXED_REG(usb3_vbus),
+	ADD_FIXED_REG(vdd_hdmi_5v0),
 	ADD_FIXED_REG(dvdd_ts),
-
-
-/* Gpio switch regulator platform data for Molly E1611 */
-static struct platform_device *fixed_reg_devs_e1611_a00[] = {
-	MOLLY_COMMON_FIXED_REG
-	E1611_FIXED_REG
-};
-
-/* Gpio switch regulator platform data for Molly E1612 */
-static struct platform_device *fixed_reg_devs_e1612_a00[] = {
-	MOLLY_COMMON_FIXED_REG
-	E1612_FIXED_REG
-};
-
-static struct platform_device *fixed_reg_devs_molly_config2[] = {
-	ADD_FIXED_REG(avdd_hdmi_pll)
+	ADD_FIXED_REG(avdd_hdmi_pll),
 };
 
 static void set_molly_power_config2(void)
@@ -1136,68 +769,13 @@ static int __init molly_cl_dvfs_init(void)
 }
 #endif
 
-static int __init molly_max77663_regulator_init(void)
-{
-	struct board_info board_info;
-	void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
-	u32 pmc_ctrl;
-
-	tegra_get_board_info(&board_info);
-	if (board_info.fab < BOARD_FAB_A02)
-		max77663_regulator_pdata_ldo4.flags = 0;
-
-	/* configure the power management controller to trigger PMU
-	 * interrupts when low */
-	pmc_ctrl = readl(pmc + PMC_CTRL);
-	writel(pmc_ctrl | PMC_CTRL_INTR_LOW, pmc + PMC_CTRL);
-
-	i2c_register_board_info(4, max77663_regulators,
-				ARRAY_SIZE(max77663_regulators));
-
-	return 0;
-}
-
-static struct regulator_bulk_data molly_gps_regulator_supply[] = {
-	[0] = {
-		.supply	= "vdd_gps_3v3",
-	},
-	[1] = {
-		.supply	= "vdd_gps_1v8",
-	},
-};
-
-static struct regulator_userspace_consumer_data molly_gps_regulator_pdata = {
-	.num_supplies	= ARRAY_SIZE(molly_gps_regulator_supply),
-	.supplies	= molly_gps_regulator_supply,
-};
-
-static struct platform_device molly_gps_regulator_device = {
-	.name	= "reg-userspace-consumer",
-	.id	= 2,
-	.dev	= {
-			.platform_data = &molly_gps_regulator_pdata,
-	},
-};
-
 static int __init molly_fixed_regulator_init(void)
 {
-	struct board_info board_info;
-
 	if (!machine_is_molly())
 		return 0;
 
-	tegra_get_board_info(&board_info);
-
-	platform_add_devices(fixed_reg_devs_molly_config2,
-			ARRAY_SIZE(fixed_reg_devs_molly_config2));
-
-	if (board_info.board_id == BOARD_E1611 ||
-		board_info.board_id == BOARD_P2454)
-		return platform_add_devices(fixed_reg_devs_e1611_a00,
-				ARRAY_SIZE(fixed_reg_devs_e1611_a00));
-	else
-		return platform_add_devices(fixed_reg_devs_e1612_a00,
-				ARRAY_SIZE(fixed_reg_devs_e1612_a00));
+	return platform_add_devices(fixed_reg_devs_molly,
+				    ARRAY_SIZE(fixed_reg_devs_molly));
 }
 subsys_initcall_sync(molly_fixed_regulator_init);
 
@@ -1226,22 +804,14 @@ fail_init_irq:
 
 int __init molly_regulator_init(void)
 {
-	struct board_info board_info;
-
 	molly_tps65090_init();
 #ifdef CONFIG_ARCH_TEGRA_HAS_CL_DVFS
 	molly_cl_dvfs_init();
 #endif
-	tegra_get_board_info(&board_info);
-	if (board_info.board_id == BOARD_E1611 ||
-		board_info.board_id == BOARD_P2454)
-		molly_palmas_regulator_init();
-	else
-		molly_max77663_regulator_init();
+	molly_palmas_regulator_init();
 
 	i2c_register_board_info(4, tps51632_boardinfo, 1);
 	platform_device_register(&molly_pda_power_device);
-	platform_device_register(&molly_gps_regulator_device);
 	return 0;
 }
 
@@ -1284,16 +854,6 @@ static struct tegra_tsensor_pmu_data tpdata_palmas = {
 	.i2c_controller_id = 4,
 	.poweroff_reg_addr = 0xa0,
 	.poweroff_reg_data = 0x0,
-};
-
-static struct tegra_tsensor_pmu_data tpdata_max77663 = {
-	.reset_tegra = 1,
-	.pmu_16bit_ops = 0,
-	.controller_type = 0,
-	.pmu_i2c_addr = 0x3c,
-	.i2c_controller_id = 4,
-	.poweroff_reg_addr = 0x41,
-	.poweroff_reg_data = 0x80,
 };
 
 static struct soctherm_platform_data molly_soctherm_data = {
@@ -1378,13 +938,6 @@ static struct soctherm_platform_data molly_soctherm_data = {
 
 int __init molly_soctherm_init(void)
 {
-	struct board_info board_info;
-
-	tegra_get_board_info(&board_info);
-	if (!(board_info.board_id == BOARD_E1611 ||
-		board_info.board_id == BOARD_P2454))
-		molly_soctherm_data.tshut_pmu_trip_data = &tpdata_max77663;
-
 	tegra_platform_edp_init(molly_soctherm_data.therm[THERM_CPU].trips,
 			&molly_soctherm_data.therm[THERM_CPU].num_trips,
 			8000); /* edp temperature margin */
