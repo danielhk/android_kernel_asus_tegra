@@ -92,10 +92,10 @@ mlan_status woal_write_reg(moal_handle * handle, t_u32 reg, t_u32 data);
 mlan_status woal_read_reg(moal_handle * handle, t_u32 reg, t_u32 * data);
 /** Function to write data to IO memory */
 mlan_status woal_write_data_sync(moal_handle * handle, mlan_buffer * pmbuf,
-                                 t_u32 port, t_u32 timeout);
+				 t_u32 port, t_u32 timeout);
 /** Function to read data from IO memory */
 mlan_status woal_read_data_sync(moal_handle * handle, mlan_buffer * pmbuf,
-                                t_u32 port, t_u32 timeout);
+				t_u32 port, t_u32 timeout);
 
 /** Register to bus driver function */
 mlan_status woal_bus_register(void);
@@ -123,16 +123,16 @@ int woal_sdio_resume(struct device *dev);
 /** Structure: SDIO MMC card */
 struct sdio_mmc_card
 {
-        /** sdio_func structure pointer */
-    struct sdio_func *func;
-        /** moal_handle structure pointer */
-    moal_handle *handle;
-        /** saved host clock value */
-    unsigned int host_clock;
+	/** sdio_func structure pointer */
+	struct sdio_func *func;
+	/** moal_handle structure pointer */
+	moal_handle *handle;
+	/** saved host clock value */
+	unsigned int host_clock;
 };
 
 /** cmd52 read write */
 int woal_sdio_read_write_cmd52(moal_handle * handle, int func, int reg,
-                               int val);
+			       int val);
 
 #endif /* _MOAL_SDIO_H */

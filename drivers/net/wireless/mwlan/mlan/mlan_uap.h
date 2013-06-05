@@ -73,27 +73,27 @@ Change log:
 mlan_status wlan_uap_get_channel(IN pmlan_private pmpriv);
 
 mlan_status wlan_uap_set_channel(IN pmlan_private pmpriv,
-                                 IN t_u8 uap_band_cfg, IN t_u8 channel);
+				 IN t_u8 uap_band_cfg, IN t_u8 channel);
 
 mlan_status wlan_uap_get_beacon_dtim(IN pmlan_private pmpriv);
 
 mlan_status wlan_ops_uap_ioctl(t_void * adapter, pmlan_ioctl_req pioctl_req);
 
 mlan_status wlan_ops_uap_prepare_cmd(IN t_void * priv,
-                                     IN t_u16 cmd_no,
-                                     IN t_u16 cmd_action,
-                                     IN t_u32 cmd_oid,
-                                     IN t_void * pioctl_buf,
-                                     IN t_void * pdata_buf,
-                                     IN t_void * pcmd_buf);
+				     IN t_u16 cmd_no,
+				     IN t_u16 cmd_action,
+				     IN t_u32 cmd_oid,
+				     IN t_void * pioctl_buf,
+				     IN t_void * pdata_buf,
+				     IN t_void * pcmd_buf);
 
 mlan_status wlan_ops_uap_process_cmdresp(IN t_void * priv,
-                                         IN t_u16 cmdresp_no,
-                                         IN t_void * pcmd_buf,
-                                         IN t_void * pioctl);
+					 IN t_u16 cmdresp_no,
+					 IN t_void * pcmd_buf,
+					 IN t_void * pioctl);
 
 mlan_status wlan_ops_uap_process_rx_packet(IN t_void * adapter,
-                                           IN pmlan_buffer pmbuf);
+					   IN pmlan_buffer pmbuf);
 
 mlan_status wlan_ops_uap_process_event(IN t_void * priv);
 

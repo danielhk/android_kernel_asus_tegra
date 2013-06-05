@@ -96,61 +96,61 @@ Change log:
 /** Data port mask */
 #define DATA_PORT_MASK			0xfffe
 /** Misc. Config Register : Auto Re-enable interrupts */
-#define AUTO_RE_ENABLE_INT		MBIT(4)
+#define AUTO_RE_ENABLE_INT             	MBIT(4)
 
 /** Host Control Registers : Host transfer status */
 #define HOST_RESTART_REG		0x28
 /** Host Control Registers : Download CRC error */
-#define DN_LD_CRC_ERR			(0x1U << 2)
+#define DN_LD_CRC_ERR              	(0x1U << 2)
 /** Host Control Registers : Upload restart */
-#define UP_LD_RESTART			(0x1U << 1)
+#define UP_LD_RESTART              	(0x1U << 1)
 /** Host Control Registers : Download restart */
-#define DN_LD_RESTART			(0x1U << 0)
+#define DN_LD_RESTART              	(0x1U << 0)
 
 /* Card Control Registers */
 /** Card Control Registers : Card to host event */
-#define CARD_TO_HOST_EVENT_REG		0x30
+#define CARD_TO_HOST_EVENT_REG         	0x30
 /** Card Control Registers : Card I/O ready */
-#define CARD_IO_READY			(0x1U << 3)
+#define CARD_IO_READY              	(0x1U << 3)
 /** Card Control Registers : CIS card ready */
-#define CIS_CARD_RDY			(0x1U << 2)
+#define CIS_CARD_RDY                 	(0x1U << 2)
 /** Card Control Registers : Upload card ready */
-#define UP_LD_CARD_RDY			(0x1U << 1)
+#define UP_LD_CARD_RDY               	(0x1U << 1)
 /** Card Control Registers : Download card ready */
-#define DN_LD_CARD_RDY			(0x1U << 0)
+#define DN_LD_CARD_RDY               	(0x1U << 0)
 
 /** Card Control Registers : Host interrupt mask register */
-#define HOST_INTERRUPT_MASK_REG		0x34
+#define HOST_INTERRUPT_MASK_REG      	0x34
 /** Card Control Registers : Host power interrupt mask */
-#define HOST_POWER_INT_MASK		(0x1U << 3)
+#define HOST_POWER_INT_MASK          	(0x1U << 3)
 /** Card Control Registers : Abort card interrupt mask */
-#define ABORT_CARD_INT_MASK		(0x1U << 2)
+#define ABORT_CARD_INT_MASK          	(0x1U << 2)
 /** Card Control Registers : Upload card interrupt mask */
-#define UP_LD_CARD_INT_MASK		(0x1U << 1)
+#define UP_LD_CARD_INT_MASK          	(0x1U << 1)
 /** Card Control Registers : Download card interrupt mask */
-#define DN_LD_CARD_INT_MASK		(0x1U << 0)
+#define DN_LD_CARD_INT_MASK          	(0x1U << 0)
 
 /** Card Control Registers : Card interrupt status register */
-#define CARD_INTERRUPT_STATUS_REG	0x38
+#define CARD_INTERRUPT_STATUS_REG    	0x38
 /** Card Control Registers : Power up interrupt */
-#define POWER_UP_INT			(0x1U << 4)
+#define POWER_UP_INT                 	(0x1U << 4)
 /** Card Control Registers : Power down interrupt */
-#define POWER_DOWN_INT			(0x1U << 3)
+#define POWER_DOWN_INT               	(0x1U << 3)
 
 /** Card Control Registers : Card interrupt RSR register */
-#define CARD_INTERRUPT_RSR_REG		0x3c
+#define CARD_INTERRUPT_RSR_REG       	0x3c
 /** Card Control Registers : Power up RSR */
-#define POWER_UP_RSR			(0x1U << 4)
+#define POWER_UP_RSR                 	(0x1U << 4)
 /** Card Control Registers : Power down RSR */
-#define POWER_DOWN_RSR			(0x1U << 3)
+#define POWER_DOWN_RSR               	(0x1U << 3)
 
 /** Card Control Registers : SQ Read base address 0 register */
-#define READ_BASE_0_REG			0x40
+#define READ_BASE_0_REG  		0x40
 /** Card Control Registers : SQ Read base address 1 register */
-#define READ_BASE_1_REG			0x41
+#define READ_BASE_1_REG  		0x41
 
 /** Card Control Registers : Card revision register */
-#define CARD_REVISION_REG		0x5c
+#define CARD_REVISION_REG            	0x5c
 
 /** Firmware status 0 register (SCRATCH0_0) */
 #define CARD_FW_STATUS0_REG		0x60
@@ -162,32 +162,32 @@ Change log:
 #define CARD_RX_UNIT_REG		0x63
 
 /** Card Control Registers : Card OCR 0 register */
-#define CARD_OCR_0_REG			0x68
+#define CARD_OCR_0_REG               	0x68
 /** Card Control Registers : Card OCR 1 register */
-#define CARD_OCR_1_REG			0x69
+#define CARD_OCR_1_REG               	0x69
 /** Card Control Registers : Card OCR 3 register */
-#define CARD_OCR_3_REG			0x6A
+#define CARD_OCR_3_REG               	0x6A
 /** Card Control Registers : Card config register */
-#define CARD_CONFIG_REG			0x6B
+#define CARD_CONFIG_REG              	0x6B
 /** Card Control Registers : Miscellaneous Configuration Register */
-#define CARD_MISC_CFG_REG		0x6C
+#define CARD_MISC_CFG_REG              	0x6C
 
 /** Card Control Registers : Debug 0 register */
-#define DEBUG_0_REG			0x70
+#define DEBUG_0_REG                  	0x70
 /** Card Control Registers : SD test BUS 0 */
-#define SD_TESTBUS0			(0x1U)
+#define SD_TESTBUS0                  	(0x1U)
 /** Card Control Registers : Debug 1 register */
-#define DEBUG_1_REG			0x71
+#define DEBUG_1_REG                  	0x71
 /** Card Control Registers : SD test BUS 1 */
-#define SD_TESTBUS1			(0x1U)
+#define SD_TESTBUS1                  	(0x1U)
 /** Card Control Registers : Debug 2 register */
-#define DEBUG_2_REG			0x72
+#define DEBUG_2_REG                  	0x72
 /** Card Control Registers : SD test BUS 2 */
-#define SD_TESTBUS2			(0x1U)
+#define SD_TESTBUS2                  	(0x1U)
 /** Card Control Registers : Debug 3 register */
-#define DEBUG_3_REG			0x73
+#define DEBUG_3_REG                  	0x73
 /** Card Control Registers : SD test BUS 3 */
-#define SD_TESTBUS3			(0x1U)
+#define SD_TESTBUS3                  	(0x1U)
 
 /** Host Control Registers : I/O port 0 */
 #define IO_PORT_0_REG			0x78
@@ -223,7 +223,7 @@ Change log:
         a->mpa_tx.start_port = port;                            \
     }                                                           \
     if(a->mpa_tx.start_port<=port){                             \
-        a->mpa_tx.ports |= (1<<(a->mpa_tx.pkt_cnt));			\
+        a->mpa_tx.ports |= (1<<(a->mpa_tx.pkt_cnt)); 			\
     }else{                                                      \
           a->mpa_tx.ports |= (1<<(a->mpa_tx.pkt_cnt+1+(MAX_PORT - a->mp_end_port)));           \
     }                                                           \
@@ -264,7 +264,8 @@ Change log:
 #define MP_RX_AGGR_IN_PROGRESS(a) (a->mpa_rx.pkt_cnt>0)
 
 /** SDIO Rx aggregation buffer room for next packet ? */
-#define MP_RX_AGGR_BUF_HAS_ROOM(a,rx_len)   ((a->mpa_rx.buf_len+rx_len)<=a->mpa_rx.buf_size)
+#define MP_RX_AGGR_BUF_HAS_ROOM(a,rx_len)   \
+    ((a->mpa_rx.buf_len+rx_len)<=a->mpa_rx.buf_size)
 
 /** Prepare to copy current packet from card to SDIO Rx aggregation buffer */
 #define MP_RX_AGGR_SETUP(a, mbuf, port, rx_len) do{    \
@@ -306,10 +307,10 @@ t_void wlan_interrupt(pmlan_adapter pmadapter);
 mlan_status wlan_process_int_status(mlan_adapter * pmadapter);
 /** Transfer data to card */
 mlan_status wlan_sdio_host_to_card(mlan_adapter * pmadapter, t_u8 type,
-                                   mlan_buffer * mbuf,
-                                   mlan_tx_param * tx_param);
+				   mlan_buffer * mbuf,
+				   mlan_tx_param * tx_param);
 mlan_status wlan_set_sdio_gpio_int(IN pmlan_private priv);
 mlan_status wlan_cmd_sdio_gpio_int(pmlan_private pmpriv,
-                                   IN HostCmd_DS_COMMAND * cmd,
-                                   IN t_u16 cmd_action, IN t_void * pdata_buf);
+				   IN HostCmd_DS_COMMAND * cmd,
+				   IN t_u16 cmd_action, IN t_void * pdata_buf);
 #endif /* _MLAN_SDIO_H */

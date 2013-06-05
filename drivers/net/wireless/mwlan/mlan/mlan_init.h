@@ -32,7 +32,7 @@ Change log:
 /** Rx buffer size for firmware download*/
 #define FW_DNLD_RX_BUF_SIZE       2048
 /** Max firmware retry */
-#define MAX_FW_RETRY		3
+#define MAX_FW_RETRY        	3
 
 /** Firmware has last block */
 #define FW_HAS_LAST_BLOCK		0x00000004
@@ -45,33 +45,33 @@ Change log:
 typedef struct _FWHeader
 {
     /** FW download command */
-    t_u32 dnld_cmd;
+	t_u32 dnld_cmd;
     /** FW base address */
-    t_u32 base_addr;
+	t_u32 base_addr;
     /** FW data length */
-    t_u32 data_length;
+	t_u32 data_length;
     /** FW CRC */
-    t_u32 crc;
+	t_u32 crc;
 } FWHeader;
 
 /** FWData */
 typedef struct _FWData
 {
     /** FW data header */
-    FWHeader fw_header;
+	FWHeader fw_header;
     /** FW data sequence number */
-    t_u32 seq_num;
+	t_u32 seq_num;
     /** FW data buffer */
-    t_u8 data[1];
+	t_u8 data[1];
 } FWData;
 
 /** FWSyncHeader */
 typedef struct _FWSyncHeader
 {
     /** FW sync header command */
-    t_u32 cmd;
+	t_u32 cmd;
     /** FW sync header sequence number */
-    t_u32 seq_num;
+	t_u32 seq_num;
 } FWSyncHeader;
 
 #ifdef BIG_ENDIAN_SUPPORT
