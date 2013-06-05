@@ -61,7 +61,6 @@
 #define PMC_CTRL		0x0
 #define PMC_CTRL_INTR_LOW	(1 << 17)
 #define TPS65090_CHARGER_INT	TEGRA_GPIO_PJ0
-#define POWER_CONFIG2	0x01
 
 /*TPS65090 consumer rails */
 static struct regulator_consumer_supply tps65090_dcdc1_supply[] = {
@@ -980,8 +979,6 @@ FIXED_REG(10,	avdd_hdmi_pll,	avdd_hdmi_pll,
 	ADD_FIXED_REG(en_1v8_cam_e1611), \
 	ADD_FIXED_REG(dvdd_ts),
 
-#define MOLLY_POWER_CONFIG_2			\
-	ADD_FIXED_REG(avdd_hdmi_pll),
 
 /* Gpio switch regulator platform data for Molly E1611 */
 static struct platform_device *fixed_reg_devs_e1611_a00[] = {
@@ -996,7 +993,7 @@ static struct platform_device *fixed_reg_devs_e1612_a00[] = {
 };
 
 static struct platform_device *fixed_reg_devs_molly_config2[] = {
-	MOLLY_POWER_CONFIG_2
+	ADD_FIXED_REG(avdd_hdmi_pll)
 };
 
 static void set_molly_power_config2(void)
@@ -1016,7 +1013,6 @@ int __init molly_palmas_regulator_init(void)
 {
 	void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
 	u32 pmc_ctrl;
-	u8 power_config;
 	int i;
 
 	/* TPS65913: Normal state of INT request line is LOW.
@@ -1026,9 +1022,7 @@ int __init molly_palmas_regulator_init(void)
 	pmc_ctrl = readl(pmc + PMC_CTRL);
 	writel(pmc_ctrl | PMC_CTRL_INTR_LOW, pmc + PMC_CTRL);
 
-	power_config = get_power_config();
-	if (power_config && POWER_CONFIG2)
-		set_molly_power_config2();
+	set_molly_power_config2();
 
 	for (i = 0; i < PALMAS_NUM_REGS ; i++) {
 		pmic_platform.reg_data[i] = molly_e1611_reg_data[i];
@@ -1186,17 +1180,14 @@ static struct platform_device molly_gps_regulator_device = {
 static int __init molly_fixed_regulator_init(void)
 {
 	struct board_info board_info;
-	u8 power_config;
 
 	if (!machine_is_molly())
 		return 0;
 
-	power_config = get_power_config();
 	tegra_get_board_info(&board_info);
 
-	if (power_config && POWER_CONFIG2)
-		platform_add_devices(fixed_reg_devs_molly_config2,
-				ARRAY_SIZE(fixed_reg_devs_molly_config2));
+	platform_add_devices(fixed_reg_devs_molly_config2,
+			ARRAY_SIZE(fixed_reg_devs_molly_config2));
 
 	if (board_info.board_id == BOARD_E1611 ||
 		board_info.board_id == BOARD_P2454)
