@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host 3D
  *
- * Copyright (c) 2012 NVIDIA Corporation.
+ * Copyright (c) 2012-2013, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -23,9 +23,14 @@
 #include <linux/module.h>
 #include <linux/scatterlist.h>
 #include <linux/pm_runtime.h>
+#include <linux/of.h>
+#include <linux/of_device.h>
+#include <linux/of_platform.h>
 #include <mach/gpufuse.h>
 
 #include "t20/t20.h"
+#include "t30/t30.h"
+#include "t114/t114.h"
 #include "host1x/host1x01_hardware.h"
 #include "nvhost_hwctx.h"
 #include "dev.h"
@@ -155,105 +160,36 @@ int nvhost_gr3d_prepare_power_off(struct platform_device *dev)
 	return nvhost_channel_save_context(pdata->channel);
 }
 
-enum gr3d_ip_ver {
-	gr3d_01 = 1,
-	gr3d_02,
-	gr3d_03,
-};
-
-struct gr3d_desc {
-	void (*finalize_poweron)(struct platform_device *dev);
-	void (*busy)(struct platform_device *);
-	void (*idle)(struct platform_device *);
-	void (*suspend_ndev)(struct platform_device *);
-	void (*init)(struct platform_device *dev);
-	void (*deinit)(struct platform_device *dev);
-	void (*scaling_init)(struct platform_device *dev);
-	void (*scaling_deinit)(struct platform_device *dev);
-	int (*prepare_poweroff)(struct platform_device *dev);
-	struct nvhost_hwctx_handler *(*alloc_hwctx_handler)(u32 syncpt,
-			u32 waitbase, struct nvhost_channel *ch);
-	int (*read_reg)(struct platform_device *dev, struct nvhost_channel *ch,
-			struct nvhost_hwctx *hwctx, u32 offset, u32 *value);
-};
-
-static const struct gr3d_desc gr3d[] = {
-	[gr3d_01] = {
-		.finalize_poweron = NULL,
-		.busy = NULL,
-		.idle = NULL,
-		.suspend_ndev = NULL,
-		.init = NULL,
-		.deinit = NULL,
-		.scaling_init = NULL,
-		.scaling_deinit = NULL,
-		.prepare_poweroff = nvhost_gr3d_prepare_power_off,
-		.alloc_hwctx_handler = nvhost_gr3d_t20_ctxhandler_init,
-		.read_reg = nvhost_gr3d_t20_read_reg,
-	},
-	[gr3d_02] = {
-		.finalize_poweron = NULL,
-		.busy = nvhost_scale3d_notify_busy,
-		.idle = nvhost_scale3d_notify_idle,
-		.suspend_ndev = nvhost_scale3d_suspend,
-		.init = NULL,
-		.deinit = NULL,
-		.scaling_init = nvhost_scale3d_init,
-		.scaling_deinit = nvhost_scale3d_deinit,
-		.prepare_poweroff = nvhost_gr3d_prepare_power_off,
-		.alloc_hwctx_handler = nvhost_gr3d_t30_ctxhandler_init,
-		.read_reg = nvhost_gr3d_t30_read_reg,
-	},
-	[gr3d_03] = {
-		.busy = nvhost_scale3d_actmon_notify_busy,
-		.idle = nvhost_scale3d_actmon_notify_idle,
-		.suspend_ndev = nvhost_scale3d_suspend,
-		.init = nvhost_gr3d_t114_init,
-		.deinit = nvhost_gr3d_t114_deinit,
-		.scaling_init = nvhost_scale3d_actmon_init,
-		.scaling_deinit = nvhost_scale3d_actmon_deinit,
-		.prepare_poweroff = nvhost_gr3d_t114_prepare_power_off,
-		.finalize_poweron = nvhost_gr3d_t114_finalize_power_on,
-		.alloc_hwctx_handler = nvhost_gr3d_t114_ctxhandler_init,
-		.read_reg = nvhost_gr3d_t30_read_reg,
-	},
-};
-
-static struct platform_device_id gr3d_id[] = {
-	{ "gr3d01", gr3d_01 },
-	{ "gr3d02", gr3d_02 },
-	{ "gr3d03", gr3d_03 },
+static struct of_device_id tegra_gr3d_of_match[] __devinitdata = {
+	{ .compatible = "nvidia,tegra20-gr3d",
+		.data = (struct nvhost_device_data *)&t20_gr3d_info },
+	{ .compatible = "nvidia,tegra30-gr3d",
+		.data = (struct nvhost_device_data *)&t30_gr3d_info },
+	{ .compatible = "nvidia,tegra114-gr3d",
+		.data = (struct nvhost_device_data *)&t11_gr3d_info },
 	{ },
 };
-
-MODULE_DEVICE_TABLE(nvhost, gr3d_id);
-
 static int __devinit gr3d_probe(struct platform_device *dev)
 {
-	int index = 0;
 	int err = 0;
-	struct nvhost_device_data *pdata =
-		(struct nvhost_device_data *)dev->dev.platform_data;
+	struct nvhost_device_data *pdata = NULL;
 
-	/* HACK: reset device name */
-	dev_set_name(&dev->dev, "%s", "gr3d");
+	if (dev->dev.of_node) {
+		const struct of_device_id *match;
+
+		match = of_match_device(tegra_gr3d_of_match, &dev->dev);
+		if (match)
+			pdata = (struct nvhost_device_data *)match->data;
+	} else
+		pdata = (struct nvhost_device_data *)dev->dev.platform_data;
+
+	WARN_ON(!pdata);
+	if (!pdata) {
+		dev_info(&dev->dev, "no platform data\n");
+		return -ENODATA;
+	}
 
 	pdata->pdev = dev;
-	index = (int)(platform_get_device_id(dev)->driver_data);
-	BUG_ON(index > gr3d_03);
-
-	pdata->finalize_poweron		= gr3d[index].finalize_poweron;
-	pdata->busy			= gr3d[index].busy;
-	pdata->idle			= gr3d[index].idle;
-	pdata->suspend_ndev		= gr3d[index].suspend_ndev;
-	pdata->init			= gr3d[index].init;
-	pdata->deinit			= gr3d[index].deinit;
-	pdata->scaling_init		= gr3d[index].scaling_init;
-	pdata->scaling_deinit		= gr3d[index].scaling_deinit;
-	pdata->prepare_poweroff		= gr3d[index].prepare_poweroff;
-	pdata->alloc_hwctx_handler	= gr3d[index].alloc_hwctx_handler;
-	pdata->read_reg			= gr3d[index].read_reg;
-
 	platform_set_drvdata(dev, pdata);
 
 	err = nvhost_client_device_init(dev);
@@ -296,8 +232,10 @@ static struct platform_driver gr3d_driver = {
 	.driver = {
 		.owner = THIS_MODULE,
 		.name = "gr3d",
+#ifdef CONFIG_OF
+		.of_match_table = tegra_gr3d_of_match,
+#endif
 	},
-	.id_table = gr3d_id,
 };
 
 static int __init gr3d_init(void)

@@ -34,7 +34,6 @@ struct tegra_sysedp_devcap {
 
 struct tegra_sysedp_corecap {
 	unsigned int power;
-	unsigned int loan;
 	struct tegra_sysedp_devcap cpupri;
 	struct tegra_sysedp_devcap gpupri;
 };
@@ -44,6 +43,7 @@ struct tegra_sysedp_platform_data {
 	unsigned int cpufreq_lim_size;
 	struct tegra_sysedp_corecap *corecap;
 	unsigned int corecap_size;
+	unsigned int init_req_watts;
 };
 
 #ifdef CONFIG_EDP_FRAMEWORK

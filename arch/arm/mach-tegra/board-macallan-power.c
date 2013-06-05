@@ -31,6 +31,9 @@
 #include <linux/gpio.h>
 #include <linux/interrupt.h>
 #include <linux/regulator/userspace-consumer.h>
+#include <linux/edp.h>
+#include <linux/edpdev.h>
+#include <linux/platform_data/tegra_edp.h>
 
 #include <asm/mach-types.h>
 #include <linux/power/sbs-battery.h>
@@ -82,6 +85,44 @@ struct bq2419x_charger_platform_data macallan_bq2419x_charger_pdata = {
 	.consumer_supplies = bq2419x_batt_supply,
 	.num_consumer_supplies = ARRAY_SIZE(bq2419x_batt_supply),
 	.wdt_timeout    = 40,
+};
+
+struct max17048_battery_model macallan_max17048_mdata = {
+	.rcomp		= 152,
+	.soccheck_A	= 206,
+	.soccheck_B	= 208,
+	.bits		= 19,
+	.alert_threshold = 0x00,
+	.one_percent_alerts = 0x40,
+	.alert_on_reset = 0x40,
+	.rcomp_seg	= 0x0080,
+	.hibernate	= 0x3080,
+	.vreset		= 0x3c96,
+	.valert		= 0xD4AA,
+	.ocvtest	= 55744,
+	.data_tbl = {
+		0xA2, 0x80, 0xA8, 0xF0, 0xAE, 0xD0, 0xB0, 0x90,
+		0xB2, 0x60, 0xB3, 0xF0, 0xB5, 0x80, 0xB7, 0x20,
+		0xB8, 0xD0, 0xBC, 0x00, 0xBE, 0x20, 0xC0, 0x20,
+		0xC3, 0xD0, 0xC9, 0x80, 0xCE, 0xA0, 0xCF, 0xC0,
+		0x0A, 0x60, 0x0D, 0xE0, 0x1D, 0x00, 0x1D, 0xE0,
+		0x1F, 0xE0, 0x1F, 0xE0, 0x11, 0xC0, 0x11, 0x20,
+		0x14, 0x60, 0x0B, 0xE0, 0x14, 0x80, 0x14, 0xC0,
+		0x0E, 0x20, 0x12, 0xA0, 0x03, 0x60, 0x03, 0x60,
+	},
+};
+
+struct max17048_platform_data macallan_max17048_pdata = {
+	.use_ac = 0,
+	.use_usb = 0,
+	.model_data = &macallan_max17048_mdata,
+};
+
+static struct i2c_board_info __initdata macallan_max17048_boardinfo[] = {
+	{
+		I2C_BOARD_INFO("max17048", 0x36),
+		.platform_data	= &macallan_max17048_pdata,
+	},
 };
 
 struct bq2419x_platform_data macallan_bq2419x_pdata = {
@@ -241,26 +282,46 @@ static struct regulator_consumer_supply palmas_regen1_supply[] = {
 static struct regulator_consumer_supply palmas_regen2_supply[] = {
 };
 
-PALMAS_PDATA_INIT(smps123, 900,  1300, NULL, 0, 0, 0, 0);
-PALMAS_PDATA_INIT(smps45, 900,  1400, NULL, 0, 0, 0, 0);
-PALMAS_PDATA_INIT(smps6, 3200,  3200, NULL, 0, 0, 1, NORMAL);
-PALMAS_PDATA_INIT(smps7, 1350,  1350, NULL, 0, 0, 1, NORMAL);
-PALMAS_PDATA_INIT(smps8, 1800,  1800, NULL, 1, 1, 1, NORMAL);
-PALMAS_PDATA_INIT(smps9, 2900,  2900, NULL, 1, 0, 1, NORMAL);
-PALMAS_PDATA_INIT(smps10, 5000,  5000, NULL, 0, 0, 0, 0);
-PALMAS_PDATA_INIT(ldo1, 1050,  1050, palmas_rails(smps7), 1, 0, 1, 0);
-PALMAS_PDATA_INIT(ldo2, 1200,  1200, palmas_rails(smps7), 0, 1, 1, 0);
-PALMAS_PDATA_INIT(ldo3, 1800,  1800, NULL, 0, 0, 0, 0);
-PALMAS_PDATA_INIT(ldo4, 1200,  1200, palmas_rails(smps8), 0, 0, 0, 0);
-PALMAS_PDATA_INIT(ldo5, 2700,  2700, palmas_rails(smps9), 0, 0, 1, 0);
-PALMAS_PDATA_INIT(ldo6, 2850,  2850, palmas_rails(smps9), 1, 1, 1, 0);
-PALMAS_PDATA_INIT(ldo7, 2700,  2700, palmas_rails(smps9), 0, 0, 1, 0);
-PALMAS_PDATA_INIT(ldo8, 950,  950, NULL, 1, 1, 1, 0);
-PALMAS_PDATA_INIT(ldo9, 1800,  2900, palmas_rails(smps9), 0, 0, 1, 0);
-PALMAS_PDATA_INIT(ldoln, 3300,   3300, NULL, 0, 0, 1, 0);
-PALMAS_PDATA_INIT(ldousb, 3300,  3300, NULL, 0, 0, 1, 0);
-PALMAS_PDATA_INIT(regen1, 4200,  4200, NULL, 0, 0, 0, 0);
-PALMAS_PDATA_INIT(regen2, 4200,  4200, palmas_rails(smps8), 0, 0, 0, 0);
+PALMAS_REGS_PDATA(smps123, 900,  1300, NULL, 0, 0, 0, 0,
+	0, PALMAS_EXT_CONTROL_ENABLE1, 0, 3, 0);
+PALMAS_REGS_PDATA(smps45, 900,  1400, NULL, 0, 0, 0, 0,
+	0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+PALMAS_REGS_PDATA(smps6, 3200,  3200, NULL, 0, 0, 1, NORMAL,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(smps7, 1350,  1350, NULL, 0, 0, 1, NORMAL,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(smps8, 1800,  1800, NULL, 1, 1, 1, NORMAL,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(smps9, 2900,  2900, NULL, 1, 0, 1, NORMAL,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(smps10, 5000,  5000, NULL, 0, 0, 0, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo1, 1050,  1050, palmas_rails(smps7), 1, 0, 1, 0,
+	0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo2, 1200,  1200, palmas_rails(smps7), 0, 1, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo3, 1800,  1800, NULL, 0, 0, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo4, 1200,  1200, palmas_rails(smps8), 0, 0, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo5, 2800,  2800, palmas_rails(smps9), 0, 0, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo6, 2850,  2850, palmas_rails(smps9), 1, 1, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo7, 2700,  2700, palmas_rails(smps9), 0, 0, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo8, 950,  950, NULL, 1, 1, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo9, 1800,  2900, palmas_rails(smps9), 0, 0, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldoln, 3300,   3300, NULL, 0, 0, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldousb, 3300,  3300, NULL, 0, 0, 1, 0,
+	0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+PALMAS_REGS_PDATA(regen1, 4200,  4200, NULL, 0, 0, 0, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(regen2, 4200,  4200, palmas_rails(smps8), 0, 0, 0, 0,
+	0, 0, 0, 0, 0);
 
 #define PALMAS_REG_PDATA(_sname) (&reg_idata_##_sname)
 static struct regulator_init_data *macallan_reg_data[PALMAS_NUM_REGS] = {
@@ -292,45 +353,13 @@ static struct regulator_init_data *macallan_reg_data[PALMAS_NUM_REGS] = {
 	NULL,
 };
 
-#define PALMAS_REG_INIT(_name, _warm_reset, _roof_floor, _mode_sleep,	\
-		_tstep, _vsel)						\
-	static struct palmas_reg_init reg_init_data_##_name = {		\
-		.warm_reset = _warm_reset,				\
-		.roof_floor =	_roof_floor,				\
-		.mode_sleep = _mode_sleep,		\
-		.tstep = _tstep,			\
-		.vsel = _vsel,		\
-	}
-
-PALMAS_REG_INIT(smps12, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(smps123, 0, PALMAS_EXT_CONTROL_ENABLE1, 0, 0, 0);
-PALMAS_REG_INIT(smps3, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(smps45, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(smps457, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(smps6, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(smps7, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(smps8, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(smps9, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(smps10, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(ldo1, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(ldo2, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(ldo3, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(ldo4, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(ldo5, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(ldo6, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(ldo7, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(ldo8, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(ldo9, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(ldoln, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(ldousb, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-
 #define PALMAS_REG_INIT_DATA(_sname) (&reg_init_data_##_sname)
 static struct palmas_reg_init *macallan_reg_init[PALMAS_NUM_REGS] = {
-	PALMAS_REG_INIT_DATA(smps12),
+	NULL,
 	PALMAS_REG_INIT_DATA(smps123),
-	PALMAS_REG_INIT_DATA(smps3),
+	NULL,
 	PALMAS_REG_INIT_DATA(smps45),
-	PALMAS_REG_INIT_DATA(smps457),
+	NULL,
 	PALMAS_REG_INIT_DATA(smps6),
 	PALMAS_REG_INIT_DATA(smps7),
 	PALMAS_REG_INIT_DATA(smps8),
@@ -347,6 +376,11 @@ static struct palmas_reg_init *macallan_reg_init[PALMAS_NUM_REGS] = {
 	PALMAS_REG_INIT_DATA(ldo9),
 	PALMAS_REG_INIT_DATA(ldoln),
 	PALMAS_REG_INIT_DATA(ldousb),
+	PALMAS_REG_INIT_DATA(regen1),
+	PALMAS_REG_INIT_DATA(regen2),
+	NULL,
+	NULL,
+	NULL,
 };
 
 static struct palmas_pmic_platform_data pmic_platform = {
@@ -375,7 +409,7 @@ static struct palmas_pinctrl_platform_data palmas_pinctrl_pdata = {
 	.dvfs2_enable = false,
 };
 
-struct palmas_extcon_platform_data palmas_extcon_pdata = {
+static struct palmas_extcon_platform_data palmas_extcon_pdata = {
 	.connection_name = "palmas-extcon",
 	.enable_vbus_detection = true,
 	.enable_id_pin_detection = true,
@@ -592,7 +626,7 @@ static struct tegra_suspend_platform_data macallan_suspend_data = {
 #ifdef CONFIG_ARCH_TEGRA_HAS_CL_DVFS
 /* board parameters for cpu dfll */
 static struct tegra_cl_dvfs_cfg_param macallan_cl_dvfs_param = {
-	.sample_rate = 12500,
+	.sample_rate = 11500,
 
 	.force_mode = TEGRA_CL_DVFS_FORCE_FIXED,
 	.cf = 10,
@@ -636,7 +670,8 @@ static int __init macallan_cl_dvfs_init(void)
 {
 	fill_reg_map();
 	if (tegra_revision < TEGRA_REVISION_A02)
-		macallan_cl_dvfs_data.out_quiet_then_disable = true;
+		macallan_cl_dvfs_data.flags =
+			TEGRA_CL_DVFS_FLAGS_I2C_WAIT_QUIET;
 	tegra_cl_dvfs_device.dev.platform_data = &macallan_cl_dvfs_data;
 	platform_device_register(&tegra_cl_dvfs_device);
 
@@ -656,14 +691,28 @@ subsys_initcall_sync(macallan_fixed_regulator_init);
 
 int __init macallan_regulator_init(void)
 {
+	struct board_info board_info;
+	tegra_get_board_info(&board_info);
 
 #ifdef CONFIG_ARCH_TEGRA_HAS_CL_DVFS
 	macallan_cl_dvfs_init();
 #endif
 	macallan_palmas_regulator_init();
 
-	/* forced make null to prevent charging. */
-	macallan_bq2419x_pdata.bcharger_pdata = NULL;
+	if (board_info.board_id == BOARD_E1569) {
+		if (get_power_supply_type() != POWER_SUPPLY_TYPE_BATTERY) {
+			/* Disable charger when adapter is power source. */
+			macallan_bq2419x_pdata.bcharger_pdata = NULL;
+		}
+		else {
+			/* Only register fuel gauge when using battery. */
+			i2c_register_board_info(0, macallan_max17048_boardinfo,
+						1);
+		}
+	} else {
+		/* forced make null to prevent charging for E1545. */
+		macallan_bq2419x_pdata.bcharger_pdata = NULL;
+	}
 
 	bq2419x_boardinfo[0].irq = gpio_to_irq(TEGRA_GPIO_PJ0);
 	i2c_register_board_info(0, bq2419x_boardinfo,
@@ -784,4 +833,131 @@ int __init macallan_soctherm_init(void)
 
 
 	return tegra11_soctherm_init(&macallan_soctherm_data);
+}
+
+static struct edp_manager macallan_sysedp_manager = {
+	.name = "battery",
+	.max = 27300
+};
+
+void __init macallan_sysedp_init(void)
+{
+	struct edp_governor *g;
+	int r;
+
+	if (!IS_ENABLED(CONFIG_EDP_FRAMEWORK))
+		return;
+
+	r = edp_register_manager(&macallan_sysedp_manager);
+	WARN_ON(r);
+	if (r)
+		return;
+
+	/* start with priority governor */
+	g = edp_get_governor("priority");
+	WARN_ON(!g);
+	if (!g)
+		return;
+
+	r = edp_set_governor(&macallan_sysedp_manager, g);
+	WARN_ON(r);
+}
+
+static unsigned int macallan_psydepl_states[] = {
+	9900, 9600, 9300, 9000, 8700, 8400, 8100, 7800,
+	7500, 7200, 6900, 6600, 6300, 6000, 5800, 5600,
+	5400, 5200, 5000, 4800, 4600, 4400, 4200, 4000,
+	3800, 3600, 3400, 3200, 3000, 2800, 2600, 2400,
+	2200, 2000, 1900, 1800, 1700, 1600, 1500, 1400,
+	1300, 1200, 1100, 1000,  900,  800,  700,  600,
+	 500,  400,  300,  200,  100,    0
+};
+
+static struct psy_depletion_ibat_lut macallan_ibat_lut[] = {
+	{  60,  500 },
+	{  40, 3900 },
+	{   0, 3900 },
+	{ -30,    0 }
+};
+
+static struct psy_depletion_rbat_lut macallan_rbat_lut[] = {
+	{ 0, 95000 }
+};
+
+static struct psy_depletion_platform_data macallan_psydepl_pdata = {
+	.power_supply = "battery",
+	.states = macallan_psydepl_states,
+	.num_states = ARRAY_SIZE(macallan_psydepl_states),
+	.e0_index = 16,
+	.r_const = 55000,
+	.vsys_min = 3250000,
+	.vcharge = 4200000,
+	.ibat_nom = 3900,
+	.ibat_lut = macallan_ibat_lut,
+	.rbat_lut = macallan_rbat_lut
+};
+
+static struct platform_device macallan_psydepl_device = {
+	.name = "psy_depletion",
+	.id = -1,
+	.dev = { .platform_data = &macallan_psydepl_pdata }
+};
+
+void __init macallan_sysedp_psydepl_init(void)
+{
+	int r;
+
+	r = platform_device_register(&macallan_psydepl_device);
+	WARN_ON(r);
+}
+
+static struct tegra_sysedp_corecap macallan_sysedp_corecap[] = {
+	{  1000, {  1000, 240, 204 }, {  1000, 240, 204 } },
+	{  2000, {  1000, 240, 204 }, {  1000, 240, 204 } },
+	{  3000, {  1000, 240, 204 }, {  1000, 240, 204 } },
+	{  4000, {  1000, 240, 204 }, {  1000, 240, 204 } },
+	{  5000, {  1000, 240, 204 }, {  1000, 240, 312 } },
+	{  6000, {  1679, 240, 312 }, {  1679, 240, 312 } },
+	{  7000, {  1843, 240, 624 }, {  1975, 324, 408 } },
+	{  8000, {  2843, 240, 624 }, {  2306, 420, 624 } },
+	{  9000, {  3843, 240, 624 }, {  2606, 420, 792 } },
+	{ 10000, {  4565, 240, 792 }, {  3398, 528, 792 } },
+	{ 11000, {  5565, 240, 792 }, {  4398, 528, 792 } },
+	{ 12000, {  6565, 240, 792 }, {  4277, 600, 792 } },
+	{ 13000, {  7565, 240, 792 }, {  5277, 600, 792 } },
+	{ 14000, {  8565, 240, 792 }, {  6277, 600, 792 } },
+	{ 15000, {  9565, 240, 792 }, {  7277, 600, 792 } },
+	{ 16000, { 10565, 240, 792 }, {  8277, 600, 792 } },
+	{ 17000, { 11565, 240, 792 }, {  9277, 600, 792 } },
+	{ 18000, { 12565, 240, 792 }, { 10277, 600, 792 } },
+	{ 19000, { 13565, 240, 792 }, { 11277, 600, 792 } },
+	{ 20000, { 14565, 240, 792 }, { 12277, 600, 792 } },
+	{ 23000, { 14565, 600, 792 }, { 14565, 600, 792 } },
+};
+
+static struct tegra_sysedp_platform_data macallan_sysedp_platdata = {
+	.corecap = macallan_sysedp_corecap,
+	.corecap_size = ARRAY_SIZE(macallan_sysedp_corecap),
+	.init_req_watts = 20000
+};
+
+static struct platform_device macallan_sysedp_device = {
+	.name = "tegra_sysedp",
+	.id = -1,
+	.dev = { .platform_data = &macallan_sysedp_platdata }
+};
+
+void __init macallan_sysedp_core_init(void)
+{
+	int r;
+
+	macallan_sysedp_platdata.cpufreq_lim = tegra_get_system_edp_entries(
+			&macallan_sysedp_platdata.cpufreq_lim_size);
+	if (!macallan_sysedp_platdata.cpufreq_lim) {
+		WARN_ON(1);
+		return;
+	}
+
+	r = platform_device_register(&macallan_sysedp_device);
+	WARN_ON(r);
 }

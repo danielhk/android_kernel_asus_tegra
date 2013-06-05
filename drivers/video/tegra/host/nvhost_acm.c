@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host Automatic Clock Management
  *
- * Copyright (c) 2010-2012, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2010-2013, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -141,7 +141,7 @@ static void to_state_clockgated_locked(struct platform_device *dev)
 		for (i = 0; i < pdata->num_clks; i++)
 			clk_disable_unprepare(pdata->clk[i]);
 
-		if (dev->dev.parent)
+		if (nvhost_get_parent(dev))
 			nvhost_module_idle(to_platform_device(dev->dev.parent));
 
 		if (!pdata->can_powergate) {
@@ -175,7 +175,7 @@ static void to_state_running_locked(struct platform_device *dev)
 		if (!pdata->can_powergate)
 			pm_runtime_get_sync(&dev->dev);
 
-		if (dev->dev.parent)
+		if (nvhost_get_parent(dev))
 			nvhost_module_busy(to_platform_device(dev->dev.parent));
 
 		for (i = 0; i < pdata->num_clks; i++) {
@@ -356,6 +356,7 @@ static int nvhost_module_update_rate(struct platform_device *dev, int index)
 	struct nvhost_module_client *m;
 	unsigned long devfreq_rate, default_rate;
 	struct nvhost_device_data *pdata = platform_get_drvdata(dev);
+	int ret;
 
 	if (!pdata->clk[index])
 		return -EINVAL;
@@ -378,7 +379,13 @@ static int nvhost_module_update_rate(struct platform_device *dev, int index)
 	trace_nvhost_module_update_rate(dev->name,
 			pdata->clocks[index].name, rate);
 
-	return clk_set_rate(pdata->clk[index], rate);
+	ret = clk_set_rate(pdata->clk[index], rate);
+
+	if (pdata->update_clk)
+		pdata->update_clk(dev);
+
+	return ret;
+
 }
 
 int nvhost_module_set_rate(struct platform_device *dev, void *priv,
@@ -748,7 +755,7 @@ bool nvhost_module_powered_ext(struct platform_device *dev)
 {
 	struct platform_device *pdev;
 
-	BUG_ON(!dev->dev.parent);
+	BUG_ON(!nvhost_get_parent(dev));
 
 	/* get the parent */
 	pdev = to_platform_device(dev->dev.parent);
@@ -760,7 +767,7 @@ void nvhost_module_busy_ext(struct platform_device *dev)
 {
 	struct platform_device *pdev;
 
-	BUG_ON(!dev->dev.parent);
+	BUG_ON(!nvhost_get_parent(dev));
 
 	/* get the parent */
 	pdev = to_platform_device(dev->dev.parent);
@@ -772,7 +779,7 @@ void nvhost_module_idle_ext(struct platform_device *dev)
 {
 	struct platform_device *pdev;
 
-	BUG_ON(!dev->dev.parent);
+	BUG_ON(!nvhost_get_parent(dev));
 
 	/* get the parent */
 	pdev = to_platform_device(dev->dev.parent);

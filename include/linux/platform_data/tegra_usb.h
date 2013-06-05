@@ -60,6 +60,7 @@ struct tegra_utmi_config {
 	u8 xcvr_use_lsb;
 	u8 xcvr_use_fuses;
 	u8 vbus_oc_map;
+	unsigned char xcvr_hsslew_lsb:2;
 };
 
 /**
@@ -112,6 +113,7 @@ struct tegra_usb_host_mode_data {
 	bool hot_plug;
 	bool remote_wakeup_supported;
 	bool power_off_on_suspend;
+	bool turn_off_vbus_on_lp0;
 };
 
 /**

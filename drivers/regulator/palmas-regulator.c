@@ -2,6 +2,7 @@
  * Driver for Regulator part of Palmas PMIC Chips
  *
  * Copyright 2011-2012 Texas Instruments Inc.
+ * Copyright (c) 2013, NVIDIA CORPORATION.  All rights reserved.
  *
  * Author: Graeme Gregory <gg@slimlogic.co.uk>
  *
@@ -27,6 +28,10 @@
 #define PALMA_SMPS10_BOOST_EN	BIT(2)
 #define PALMA_SMPS10_BYPASS_EN	BIT(1)
 #define PALMA_SMPS10_SWITCH_EN	BIT(0)
+
+#define EXT_PWR_REQ (PALMAS_EXT_CONTROL_ENABLE1 |	\
+		     PALMAS_EXT_CONTROL_ENABLE2 |	\
+		     PALMAS_EXT_CONTROL_NSLEEP)
 
 struct regs_info {
 	char	*name;
@@ -293,6 +298,9 @@ static int palmas_is_enabled_smps(struct regulator_dev *dev)
 	int id = rdev_get_id(dev);
 	unsigned int reg;
 
+	if (EXT_PWR_REQ & pmic->roof_floor[id])
+		return true;
+
 	palmas_smps_read(pmic->palmas, palmas_regs_info[id].ctrl_addr, &reg);
 
 	reg &= PALMAS_SMPS12_CTRL_MODE_ACTIVE_MASK;
@@ -306,6 +314,9 @@ static int palmas_enable_smps(struct regulator_dev *dev)
 	struct palmas_pmic *pmic = rdev_get_drvdata(dev);
 	int id = rdev_get_id(dev);
 	unsigned int reg;
+
+	if (EXT_PWR_REQ & pmic->roof_floor[id])
+		return 0;
 
 	palmas_smps_read(pmic->palmas, palmas_regs_info[id].ctrl_addr, &reg);
 
@@ -325,6 +336,9 @@ static int palmas_disable_smps(struct regulator_dev *dev)
 	struct palmas_pmic *pmic = rdev_get_drvdata(dev);
 	int id = rdev_get_id(dev);
 	unsigned int reg;
+
+	if (EXT_PWR_REQ & pmic->roof_floor[id])
+		return 0;
 
 	palmas_smps_read(pmic->palmas, palmas_regs_info[id].ctrl_addr, &reg);
 
@@ -505,7 +519,7 @@ static int palma_smps_set_voltage_smps_time_sel(struct regulator_dev *rdev,
 
 	/* ES2.1, have the 1.5X slower slew rate than configured */
 	if (palmas_is_es_version_or_less(pmic->palmas, 2, 1))
-		ramp_delay = (ramp_delay * 15)/10;
+		ramp_delay = (ramp_delay * 10)/15;
 
 	if (!ramp_delay)
 		return 0;
@@ -532,9 +546,9 @@ static int palmas_smps_set_ramp_delay(struct regulator_dev *rdev,
 
 	if (ramp_delay <= 0)
 		reg = 0;
-	else if (ramp_delay < 2500)
+	else if (ramp_delay <= 2500)
 		reg = 3;
-	else if (ramp_delay < 5000)
+	else if (ramp_delay <= 5000)
 		reg = 2;
 	else
 		reg = 1;
@@ -566,8 +580,12 @@ static struct regulator_ops palmas_ops_smps = {
 static int palmas_is_enabled_smps10(struct regulator_dev *dev)
 {
 	struct palmas_pmic *pmic = rdev_get_drvdata(dev);
+	int id = rdev_get_id(dev);
 	unsigned int reg;
 	int ret;
+
+	if (EXT_PWR_REQ & pmic->roof_floor[id])
+		return true;
 
 	ret = palmas_smps_read(pmic->palmas, PALMAS_SMPS10_STATUS, &reg);
 	if (ret < 0) {
@@ -589,6 +607,9 @@ static int palmas_enable_smps10(struct regulator_dev *dev)
 	unsigned int reg;
 	int ret;
 
+	if (EXT_PWR_REQ & pmic->roof_floor[id])
+		return 0;
+
 	ret = palmas_smps_read(pmic->palmas,
 				palmas_regs_info[id].ctrl_addr, &reg);
 	if (ret < 0) {
@@ -603,6 +624,8 @@ static int palmas_enable_smps10(struct regulator_dev *dev)
 	if (ret < 0)
 		dev_err(pmic->palmas->dev,
 			"Error in writing smps10 control reg\n");
+
+	pmic->smps10_regulator_enabled = true;
 	return ret;
 }
 
@@ -612,6 +635,9 @@ static int palmas_disable_smps10(struct regulator_dev *dev)
 	int id = rdev_get_id(dev);
 	unsigned int reg;
 	int ret;
+
+	if (EXT_PWR_REQ & pmic->roof_floor[id])
+		return 0;
 
 	ret = palmas_smps_read(pmic->palmas,
 				palmas_regs_info[id].ctrl_addr, &reg);
@@ -627,6 +653,7 @@ static int palmas_disable_smps10(struct regulator_dev *dev)
 	if (ret < 0)
 		dev_err(pmic->palmas->dev,
 			"Error in writing smps10 control reg\n");
+	pmic->smps10_regulator_enabled = false;
 	return ret;
 }
 
@@ -704,6 +731,9 @@ static int palmas_is_enabled_ldo(struct regulator_dev *dev)
 	int id = rdev_get_id(dev);
 	unsigned int reg;
 
+	if (EXT_PWR_REQ & pmic->roof_floor[id])
+		return true;
+
 	palmas_ldo_read(pmic->palmas, palmas_regs_info[id].ctrl_addr, &reg);
 
 	reg &= PALMAS_LDO1_CTRL_STATUS;
@@ -716,6 +746,9 @@ static int palmas_enable_ldo(struct regulator_dev *dev)
 	struct palmas_pmic *pmic = rdev_get_drvdata(dev);
 	int id = rdev_get_id(dev);
 	unsigned int reg;
+
+	if (EXT_PWR_REQ & pmic->roof_floor[id])
+		return 0;
 
 	palmas_ldo_read(pmic->palmas, palmas_regs_info[id].ctrl_addr, &reg);
 
@@ -731,6 +764,9 @@ static int palmas_disable_ldo(struct regulator_dev *dev)
 	struct palmas_pmic *pmic = rdev_get_drvdata(dev);
 	int id = rdev_get_id(dev);
 	unsigned int reg;
+
+	if (EXT_PWR_REQ & pmic->roof_floor[id])
+		return 0;
 
 	palmas_ldo_read(pmic->palmas, palmas_regs_info[id].ctrl_addr, &reg);
 
@@ -805,6 +841,9 @@ static int palmas_is_enabled_extreg(struct regulator_dev *dev)
 	unsigned int reg;
 	int ret;
 
+	if (EXT_PWR_REQ & pmic->roof_floor[id])
+		return true;
+
 	ret = palmas_resource_read(pmic->palmas,
 			palmas_regs_info[id].ctrl_addr, &reg);
 	reg &= PALMAS_REGEN1_CTRL_STATUS;
@@ -820,6 +859,9 @@ static int palmas_enable_extreg(struct regulator_dev *dev)
 	int id = rdev_get_id(dev);
 	unsigned int reg;
 	int ret;
+
+	if (EXT_PWR_REQ & pmic->roof_floor[id])
+		return 0;
 
 	ret = palmas_resource_read(pmic->palmas,
 			palmas_regs_info[id].ctrl_addr, &reg);
@@ -838,6 +880,9 @@ static int palmas_disable_extreg(struct regulator_dev *dev)
 	int id = rdev_get_id(dev);
 	unsigned int reg;
 	int ret;
+
+	if (EXT_PWR_REQ & pmic->roof_floor[id])
+		return 0;
 
 	ret = palmas_resource_read(pmic->palmas,
 			palmas_regs_info[id].ctrl_addr, &reg);
@@ -1300,6 +1345,7 @@ static __devinit int palmas_probe(struct platform_device *pdev)
 	for (id = 0; id < PALMAS_REG_LDO1; id++) {
 		bool ramp_delay_support = false;
 
+		reg_init = NULL;
 		reg_data = pdata->reg_data[id];
 
 		/*
@@ -1368,7 +1414,7 @@ static __devinit int palmas_probe(struct platform_device *pdev)
 		pmic->desc[id].owner = THIS_MODULE;
 
 		/* Initialise sleep/init values from platform data */
-		if (pdata && pdata->reg_init) {
+		if (pdata && reg_data && pdata->reg_init) {
 			reg_init = pdata->reg_init[id];
 			if (reg_init) {
 				ret = palmas_smps_init(palmas, id, reg_init);
@@ -1410,6 +1456,11 @@ static __devinit int palmas_probe(struct platform_device *pdev)
 				pdev->name);
 			ret = PTR_ERR(rdev);
 			goto err_unregister_regulator;
+		}
+
+		if (reg_init && reg_data) {
+			pmic->roof_floor[id] = reg_init->roof_floor;
+			pmic->config_flags[id] = reg_init->config_flags;
 		}
 
 		/* Save regulator for cleanup */
@@ -1457,9 +1508,12 @@ static __devinit int palmas_probe(struct platform_device *pdev)
 		pmic->rdev[id] = rdev;
 
 		/* Initialise sleep/init values from platform data */
-		if (pdata->reg_init) {
+		if (reg_data && pdata->reg_init) {
 			reg_init = pdata->reg_init[id];
 			if (reg_init) {
+				pmic->roof_floor[id] = reg_init->roof_floor;
+				pmic->config_flags[id] = reg_init->config_flags;
+
 				if (id < PALMAS_REG_REGEN1)
 					ret = palmas_ldo_init(palmas, id,
 								reg_init);
@@ -1506,28 +1560,50 @@ static int __devexit palmas_remove(struct platform_device *pdev)
 static int palmas_suspend(struct device *dev)
 {
 	struct palmas *palmas = dev_get_drvdata(dev->parent);
+	struct palmas_pmic *pmic = dev_get_drvdata(dev);
 	struct palmas_pmic_platform_data *pdata = dev_get_platdata(dev);
+	int id;
 
 	/* Check if LDO8 is in tracking mode disable in suspend or not */
 	if (pdata->enable_ldo8_tracking && pdata->disabe_ldo8_tracking_suspend)
 		palmas_disable_ldo8_track(palmas);
 
-	if (pdata->disable_smps10_boost_suspend)
+	if (pdata->disable_smps10_boost_suspend &&
+			!pmic->smps10_regulator_enabled)
 		palmas_disable_smps10_boost(palmas);
+
+	for (id = 0; id < PALMAS_NUM_REGS; id++) {
+		if (pmic->config_flags[id] &
+			PALMAS_REGULATOR_CONFIG_SUSPEND_FORCE_OFF) {
+			if (pmic->desc[id].ops->disable)
+				pmic->desc[id].ops->disable(pmic->rdev[id]);
+		}
+	}
 	return 0;
 }
 
 static int palmas_resume(struct device *dev)
 {
 	struct palmas *palmas = dev_get_drvdata(dev->parent);
+	struct palmas_pmic *pmic = dev_get_drvdata(dev);
 	struct palmas_pmic_platform_data *pdata = dev_get_platdata(dev);
+	int id;
 
 	/* Check if LDO8 is in tracking mode disable in suspend or not */
 	if (pdata->enable_ldo8_tracking && pdata->disabe_ldo8_tracking_suspend)
 		palmas_enable_ldo8_track(palmas);
 
-	if (pdata->disable_smps10_boost_suspend)
+	if (pdata->disable_smps10_boost_suspend &&
+			!pmic->smps10_regulator_enabled)
 		palmas_enable_smps10_boost(palmas);
+
+	for (id = 0; id < PALMAS_NUM_REGS; id++) {
+		if (pmic->config_flags[id] &
+			PALMAS_REGULATOR_CONFIG_SUSPEND_FORCE_OFF) {
+			if (pmic->desc[id].ops->enable)
+				pmic->desc[id].ops->enable(pmic->rdev[id]);
+		}
+	}
 	return 0;
 }
 #endif

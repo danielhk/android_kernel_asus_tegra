@@ -93,6 +93,7 @@ struct tegra_dc_hdmi_data {
 #ifdef CONFIG_SWITCH
 	struct switch_dev		hpd_switch;
 #endif
+	struct tegra_hdmi_out		info;
 
 	spinlock_t			suspend_lock;
 	bool				suspended;
@@ -107,18 +108,8 @@ struct tegra_dc_hdmi_data {
 
 struct tegra_dc_hdmi_data *dc_hdmi;
 
-/* table of electrical settings, must be in acending order. */
-struct tdms_config {
-	int pclk;
-	u32 pll0;
-	u32 pll1;
-	u32 pe_current; /* pre-emphasis */
-	u32 drive_current;
-	u32 peak_current; /* for TEGRA_11x_SOC */
-};
-
 #if defined(CONFIG_ARCH_TEGRA_3x_SOC)
-const struct tdms_config tdms_config[] = {
+const struct tmds_config tmds_config[] = {
 	{ /* 480p modes */
 	.pclk = 27000000,
 	.pll0 = SOR_PLL_BG_V17_S(3) | SOR_PLL_ICHPMP(1) |
@@ -166,7 +157,7 @@ const struct tdms_config tdms_config[] = {
 	},
 };
 #elif defined(CONFIG_ARCH_TEGRA_2x_SOC)
-const struct tdms_config tdms_config[] = {
+const struct tmds_config tmds_config[] = {
 	{ /* 480p modes */
 	.pclk = 27000000,
 	.pll0 = SOR_PLL_BG_V17_S(3) | SOR_PLL_ICHPMP(1) |
@@ -214,7 +205,7 @@ const struct tdms_config tdms_config[] = {
 	},
 };
 #elif defined(CONFIG_ARCH_TEGRA_11x_SOC)
-const struct tdms_config tdms_config[] = {
+const struct tmds_config tmds_config[] = {
 	{ /* 480p/576p / 25.2MHz/27MHz modes */
 	.pclk = 27000000,
 	.pll0 = SOR_PLL_ICHPMP(2) | SOR_PLL_BG_V17_S(3) |
@@ -299,7 +290,7 @@ const struct tdms_config tdms_config[] = {
 	},
 };
 #else
-#warning tdms_config needs to be defined for your arch
+#warning tmds_config needs to be defined for your arch
 #endif
 
 struct tegra_hdmi_audio_config {
@@ -315,6 +306,7 @@ const struct tegra_hdmi_audio_config tegra_hdmi_audio_32k[] = {
 	{27000000,	4096,	27000,	24000},
 	{74250000,	4096,	74250,	24000},
 	{148500000,	4096,	148500,	24000},
+	{241500000,	4096,	241500,	24000},
 	{297000000,	3072,	222750,	24000},
 	{0,		0,	0},
 };
@@ -324,6 +316,7 @@ const struct tegra_hdmi_audio_config tegra_hdmi_audio_44_1k[] = {
 	{27000000,	5880,	28125,	25000},
 	{74250000,	4704,	61875,	20000},
 	{148500000,	4704,	123750,	20000},
+	{241500000,	4704,	201250,	20000},
 	{297000000,	4704,	247500,	20000},
 	{0,		0,	0},
 };
@@ -333,6 +326,7 @@ const struct tegra_hdmi_audio_config tegra_hdmi_audio_48k[] = {
 	{27000000,	6144,	27000,	24000},
 	{74250000,	6144,	74250,	24000},
 	{148500000,	6144,	148500,	24000},
+	{241500000,	5632,	221375,	22000},
 	{297000000,	5120,	247500,	24000},
 	{0,		0,	0},
 };
@@ -342,6 +336,7 @@ const struct tegra_hdmi_audio_config tegra_hdmi_audio_88_2k[] = {
 	{27000000,	11760,	28125,	25000},
 	{74250000,	9408,	61875,	20000},
 	{148500000,	9408,	123750, 20000},
+	{241500000,	9408,	201250,	20000},
 	{297000000,	9408,	247500, 20000},
 	{0,		0,	0},
 };
@@ -351,6 +346,7 @@ const struct tegra_hdmi_audio_config tegra_hdmi_audio_96k[] = {
 	{27000000,	12288,	27000,	24000},
 	{74250000,	12288,	74250,	24000},
 	{148500000,	12288,	148500,	24000},
+	{241500000,	11264,	221375,	22000},
 	{297000000,	10240,	247500,	24000},
 	{0,		0,	0},
 };
@@ -360,6 +356,7 @@ const struct tegra_hdmi_audio_config tegra_hdmi_audio_176_4k[] = {
 	{27000000,	23520,	28125,	25000},
 	{74250000,	18816,	61875,	20000},
 	{148500000,	18816,	123750,	20000},
+	{241500000,	18816,	201250,	20000},
 	{297000000,	18816,	247500,	20000},
 	{0,		0,	0},
 };
@@ -369,6 +366,7 @@ const struct tegra_hdmi_audio_config tegra_hdmi_audio_192k[] = {
 	{27000000,	24576,	27000,	24000},
 	{74250000,	24576,	74250,	24000},
 	{148500000,	24576,	148500,	24000},
+	{241500000,	22528,	221375,	22000},
 	{297000000,	20480,	247500,	24000},
 	{0,		0,	0},
 };
@@ -405,7 +403,9 @@ static const struct tegra_hdmi_audio_config
 	}
 
 	while (table->pix_clock) {
-		if (table->pix_clock == pix_clock)
+		if (table->pix_clock > (pix_clock/100*99) &&
+                table->pix_clock < (pix_clock/100*101) &&
+                table->pix_clock >= 1000)
 			return table;
 		table++;
 	}
@@ -956,12 +956,8 @@ static irqreturn_t tegra_dc_hdmi_irq(int irq, void *ptr)
 	spin_lock_irqsave(&hdmi->suspend_lock, flags);
 	if (!hdmi->suspended) {
 		__cancel_delayed_work(&hdmi->work);
-		if (tegra_dc_hdmi_hpd(dc))
-			queue_delayed_work(system_nrt_wq, &hdmi->work,
-					   msecs_to_jiffies(100));
-		else
-			queue_delayed_work(system_nrt_wq, &hdmi->work,
-					   msecs_to_jiffies(30));
+		queue_delayed_work(system_nrt_wq, &hdmi->work,
+				   msecs_to_jiffies(100));
 	}
 	spin_unlock_irqrestore(&hdmi->suspend_lock, flags);
 
@@ -982,17 +978,14 @@ static void tegra_dc_hdmi_suspend(struct tegra_dc *dc)
 static void tegra_dc_hdmi_resume(struct tegra_dc *dc)
 {
 	struct tegra_dc_hdmi_data *hdmi = tegra_dc_get_outdata(dc);
+	bool hpd = tegra_dc_hdmi_hpd(dc);
 	unsigned long flags;
 
 	spin_lock_irqsave(&hdmi->suspend_lock, flags);
 	hdmi->suspended = false;
 
-	if (tegra_dc_hdmi_hpd(dc))
-		queue_delayed_work(system_nrt_wq, &hdmi->work,
-				   msecs_to_jiffies(100));
-	else
-		queue_delayed_work(system_nrt_wq, &hdmi->work,
-				   msecs_to_jiffies(30));
+	queue_delayed_work(system_nrt_wq, &hdmi->work,
+			   msecs_to_jiffies(hpd ? 100 : 30));
 
 	spin_unlock_irqrestore(&hdmi->suspend_lock, flags);
 	tegra_nvhdcp_resume(hdmi->nvhdcp);
@@ -1026,6 +1019,7 @@ static int tegra_dc_hdmi_init(struct tegra_dc *dc)
 	struct clk *clk = NULL;
 	struct clk *disp1_clk = NULL;
 	struct clk *disp2_clk = NULL;
+	struct tegra_hdmi_out *hdmi_out = NULL;
 	int err;
 
 	hdmi = kzalloc(sizeof(*hdmi), GFP_KERNEL);
@@ -1098,6 +1092,11 @@ static int tegra_dc_hdmi_init(struct tegra_dc *dc)
 		goto err_put_clock;
 	}
 #endif
+
+	/* Get the pointer of board file settings */
+	hdmi_out = dc->pdata->default_out->hdmi_out;
+	if (hdmi_out)
+		memcpy(&hdmi->info, hdmi_out, sizeof(hdmi->info));
 
 	hdmi->edid = tegra_edid_create(dc->out->dcc_bus);
 	if (IS_ERR_OR_NULL(hdmi->edid)) {
@@ -1738,8 +1737,8 @@ static void tegra_dc_hdmi_setup_audio_infoframe(struct tegra_dc *dc, bool dvi)
 			  HDMI_NV_PDISP_HDMI_AUDIO_INFOFRAME_CTRL);
 }
 
-static void tegra_dc_hdmi_setup_tdms(struct tegra_dc_hdmi_data *hdmi,
-		const struct tdms_config *tc)
+static void tegra_dc_hdmi_setup_tmds(struct tegra_dc_hdmi_data *hdmi,
+		const struct tmds_config *tc)
 {
 #if defined(CONFIG_ARCH_TEGRA_11x_SOC)
 	u32 val;
@@ -1776,6 +1775,8 @@ static void tegra_dc_hdmi_enable(struct tegra_dc *dc)
 	unsigned long val;
 	unsigned i;
 	unsigned long oldrate;
+	const struct tmds_config *tmds_ptr;
+	size_t tmds_len;
 
 	/* enbale power, clocks, resets, etc. */
 
@@ -1896,12 +1897,25 @@ static void tegra_dc_hdmi_enable(struct tegra_dc *dc)
 
 	tegra_dc_hdmi_setup_audio_infoframe(dc, hdmi->dvi);
 
-	/* TMDS CONFIG */
-	for (i = 0; i < ARRAY_SIZE(tdms_config); i++) {
-		if (dc->mode.pclk <= tdms_config[i].pclk) {
-			tegra_dc_hdmi_setup_tdms(hdmi, &tdms_config[i]);
-			break;
-		}
+	/* Set tmds config. Set it to custom values provided in board file;
+	 * otherwise, set it to default values. */
+	if (hdmi->info.tmds_config && hdmi->info.n_tmds_config) {
+		tmds_ptr = hdmi->info.tmds_config;
+		tmds_len = hdmi->info.n_tmds_config;
+	} else {
+		tmds_ptr = tmds_config;
+		tmds_len = ARRAY_SIZE(tmds_config);
+	}
+
+	for (i = 0; i < tmds_len && tmds_ptr[i].pclk < dc->mode.pclk; i++)
+		;
+	if (i < tmds_len) {
+		tegra_dc_hdmi_setup_tmds(hdmi, &tmds_ptr[i]);
+	} else {
+		dev_warn(&dc->ndev->dev,
+			"pixel clock %u not present on TMDS table.\n",
+			dc->mode.pclk);
+		tegra_dc_hdmi_setup_tmds(hdmi, &tmds_ptr[tmds_len - 1]);
 	}
 
 	tegra_hdmi_writel(hdmi,

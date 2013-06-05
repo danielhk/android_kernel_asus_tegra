@@ -113,6 +113,12 @@ static void usb_host_vbus_enable(struct tegra_usb_phy *phy, bool enable)
 	}
 }
 
+void tegra_usb_enable_vbus(struct tegra_usb_phy *phy, bool enable)
+{
+	usb_host_vbus_enable(phy, enable);
+}
+EXPORT_SYMBOL_GPL(tegra_usb_enable_vbus);
+
 int usb_phy_reg_status_wait(void __iomem *reg, u32 mask,
 					u32 result, u32 timeout)
 {
@@ -807,3 +813,10 @@ fail_inval:
 	return ERR_PTR(err);
 }
 EXPORT_SYMBOL_GPL(tegra_usb_phy_open);
+
+void tegra_usb_phy_pmc_disable(struct tegra_usb_phy *phy)
+{
+	if (phy->ops && phy->ops->pmc_disable)
+		phy->ops->pmc_disable(phy);
+}
+EXPORT_SYMBOL_GPL(tegra_usb_phy_pmc_disable);

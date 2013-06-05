@@ -139,7 +139,7 @@ struct akm_inf {
 	int port_id[2];			/* MPU port ID */
 	u8 data_out;			/* write value to trigger a sample */
 	u8 range_index;			/* max_range index */
-	int xyz[3];			/* sample data */
+	short xyz[3];			/* sample data */
 	bool cycle;			/* cycle MPU en/dis for high speed */
 	unsigned long cycle_delay_us;	/* cycle off time (us) */
 	s64 cycle_ts;			/* cycle MPU disable timestamp */
@@ -553,9 +553,9 @@ static int akm_init_hw(struct akm_inf *inf)
 
 static void akm_calc(struct akm_inf *inf, u8 *data)
 {
-	int x;
-	int y;
-	int z;
+	short x;
+	short y;
+	short z;
 
 	/* data[1] = AKM_REG_HXL
 	 * data[2] = AKM_REG_HXH
@@ -564,9 +564,9 @@ static void akm_calc(struct akm_inf *inf, u8 *data)
 	 * data[5] = AKM_REG_HZL
 	 * data[6] = AKM_REG_HZH
 	 */
-	x = (int)((data[2] << 8) | data[1]);
-	y = (int)((data[4] << 8) | data[3]);
-	z = (int)((data[6] << 8) | data[5]);
+	x = ((data[2] << 8) | data[1]);
+	y = ((data[4] << 8) | data[3]);
+	z = ((data[6] << 8) | data[5]);
 	x = ((x * (inf->asa.asa[AXIS_X] + 128)) >> 8);
 	y = ((y * (inf->asa.asa[AXIS_Y] + 128)) >> 8);
 	z = ((z * (inf->asa.asa[AXIS_Z] + 128)) >> 8);
@@ -986,9 +986,9 @@ static ssize_t akm_magnetic_field_show(struct device *dev,
 				       char *buf)
 {
 	struct akm_inf *inf;
-	int x;
-	int y;
-	int z;
+	short x;
+	short y;
+	short z;
 
 	inf = dev_get_drvdata(dev);
 	if (inf->enable) {
@@ -997,7 +997,7 @@ static ssize_t akm_magnetic_field_show(struct device *dev,
 		y = inf->xyz[AXIS_Y];
 		z = inf->xyz[AXIS_Z];
 		mutex_unlock(&inf->mutex_data);
-		return sprintf(buf, "%d, %d, %d\n", x, y, z);
+		return sprintf(buf, "%hd, %hd, %hd\n", x, y, z);
 	}
 
 	return -EPERM;
@@ -1113,7 +1113,6 @@ static int akm_remove(struct i2c_client *client)
 		akm_pm_exit(inf);
 		if (&inf->mutex_data)
 			mutex_destroy(&inf->mutex_data);
-		kfree(inf);
 	}
 	dev_info(&client->dev, "%s\n", __func__);
 	return 0;
@@ -1173,7 +1172,7 @@ static int akm_probe(struct i2c_client *client,
 	int err;
 
 	dev_info(&client->dev, "%s\n", __func__);
-	inf = kzalloc(sizeof(*inf), GFP_KERNEL);
+	inf = devm_kzalloc(&client->dev, sizeof(*inf), GFP_KERNEL);
 	if (!inf) {
 		dev_err(&client->dev, "%s kzalloc ERR\n", __func__);
 		return -ENOMEM;
@@ -1187,10 +1186,8 @@ static int akm_probe(struct i2c_client *client,
 	else
 		pd = (struct mpu_platform_data *)dev_get_platdata(&client->dev);
 
-	if (!pd || IS_ERR(pd)) {
-		kfree(inf);
+	if (!pd || IS_ERR(pd))
 		return -EINVAL;
-	}
 
 	inf->pdata = *pd;
 

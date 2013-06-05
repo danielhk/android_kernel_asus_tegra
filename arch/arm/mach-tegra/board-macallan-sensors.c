@@ -142,7 +142,7 @@ module_init(macallan_throttle_init);
 static struct nct1008_platform_data macallan_nct1008_pdata = {
 	.supported_hwrev = true,
 	.ext_range = true,
-	.conv_rate = 0x08,
+	.conv_rate = 0x06, /* 4Hz conversion rate */
 	.shutdown_ext_limit = 105, /* C */
 	.shutdown_local_limit = 120, /* C */
 
@@ -266,6 +266,10 @@ static int macallan_imx091_power_on(struct nvc_regulator *vreg)
 	if (err)
 		goto imx091_avdd_fail;
 
+	err = regulator_enable(vreg[IMX091_VREG_DVDD].vreg);
+	if (err)
+		goto imx091_dvdd_fail;
+
 	err = regulator_enable(vreg[IMX091_VREG_IOVDD].vreg);
 	if (err)
 		goto imx091_iovdd_fail;
@@ -286,6 +290,9 @@ imx091_vcmvdd_fail:
 	regulator_disable(vreg[IMX091_VREG_IOVDD].vreg);
 
 imx091_iovdd_fail:
+	regulator_disable(vreg[IMX091_VREG_DVDD].vreg);
+
+imx091_dvdd_fail:
 	regulator_disable(vreg[IMX091_VREG_AVDD].vreg);
 
 imx091_avdd_fail:
@@ -308,6 +315,7 @@ static int macallan_imx091_power_off(struct nvc_regulator *vreg)
 
 	regulator_disable(macallan_vcmvdd);
 	regulator_disable(vreg[IMX091_VREG_IOVDD].vreg);
+	regulator_disable(vreg[IMX091_VREG_DVDD].vreg);
 	regulator_disable(vreg[IMX091_VREG_AVDD].vreg);
 
 	return 1;
@@ -359,11 +367,6 @@ static struct imx091_platform_data imx091_pdata = {
 	.power_off		= macallan_imx091_power_off,
 };
 
-static struct sbs_platform_data sbs_pdata = {
-	.poll_retry_count = 100,
-	.i2c_retry_count = 2,
-};
-
 static int macallan_ov9772_power_on(struct ov9772_power_rail *pw)
 {
 	int err;
@@ -380,6 +383,10 @@ static int macallan_ov9772_power_on(struct ov9772_power_rail *pw)
 	err = regulator_enable(pw->avdd);
 	if (unlikely(err))
 		goto ov9772_avdd_fail;
+
+	err = regulator_enable(pw->dvdd);
+	if (unlikely(err))
+		goto ov9772_dvdd_fail;
 
 	err = regulator_enable(pw->dovdd);
 	if (unlikely(err))
@@ -402,6 +409,9 @@ ov9772_vcmvdd_fail:
 	regulator_disable(pw->dovdd);
 
 ov9772_dovdd_fail:
+	regulator_disable(pw->dvdd);
+
+ov9772_dvdd_fail:
 	regulator_disable(pw->avdd);
 
 ov9772_avdd_fail:
@@ -426,6 +436,7 @@ static int macallan_ov9772_power_off(struct ov9772_power_rail *pw)
 
 	regulator_disable(macallan_vcmvdd);
 	regulator_disable(pw->dovdd);
+	regulator_disable(pw->dvdd);
 	regulator_disable(pw->avdd);
 
 	/* return 1 to skip the in-driver power_off sequence */
@@ -468,6 +479,7 @@ static struct as364x_platform_data macallan_as3648_pdata = {
 	.config		= {
 		.max_total_current_mA = 1000,
 		.max_peak_current_mA = 600,
+		.max_torch_current_mA = 150,
 		.vin_low_v_run_mV = 3070,
 		.strobe_type = 1,
 		},
@@ -643,13 +655,6 @@ static int macallan_nct1008_init(void)
 	return ret;
 }
 
-static struct i2c_board_info __initdata bq20z45_pdata[] = {
-	{
-		I2C_BOARD_INFO("sbs-battery", 0x0B),
-		.platform_data = &sbs_pdata,
-	},
-};
-
 #ifdef CONFIG_TEGRA_SKIN_THROTTLE
 static struct thermal_trip_info skin_trips[] = {
 	{
@@ -664,7 +669,7 @@ static struct thermal_trip_info skin_trips[] = {
 
 static struct therm_est_subdevice skin_devs[] = {
 	{
-		.dev_data = "nct_ext",
+		.dev_data = "Tdiode",
 		.coeffs = {
 			2, 1, 1, 1,
 			1, 1, 1, 1,
@@ -674,7 +679,7 @@ static struct therm_est_subdevice skin_devs[] = {
 		},
 	},
 	{
-		.dev_data = "nct_int",
+		.dev_data = "Tboard",
 		.coeffs = {
 			-11, -7, -5, -3,
 			-3, -2, -1, 0,
@@ -796,9 +801,6 @@ int __init macallan_sensors_init(void)
 
 	i2c_register_board_info(0, macallan_i2c0_board_info_cm3217,
 				ARRAY_SIZE(macallan_i2c0_board_info_cm3217));
-
-	i2c_register_board_info(0, bq20z45_pdata,
-		ARRAY_SIZE(bq20z45_pdata));
 
 	return 0;
 }

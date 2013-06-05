@@ -764,7 +764,7 @@ static void fuse_program_array(int pgm_cycles)
 	 */
 	if (pgm_cycles > 0) {
 		reg = pgm_cycles;
-		tegra_fuse_writel(reg, FUSE_TIME_PGM);
+		tegra_fuse_writel(reg, FUSE_TIME_PGM2);
 	}
 	fuse_val[0] = (0x1 & ~fuse_val[0]);
 	fuse_val[1] = (0x1 & ~fuse_val[1]);
@@ -888,6 +888,20 @@ int tegra_fuse_program(struct fuse_data *pgm_data, u32 flags)
 		return -EPERM;
 	}
 
+	/* calculate the number of program cycles from the oscillator freq */
+	reg = readl(IO_ADDRESS(TEGRA_PMC_BASE) + PMC_PLLP_OVERRIDE);
+	if (reg & PMC_OSC_OVERRIDE) {
+		index = (reg & PMC_OSC_FREQ_MASK) >> PMC_OSC_FREQ_SHIFT;
+	} else {
+		reg = readl(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + CAR_OSC_CTRL);
+		index = reg >> CAR_OSC_FREQ_SHIFT;
+	}
+
+	pr_debug("%s: use %d programming cycles\n", __func__,
+						fuse_pgm_cycles[index]);
+	if (fuse_pgm_cycles[index] == 0)
+		return -EPERM;
+
 	clk_enable(clk_fuse);
 
 	/* check that fuse options write access hasn't been disabled */
@@ -919,18 +933,6 @@ int tegra_fuse_program(struct fuse_data *pgm_data, u32 flags)
 		BUG_ON("regulator enable fail\n");
 
 	populate_fuse_arrs(&fuse_info, flags);
-
-	/* calculate the number of program cycles from the oscillator freq */
-	reg = readl(IO_ADDRESS(TEGRA_PMC_BASE) + PMC_PLLP_OVERRIDE);
-	if (reg & PMC_OSC_OVERRIDE) {
-		index = (reg & PMC_OSC_FREQ_MASK) >> PMC_OSC_FREQ_SHIFT;
-	} else {
-		reg = readl(IO_ADDRESS(TEGRA_CLK_RESET_BASE) + CAR_OSC_CTRL);
-		index = reg >> CAR_OSC_FREQ_SHIFT;
-	}
-
-	pr_debug("%s: use %d programming cycles\n", __func__,
-						fuse_pgm_cycles[index]);
 
 	/* FIXME: Ideally, this delay should not be present */
 	mdelay(1);

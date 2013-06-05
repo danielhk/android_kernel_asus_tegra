@@ -84,6 +84,7 @@ struct bq2419x_charger_platform_data tegratab_bq2419x_charger_pdata = {
 	.wdt_timeout    = 40,
 };
 
+#ifndef CONFIG_OF
 struct max17048_battery_model tegratab_max17048_mdata = {
 	.rcomp		= 152,
 	.soccheck_A	= 206,
@@ -121,6 +122,7 @@ static struct i2c_board_info __initdata tegratab_max17048_boardinfo[] = {
 		.platform_data	= &tegratab_max17048_pdata,
 	},
 };
+#endif
 
 struct bq2419x_platform_data tegratab_bq2419x_pdata = {
 	.vbus_pdata = &tegratab_bq2419x_vbus_pdata,
@@ -162,6 +164,7 @@ static struct regulator_consumer_supply palmas_smps8_supply[] = {
 	REGULATOR_SUPPLY("avdd_osc", NULL),
 	REGULATOR_SUPPLY("vddio_sys", NULL),
 	REGULATOR_SUPPLY("vddio_bb", NULL),
+	REGULATOR_SUPPLY("pwrdet_bb", NULL),
 	REGULATOR_SUPPLY("vddio_sdmmc", "sdhci-tegra.0"),
 	REGULATOR_SUPPLY("pwrdet_sdmmc1", NULL),
 	REGULATOR_SUPPLY("vddio_sdmmc", "sdhci-tegra.3"),
@@ -172,12 +175,15 @@ static struct regulator_consumer_supply palmas_smps8_supply[] = {
 	REGULATOR_SUPPLY("vddio_uart", NULL),
 	REGULATOR_SUPPLY("pwrdet_uart", NULL),
 	REGULATOR_SUPPLY("vddio_gmi", NULL),
+	REGULATOR_SUPPLY("pwrdet_nand", NULL),
 	REGULATOR_SUPPLY("vlogic", "0-0069"),
 	REGULATOR_SUPPLY("vid", "0-000d"),
 };
 
 static struct regulator_consumer_supply palmas_smps9_supply[] = {
 	REGULATOR_SUPPLY("vddio_sd_slot", "sdhci-tegra.3"),
+	REGULATOR_SUPPLY("vddio_hv", "tegradc.1"),
+	REGULATOR_SUPPLY("pwrdet_hv", NULL),
 };
 
 static struct regulator_consumer_supply palmas_smps10_supply[] = {
@@ -202,6 +208,7 @@ static struct regulator_consumer_supply palmas_ldo2_supply[] = {
 	REGULATOR_SUPPLY("avdd_dsi_csi", "vi"),
 	REGULATOR_SUPPLY("vddio_hsic", "tegra-ehci.1"),
 	REGULATOR_SUPPLY("vddio_hsic", "tegra-ehci.2"),
+	REGULATOR_SUPPLY("pwrdet_mipi", NULL),
 };
 
 static struct regulator_consumer_supply palmas_ldo3_supply[] = {
@@ -213,8 +220,14 @@ static struct regulator_consumer_supply palmas_ldo4_supply[] = {
 };
 
 static struct regulator_consumer_supply palmas_ldo5_supply[] = {
+#ifdef CONFIG_USE_OF
+	REGULATOR_SUPPLY("ext_vcm_vdd", "2-0010"),
+#else
 	REGULATOR_SUPPLY("vdd_af_cam1", NULL),
+#endif
 	REGULATOR_SUPPLY("vdd", "2-000c"),
+	REGULATOR_SUPPLY("vana", "2-0048"),
+	REGULATOR_SUPPLY("vana", "2-0021"),
 };
 
 static struct regulator_consumer_supply palmas_ldo6_supply[] = {
@@ -251,26 +264,46 @@ static struct regulator_consumer_supply palmas_regen1_supply[] = {
 static struct regulator_consumer_supply palmas_regen2_supply[] = {
 };
 
-PALMAS_PDATA_INIT(smps123, 900,  1300, NULL, 0, 0, 0, 0);
-PALMAS_PDATA_INIT(smps45, 900,  1400, NULL, 0, 0, 0, 0);
-PALMAS_PDATA_INIT(smps6, 3200,  3200, NULL, 0, 0, 1, NORMAL);
-PALMAS_PDATA_INIT(smps7, 1350,  1350, NULL, 0, 0, 1, NORMAL);
-PALMAS_PDATA_INIT(smps8, 1800,  1800, NULL, 1, 1, 1, NORMAL);
-PALMAS_PDATA_INIT(smps9, 2900,  2900, NULL, 1, 0, 1, NORMAL);
-PALMAS_PDATA_INIT(smps10, 5000,  5000, NULL, 0, 0, 0, 0);
-PALMAS_PDATA_INIT(ldo1, 1050,  1050, palmas_rails(smps7), 1, 0, 1, 0);
-PALMAS_PDATA_INIT(ldo2, 1200,  1200, palmas_rails(smps7), 0, 1, 1, 0);
-PALMAS_PDATA_INIT(ldo3, 1800,  1800, NULL, 0, 0, 0, 0);
-PALMAS_PDATA_INIT(ldo4, 1200,  1200, palmas_rails(smps8), 0, 0, 0, 0);
-PALMAS_PDATA_INIT(ldo5, 2700,  2700, palmas_rails(smps9), 0, 0, 1, 0);
-PALMAS_PDATA_INIT(ldo6, 2850,  2850, palmas_rails(smps9), 1, 1, 1, 0);
-PALMAS_PDATA_INIT(ldo7, 2700,  2700, palmas_rails(smps9), 0, 0, 1, 0);
-PALMAS_PDATA_INIT(ldo8, 950,  950, NULL, 1, 1, 1, 0);
-PALMAS_PDATA_INIT(ldo9, 1800,  2900, palmas_rails(smps9), 0, 0, 1, 0);
-PALMAS_PDATA_INIT(ldoln, 3300,   3300, NULL, 0, 0, 1, 0);
-PALMAS_PDATA_INIT(ldousb, 3300,  3300, NULL, 0, 0, 1, 0);
-PALMAS_PDATA_INIT(regen1, 4200,  4200, NULL, 0, 0, 0, 0);
-PALMAS_PDATA_INIT(regen2, 4200,  4200, palmas_rails(smps8), 0, 0, 0, 0);
+PALMAS_REGS_PDATA(smps123, 900,  1300, NULL, 0, 0, 0, 0,
+	0, PALMAS_EXT_CONTROL_ENABLE1, 0, 3, 0);
+PALMAS_REGS_PDATA(smps45, 900,  1400, NULL, 0, 0, 0, 0,
+	0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+PALMAS_REGS_PDATA(smps6, 3200,  3200, NULL, 0, 0, 1, NORMAL,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(smps7, 1350,  1350, NULL, 0, 0, 1, NORMAL,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(smps8, 1800,  1800, NULL, 1, 1, 1, NORMAL,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(smps9, 2900,  2900, NULL, 1, 0, 1, NORMAL,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(smps10, 5000,  5000, NULL, 0, 0, 0, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo1, 1050,  1050, palmas_rails(smps7), 1, 0, 1, 0,
+	0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo2, 1200,  1200, palmas_rails(smps7), 0, 1, 1, 0,
+	0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo3, 1800,  1800, NULL, 0, 0, 0, 0,
+	0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo4, 1200,  1200, palmas_rails(smps8), 0, 0, 0, 0,
+	0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo5, 2700,  2700, palmas_rails(smps9), 0, 0, 1, 0,
+	0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo6, 2850,  2850, palmas_rails(smps9), 1, 1, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo7, 2700,  2700, palmas_rails(smps9), 0, 0, 1, 0,
+	0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo8, 950,  950, NULL, 1, 1, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo9, 1800,  2900, palmas_rails(smps9), 0, 0, 1, 0,
+	0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+PALMAS_REGS_PDATA(ldoln, 3300,   3300, NULL, 0, 0, 1, 0,
+	0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+PALMAS_REGS_PDATA(ldousb, 3300,  3300, NULL, 0, 0, 1, 0,
+	0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+PALMAS_REGS_PDATA(regen1, 4200,  4200, NULL, 0, 0, 0, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(regen2, 4200,  4200, palmas_rails(smps8), 0, 0, 0, 0,
+	0, 0, 0, 0, 0);
 
 #define PALMAS_REG_PDATA(_sname) (&reg_idata_##_sname)
 static struct regulator_init_data *tegratab_reg_data[PALMAS_NUM_REGS] = {
@@ -302,45 +335,13 @@ static struct regulator_init_data *tegratab_reg_data[PALMAS_NUM_REGS] = {
 	NULL,
 };
 
-#define PALMAS_REG_INIT(_name, _warm_reset, _roof_floor, _mode_sleep,	\
-		_tstep, _vsel)						\
-	static struct palmas_reg_init reg_init_data_##_name = {		\
-		.warm_reset = _warm_reset,				\
-		.roof_floor =	_roof_floor,				\
-		.mode_sleep = _mode_sleep,		\
-		.tstep = _tstep,			\
-		.vsel = _vsel,		\
-	}
-
-PALMAS_REG_INIT(smps12, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(smps123, 0, PALMAS_EXT_CONTROL_ENABLE1, 0, 0, 0);
-PALMAS_REG_INIT(smps3, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(smps45, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(smps457, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(smps6, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(smps7, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(smps8, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(smps9, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(smps10, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(ldo1, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(ldo2, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(ldo3, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(ldo4, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(ldo5, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(ldo6, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(ldo7, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(ldo8, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(ldo9, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(ldoln, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(ldousb, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-
 #define PALMAS_REG_INIT_DATA(_sname) (&reg_init_data_##_sname)
 static struct palmas_reg_init *tegratab_reg_init[PALMAS_NUM_REGS] = {
-	PALMAS_REG_INIT_DATA(smps12),
+	NULL,
 	PALMAS_REG_INIT_DATA(smps123),
-	PALMAS_REG_INIT_DATA(smps3),
+	NULL,
 	PALMAS_REG_INIT_DATA(smps45),
-	PALMAS_REG_INIT_DATA(smps457),
+	NULL,
 	PALMAS_REG_INIT_DATA(smps6),
 	PALMAS_REG_INIT_DATA(smps7),
 	PALMAS_REG_INIT_DATA(smps8),
@@ -357,6 +358,11 @@ static struct palmas_reg_init *tegratab_reg_init[PALMAS_NUM_REGS] = {
 	PALMAS_REG_INIT_DATA(ldo9),
 	PALMAS_REG_INIT_DATA(ldoln),
 	PALMAS_REG_INIT_DATA(ldousb),
+	PALMAS_REG_INIT_DATA(regen1),
+	PALMAS_REG_INIT_DATA(regen2),
+	NULL,
+	NULL,
+	NULL,
 };
 
 static struct palmas_pmic_platform_data pmic_platform = {
@@ -385,10 +391,10 @@ static struct palmas_pinctrl_platform_data palmas_pinctrl_pdata = {
 	.dvfs2_enable = false,
 };
 
-struct palmas_extcon_platform_data palmas_extcon_pdata = {
+static struct palmas_extcon_platform_data palmas_extcon_pdata = {
 	.connection_name = "palmas-extcon",
 	.enable_vbus_detection = true,
-	.enable_id_pin_detection = false,
+	.enable_id_pin_detection = true,
 };
 
 static struct palmas_platform_data palmas_pdata = {
@@ -432,6 +438,10 @@ static struct regulator_consumer_supply fixed_reg_vddio_sd_slot_supply[] = {
 
 static struct regulator_consumer_supply fixed_reg_vd_cam_1v8_supply[] = {
 	REGULATOR_SUPPLY("dovdd", "2-0010"),
+	REGULATOR_SUPPLY("vif2", "2-0048"),
+	REGULATOR_SUPPLY("vif2", "2-0021"),
+	REGULATOR_SUPPLY("vddio_cam", "vi"),
+	REGULATOR_SUPPLY("pwrdet_cam", NULL),
 };
 
 /* Macro for defining fixed regulator sub device data */
@@ -490,7 +500,7 @@ FIXED_REG(3,	dvdd_ts,	dvdd_ts,
 
 FIXED_REG(4,	vdd_hdmi_5v0,	vdd_hdmi_5v0,
 	palmas_rails(smps10),	0,	0,
-	TEGRA_GPIO_PK6,	false,	true,	0,	5000);
+	TEGRA_GPIO_PK6,	true,	true,	0,	5000);
 
 FIXED_REG(5,	vddio_sd_slot,	vddio_sd_slot,
 	palmas_rails(smps9),	0,	0,
@@ -582,7 +592,7 @@ static struct tegra_suspend_platform_data tegratab_suspend_data = {
 #ifdef CONFIG_ARCH_TEGRA_HAS_CL_DVFS
 /* board parameters for cpu dfll */
 static struct tegra_cl_dvfs_cfg_param tegratab_cl_dvfs_param = {
-	.sample_rate = 12500,
+	.sample_rate = 11500,
 
 	.force_mode = TEGRA_CL_DVFS_FORCE_FIXED,
 	.cf = 10,
@@ -626,7 +636,8 @@ static int __init tegratab_cl_dvfs_init(void)
 {
 	fill_reg_map();
 	if (tegra_revision < TEGRA_REVISION_A02)
-		tegratab_cl_dvfs_data.out_quiet_then_disable = true;
+		tegratab_cl_dvfs_data.flags =
+			TEGRA_CL_DVFS_FLAGS_I2C_WAIT_QUIET;
 	tegra_cl_dvfs_device.dev.platform_data = &tegratab_cl_dvfs_data;
 	platform_device_register(&tegra_cl_dvfs_device);
 
@@ -652,9 +663,9 @@ int __init tegratab_regulator_init(void)
 	tegratab_cl_dvfs_init();
 #endif
 	tegratab_palmas_regulator_init();
-
+#ifndef CONFIG_OF
 	i2c_register_board_info(0, tegratab_max17048_boardinfo, 1);
-
+#endif
 	/* Disable charger when adapter is power source. */
 	if (get_power_supply_type() != POWER_SUPPLY_TYPE_BATTERY)
 		tegratab_bq2419x_pdata.bcharger_pdata = NULL;
@@ -663,6 +674,15 @@ int __init tegratab_regulator_init(void)
 	i2c_register_board_info(0, tegratab_bq2419x_boardinfo, 1);
 
 	platform_device_register(&tegratab_pda_power_device);
+
+	return 0;
+}
+
+int __init tegratab_power_off_init(void)
+{
+	/* Use PMU reset only when battery is exist. */
+	if (get_power_supply_type() == POWER_SUPPLY_TYPE_BATTERY)
+		pm_power_off = palmas_reset;
 
 	return 0;
 }
@@ -679,7 +699,7 @@ int __init tegratab_edp_init(void)
 
 	regulator_mA = get_maximum_cpu_current_supported();
 	if (!regulator_mA)
-		regulator_mA = 15000;
+		regulator_mA = 9000;
 
 	pr_info("%s: CPU regulator %d mA\n", __func__, regulator_mA);
 	tegra_init_cpu_edp_limits(regulator_mA);

@@ -22,15 +22,19 @@
 #include <linux/platform_device.h>
 #include <linux/resource.h>
 #include <linux/io.h>
+#include <linux/gpio.h>
 
 #include <mach/iomap.h>
 #include <mach/edp.h>
 #include <mach/irqs.h>
 #include <mach/hardware.h>
+#include <mach/io_dpd.h>
 #include <linux/regulator/fixed.h>
 #include <linux/mfd/palmas.h>
 #include <linux/regulator/machine.h>
 #include <linux/irq.h>
+#include <linux/edp.h>
+#include <linux/edpdev.h>
 #include <linux/platform_data/tegra_edp.h>
 
 #include <asm/mach-types.h>
@@ -48,6 +52,7 @@
 
 #define PMC_CTRL		0x0
 #define PMC_CTRL_INTR_LOW	(1 << 17)
+#define PLUTO_4K_REWORKED	0x2
 
 /************************ Pluto based regulator ****************/
 static struct regulator_consumer_supply palmas_smps123_supply[] = {
@@ -146,6 +151,18 @@ static struct regulator_consumer_supply palmas_ldo1_supply[] = {
 	REGULATOR_SUPPLY("avdd_plle", NULL),
 };
 
+static struct regulator_consumer_supply palmas_ldo1_4K_supply[] = {
+	REGULATOR_SUPPLY("avdd_csi_dsi_pll", "tegradc.0"),
+	REGULATOR_SUPPLY("avdd_csi_dsi_pll", "tegradc.1"),
+	REGULATOR_SUPPLY("avdd_csi_dsi_pll", "vi"),
+	REGULATOR_SUPPLY("avdd_pllm", NULL),
+	REGULATOR_SUPPLY("avdd_pllu", NULL),
+	REGULATOR_SUPPLY("avdd_plla_p_c", NULL),
+	REGULATOR_SUPPLY("avdd_pllx", NULL),
+	REGULATOR_SUPPLY("vdd_ddr_hs", NULL),
+	REGULATOR_SUPPLY("avdd_plle", NULL),
+};
+
 static struct regulator_consumer_supply palmas_ldo2_supply[] = {
 	REGULATOR_SUPPLY("avdd_lcd", NULL),
 };
@@ -163,6 +180,11 @@ static struct regulator_consumer_supply palmas_ldo3_supply[] = {
 };
 
 static struct regulator_consumer_supply palmas_ldo4_supply[] = {
+	REGULATOR_SUPPLY("vdd_spare", NULL),
+};
+
+static struct regulator_consumer_supply palmas_ldo4_4K_supply[] = {
+	REGULATOR_SUPPLY("avdd_hdmi_pll", "tegradc.1"),
 	REGULATOR_SUPPLY("vdd_spare", NULL),
 };
 
@@ -226,29 +248,48 @@ static struct regulator_consumer_supply palmas_regen2_supply[] = {
 	REGULATOR_SUPPLY("vdd_mic", NULL),
 };
 
-PALMAS_PDATA_INIT(smps123, 900,  1300, NULL, 0, 0, 0, NORMAL);
-PALMAS_PDATA_INIT(smps45, 900,  1400, NULL, 0, 0, 0, NORMAL);
-PALMAS_PDATA_INIT(smps6, 850,  850, NULL, 0, 0, 1, NORMAL);
-PALMAS_PDATA_INIT(smps7, 1200,  1200, NULL, 0, 0, 1, NORMAL);
-PALMAS_PDATA_INIT(smps8, 1800,  1800, NULL, 1, 1, 1, NORMAL);
-PALMAS_PDATA_INIT(smps9, 2800,  2800, NULL, 1, 0, 1, NORMAL);
-PALMAS_PDATA_INIT(smps10, 5000,  5000, NULL, 0, 0, 0, 0);
-PALMAS_PDATA_INIT(ldo1, 1050,  1050, palmas_rails(smps7), 0, 0, 1, 0);
-PALMAS_PDATA_INIT(ldo2, 2800,  3000, NULL, 0, 0, 0, 0);
-PALMAS_PDATA_INIT(ldo3, 1200,  1200, palmas_rails(smps8), 0, 1, 1, 0);
-PALMAS_PDATA_INIT(ldo4, 900,  3300, NULL, 0, 0, 0, 0);
-PALMAS_PDATA_INIT(ldo5, 2700,  2700, NULL, 0, 0, 1, 0);
-PALMAS_PDATA_INIT(ldo6, 3000,  3000, NULL, 1, 1, 1, 0);
-PALMAS_PDATA_INIT(ldo7, 2800,  2800, NULL, 0, 0, 1, 0);
-PALMAS_PDATA_INIT(ldo8, 900,  900, NULL, 1, 1, 1, 0);
-PALMAS_PDATA_INIT(ldo9, 1800,  3300, palmas_rails(smps9), 0, 0, 1, 0);
-PALMAS_PDATA_INIT(ldoln, 2700, 2700, NULL, 0, 0, 1, 0);
-PALMAS_PDATA_INIT(ldousb, 3300,  3300, NULL, 0, 0, 1, 0);
-PALMAS_PDATA_INIT(regen1, 4300,  4300, NULL, 0, 0, 0, 0);
-PALMAS_PDATA_INIT(regen2, 4300,  4300, palmas_rails(smps8), 0, 0, 0, 0);
+PALMAS_REGS_PDATA(smps123, 900,  1300, NULL, 0, 0, 0, NORMAL,
+		0, PALMAS_EXT_CONTROL_ENABLE1, 0, 3, 0);
+PALMAS_REGS_PDATA(smps45, 900,  1400, NULL, 0, 0, 0, NORMAL,
+		0, PALMAS_EXT_CONTROL_NSLEEP, 0, 3, 0);
+PALMAS_REGS_PDATA(smps6, 850,  850, NULL, 0, 0, 1, NORMAL,
+		0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(smps7, 1200,  1200, NULL, 0, 0, 1, NORMAL,
+		0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(smps8, 1800,  1800, NULL, 1, 1, 1, NORMAL,
+		0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(smps9, 2800,  2800, NULL, 1, 0, 1, NORMAL,
+		0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(smps10, 5000,  5000, NULL, 0, 0, 0, 0,
+		0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo1, 1050,  1050, palmas_rails(smps7), 0, 0, 1, 0,
+		0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo2, 2800,  3000, NULL, 0, 0, 0, 0,
+		0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo3, 1200,  1200, palmas_rails(smps8), 0, 1, 1, 0,
+		0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo4, 1200,  1200, NULL, 0, 0, 1, 0,
+		0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo5, 2700,  2700, NULL, 0, 0, 1, 0,
+		0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo6, 3000,  3000, NULL, 1, 1, 1, 0,
+		0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo7, 2800,  2800, NULL, 0, 0, 1, 0,
+		0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo8, 900,  900, NULL, 1, 1, 1, 0,
+		0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo9, 1800,  3300, palmas_rails(smps9), 0, 0, 1, 0,
+		0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldoln, 2700, 2700, NULL, 0, 0, 1, 0,
+		0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+PALMAS_REGS_PDATA(ldousb, 3300,  3300, NULL, 0, 0, 1, 0,
+		0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+PALMAS_REGS_PDATA(regen1, 4300,  4300, NULL, 0, 0, 0, 0,
+		0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(regen2, 4300,  4300, palmas_rails(smps8), 0, 0, 0, 0,
+		0, 0, 0, 0, 0);
 
 #define PALMAS_REG_PDATA(_sname) &reg_idata_##_sname
-
 static struct regulator_init_data *pluto_reg_data[PALMAS_NUM_REGS] = {
 	NULL,
 	PALMAS_REG_PDATA(smps123),
@@ -278,45 +319,13 @@ static struct regulator_init_data *pluto_reg_data[PALMAS_NUM_REGS] = {
 	NULL,
 };
 
-#define PALMAS_REG_INIT(_name, _warm_reset, _roof_floor, _mode_sleep,	\
-		_tstep, _vsel)						\
-	static struct palmas_reg_init reg_init_data_##_name = {		\
-		.warm_reset = _warm_reset,				\
-		.roof_floor =	_roof_floor,				\
-		.mode_sleep = _mode_sleep,		\
-		.tstep = _tstep,			\
-		.vsel = _vsel,		\
-	}
-
-PALMAS_REG_INIT(smps12, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(smps123, 0, PALMAS_EXT_CONTROL_ENABLE1, 0, 0, 0);
-PALMAS_REG_INIT(smps3, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(smps45, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(smps457, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(smps6, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(smps7, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(smps8, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(smps9, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(smps10, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(ldo1, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(ldo2, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(ldo3, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(ldo4, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(ldo5, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(ldo6, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(ldo7, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(ldo8, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(ldo9, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(ldoln, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(ldousb, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-
 #define PALMAS_REG_INIT_DATA(_sname) &reg_init_data_##_sname
 static struct palmas_reg_init *pluto_reg_init[PALMAS_NUM_REGS] = {
-	PALMAS_REG_INIT_DATA(smps12),
+	NULL,
 	PALMAS_REG_INIT_DATA(smps123),
-	PALMAS_REG_INIT_DATA(smps3),
+	NULL,
 	PALMAS_REG_INIT_DATA(smps45),
-	PALMAS_REG_INIT_DATA(smps457),
+	NULL,
 	PALMAS_REG_INIT_DATA(smps6),
 	PALMAS_REG_INIT_DATA(smps7),
 	PALMAS_REG_INIT_DATA(smps8),
@@ -333,6 +342,11 @@ static struct palmas_reg_init *pluto_reg_init[PALMAS_NUM_REGS] = {
 	PALMAS_REG_INIT_DATA(ldo9),
 	PALMAS_REG_INIT_DATA(ldoln),
 	PALMAS_REG_INIT_DATA(ldousb),
+	PALMAS_REG_INIT_DATA(regen1),
+	PALMAS_REG_INIT_DATA(regen2),
+	NULL,
+	NULL,
+	NULL,
 };
 
 static int ac_online(void)
@@ -527,7 +541,7 @@ static struct platform_device *pfixed_reg_devs[] = {
 #ifdef CONFIG_ARCH_TEGRA_HAS_CL_DVFS
 /* board parameters for cpu dfll */
 static struct tegra_cl_dvfs_cfg_param pluto_cl_dvfs_param = {
-	.sample_rate = 12500,
+	.sample_rate = 11500,
 
 	.force_mode = TEGRA_CL_DVFS_FORCE_FIXED,
 	.cf = 10,
@@ -571,7 +585,7 @@ static int __init pluto_cl_dvfs_init(void)
 {
 	fill_reg_map();
 	if (tegra_revision < TEGRA_REVISION_A02)
-		pluto_cl_dvfs_data.out_quiet_then_disable = true;
+		pluto_cl_dvfs_data.flags = TEGRA_CL_DVFS_FLAGS_I2C_WAIT_QUIET;
 	tegra_cl_dvfs_device.dev.platform_data = &pluto_cl_dvfs_data;
 	platform_device_register(&tegra_cl_dvfs_device);
 
@@ -666,6 +680,16 @@ int __init pluto_regulator_init(void)
 	pmc_ctrl = readl(pmc + PMC_CTRL);
 	writel(pmc_ctrl & ~PMC_CTRL_INTR_LOW, pmc + PMC_CTRL);
 
+	if (get_power_config() & PLUTO_4K_REWORKED) {
+		/* Account for the change of avdd_hdmi_pll from ldo1 to ldo4 */
+		reg_idata_ldo1.consumer_supplies = palmas_ldo1_4K_supply;
+		reg_idata_ldo1.num_consumer_supplies =
+			ARRAY_SIZE(palmas_ldo1_4K_supply);
+		reg_idata_ldo4.consumer_supplies = palmas_ldo4_4K_supply;
+		reg_idata_ldo4.num_consumer_supplies =
+			ARRAY_SIZE(palmas_ldo4_4K_supply);
+	}
+
 	for (i = 0; i < PALMAS_NUM_REGS ; i++) {
 		pmic_platform.reg_data[i] = pluto_reg_data[i];
 		pmic_platform.reg_init[i] = pluto_reg_init[i];
@@ -687,6 +711,30 @@ static int __init pluto_fixed_regulator_init(void)
 }
 subsys_initcall_sync(pluto_fixed_regulator_init);
 
+static struct tegra_io_dpd hv_io = {
+	.name			= "HV",
+	.io_dpd_reg_index	= 1,
+	.io_dpd_bit		= 6,
+};
+
+static void pluto_board_suspend(int state, enum suspend_stage stage)
+{
+	/* put HV IOs into DPD mode to save additional power */
+	if (state == TEGRA_SUSPEND_LP1 && stage == TEGRA_SUSPEND_BEFORE_CPU) {
+		gpio_direction_input(TEGRA_GPIO_PK6);
+		tegra_io_dpd_enable(&hv_io);
+	}
+}
+
+static void pluto_board_resume(int state, enum resume_stage stage)
+{
+	/* bring HV IOs back from DPD mode, GPIO configuration
+	 * will be restored by gpio driver
+	 */
+	if (state == TEGRA_SUSPEND_LP1 && stage == TEGRA_RESUME_AFTER_CPU)
+		tegra_io_dpd_disable(&hv_io);
+}
+
 static struct tegra_suspend_platform_data pluto_suspend_data = {
 	.cpu_timer	= 300,
 	.cpu_off_timer	= 300,
@@ -706,6 +754,8 @@ static struct tegra_suspend_platform_data pluto_suspend_data = {
 	.lp1_core_volt_low = 0x2e,
 	.lp1_core_volt_high = 0x42,
 #endif
+	.board_suspend	= pluto_board_suspend,
+	.board_resume	= pluto_board_resume,
 };
 
 int __init pluto_suspend_init(void)
@@ -859,84 +909,116 @@ int __init pluto_soctherm_init(void)
 	return tegra11_soctherm_init(&pluto_soctherm_data);
 }
 
+static struct edp_manager pluto_sysedp_manager = {
+	.name = "battery",
+	.max = 14000
+};
+
+void __init pluto_sysedp_init(void)
+{
+	struct edp_governor *g;
+	int r;
+
+	if (!IS_ENABLED(CONFIG_EDP_FRAMEWORK))
+		return;
+
+	r = edp_register_manager(&pluto_sysedp_manager);
+	WARN_ON(r);
+	if (r)
+		return;
+
+	/* start with priority governor */
+	g = edp_get_governor("priority");
+	WARN_ON(!g);
+	if (!g)
+		return;
+
+	r = edp_set_governor(&pluto_sysedp_manager, g);
+	WARN_ON(r);
+}
+
+static unsigned int pluto_psydepl_states[] = {
+	9900, 9600, 9300, 9000, 8700, 8400, 8100, 7800,
+	7500, 7200, 6900, 6600, 6300, 6000, 5800, 5600,
+	5400, 5200, 5000, 4800, 4600, 4400, 4200, 4000,
+	3800, 3600, 3400, 3200, 3000, 2800, 2600, 2400,
+	2200, 2000, 1900, 1800, 1700, 1600, 1500, 1400,
+	1300, 1200, 1100, 1000,  900,  800,  700,  600,
+	 500,  400,  300,  200,  100,    0
+};
+
+/* Temperature in deci-celcius */
+static struct psy_depletion_ibat_lut pluto_ibat_lut[] = {
+	{  600,  500 },
+	{  400, 3000 },
+	{    0, 3000 },
+	{ -300,    0 }
+};
+
+static struct psy_depletion_rbat_lut pluto_rbat_lut[] = {
+	{ 100,  43600 },
+	{  80, 104000 },
+	{  60, 102000 },
+	{  40, 113600 },
+	{  20, 124000 },
+	{   0, 150000 }
+};
+
+static struct psy_depletion_platform_data pluto_psydepl_pdata = {
+	.power_supply = "max170xx_battery",
+	.states = pluto_psydepl_states,
+	.num_states = ARRAY_SIZE(pluto_psydepl_states),
+	.e0_index = 16,
+	.r_const = 80000,
+	.vsys_min = 3250000,
+	.vcharge = 4200000,
+	.ibat_nom = 3000,
+	.ibat_lut = pluto_ibat_lut,
+	.rbat_lut = pluto_rbat_lut
+};
+
+static struct platform_device pluto_psydepl_device = {
+	.name = "psy_depletion",
+	.id = -1,
+	.dev = { .platform_data = &pluto_psydepl_pdata }
+};
+
+void __init pluto_sysedp_psydepl_init(void)
+{
+	int r;
+
+	r = platform_device_register(&pluto_psydepl_device);
+	WARN_ON(r);
+}
+
 static struct tegra_sysedp_corecap pluto_sysedp_corecap[] = {
-	{  1000,    0, {   748, 240, 204 }, {   748, 240, 204 } },
-	{  2000,    0, {   748, 240, 204 }, {   748, 240, 204 } },
-	{  3000,    0, {   748, 240, 204 }, {   748, 240, 204 } },
-	{  4000,    0, {   748, 240, 204 }, {   748, 240, 204 } },
-	{  5000,    0, {   748, 240, 204 }, {   748, 240, 204 } },
-	{  6000,    0, {  1748, 240, 204 }, {  1748, 240, 204 } },
-	{  7000,    0, {  2748, 240, 204 }, {  2748, 240, 204 } },
-	{  7000, 1000, {  3748, 240, 204 }, {  3748, 240, 204 } },
-	{  7000, 2000, {  4748, 240, 204 }, {  4696, 324, 204 } },
-	{  7000, 3000, {  4843, 240, 624 }, {  4913, 420, 408 } },
-	{  7000, 4000, {  5843, 240, 624 }, {  5306, 420, 624 } },
-	{  8000,    0, {  3748, 240, 204 }, {  3748, 240, 204 } },
-	{  8000, 1000, {  4748, 240, 204 }, {  4696, 324, 204 } },
-	{  8000, 2000, {  4843, 240, 624 }, {  4975, 324, 408 } },
-	{  8000, 3000, {  5843, 240, 624 }, {  5913, 420, 408 } },
-	{  8000, 4000, {  6843, 240, 624 }, {  5895, 528, 624 } },
-	{  9000,    0, {  4748, 240, 204 }, {  3975, 324, 408 } },
-	{  9000, 1000, {  4843, 240, 624 }, {  4975, 324, 408 } },
-	{  9000, 2000, {  5843, 240, 624 }, {  5913, 420, 408 } },
-	{  9000, 3000, {  6565, 240, 792 }, {  5895, 528, 624 } },
-	{  9000, 4000, {  7565, 240, 792 }, {  6405, 600, 624 } },
-	{ 10000,    0, {  4565, 240, 792 }, {  3895, 528, 624 } },
-	{ 10000, 1000, {  5565, 240, 792 }, {  4895, 528, 624 } },
-	{ 10000, 2000, {  6565, 240, 792 }, {  5405, 600, 624 } },
-	{ 10000, 3000, {  7565, 240, 792 }, {  5277, 600, 792 } },
-	{ 10000, 4000, {  8565, 240, 792 }, {  6277, 600, 792 } },
-	{ 11000,    0, {  5565, 240, 792 }, {  5553, 324, 624 } },
-	{ 11000, 1000, {  6565, 240, 792 }, {  5405, 600, 624 } },
-	{ 11000, 2000, {  7565, 240, 792 }, {  5277, 600, 792 } },
-	{ 11000, 3000, {  8565, 240, 792 }, {  6277, 600, 792 } },
-	{ 11000, 4000, {  9565, 240, 792 }, {  7277, 600, 792 } },
-	{ 12000,    0, {  6565, 240, 792 }, {  5405, 600, 624 } },
-	{ 12000, 1000, {  7565, 240, 792 }, {  5277, 600, 792 } },
-	{ 12000, 2000, {  8565, 240, 792 }, {  6277, 600, 792 } },
-	{ 12000, 3000, {  9565, 240, 792 }, {  7277, 600, 792 } },
-	{ 12000, 4000, { 10565, 240, 792 }, {  8277, 600, 792 } },
-	{ 13000,    0, {  7565, 240, 792 }, {  6405, 600, 624 } },
-	{ 13000, 1000, {  8565, 240, 792 }, {  6277, 600, 792 } },
-	{ 13000, 2000, {  9565, 240, 792 }, {  7277, 600, 792 } },
-	{ 13000, 3000, { 10565, 240, 792 }, {  8277, 600, 792 } },
-	{ 13000, 4000, { 11565, 240, 792 }, {  9277, 600, 792 } },
-	{ 14000,    0, {  8565, 240, 792 }, {  6277, 600, 792 } },
-	{ 14000, 1000, {  9565, 240, 792 }, {  7277, 600, 792 } },
-	{ 14000, 2000, { 10565, 240, 792 }, {  8277, 600, 792 } },
-	{ 14000, 3000, { 11565, 240, 792 }, {  9277, 600, 792 } },
-	{ 14000, 4000, { 12565, 240, 792 }, { 10277, 600, 792 } },
-	{ 15000,    0, {  9565, 240, 792 }, {  7277, 600, 792 } },
-	{ 15000, 1000, { 10565, 240, 792 }, {  8277, 600, 792 } },
-	{ 15000, 2000, { 11565, 240, 792 }, {  9277, 600, 792 } },
-	{ 15000, 3000, { 12565, 240, 792 }, { 10277, 600, 792 } },
-	{ 15000, 4000, { 13565, 240, 792 }, { 11277, 600, 792 } },
-	{ 16000,    0, { 10565, 240, 792 }, {  8277, 600, 792 } },
-	{ 16000, 1000, { 11565, 240, 792 }, {  9277, 600, 792 } },
-	{ 16000, 2000, { 12565, 240, 792 }, { 10277, 600, 792 } },
-	{ 16000, 3000, { 13565, 240, 792 }, { 11277, 600, 792 } },
-	{ 16000, 4000, { 14565, 240, 792 }, { 12277, 600, 792 } },
-	{ 17000,    0, { 11565, 240, 792 }, {  9277, 600, 792 } },
-	{ 17000, 1000, { 12565, 240, 792 }, { 10277, 600, 792 } },
-	{ 17000, 2000, { 13565, 240, 792 }, { 11277, 600, 792 } },
-	{ 17000, 3000, { 14565, 240, 792 }, { 12277, 600, 792 } },
-	{ 17000, 4000, { 15565, 240, 792 }, { 13277, 600, 792 } },
-	{ 18000,    0, { 12565, 240, 792 }, { 10277, 600, 792 } },
-	{ 18000, 1000, { 13565, 240, 792 }, { 11277, 600, 792 } },
-	{ 18000, 2000, { 14565, 240, 792 }, { 12277, 600, 792 } },
-	{ 18000, 3000, { 15565, 240, 792 }, { 13277, 600, 792 } },
-	{ 18000, 4000, { 16565, 240, 792 }, { 14277, 600, 792 } },
-	{ 19000,    0, { 13565, 240, 792 }, { 11277, 600, 792 } },
-	{ 19000, 1000, { 14565, 240, 792 }, { 12277, 600, 792 } },
-	{ 19000, 2000, { 15565, 240, 792 }, { 13277, 600, 792 } },
-	{ 19000, 3000, { 16565, 240, 792 }, { 14277, 600, 792 } },
-	{ 19000, 4000, { 17565, 240, 792 }, { 15277, 600, 792 } },
-	{ 23000,    0, { 15277, 600, 792 }, { 15277, 600, 792 } }
+	{  1000, {  1000, 240, 204 }, {  1000, 240, 204 } },
+	{  2000, {  1000, 240, 204 }, {  1000, 240, 204 } },
+	{  3000, {  1000, 240, 204 }, {  1000, 240, 204 } },
+	{  4000, {  1000, 240, 204 }, {  1000, 240, 204 } },
+	{  5000, {  1000, 240, 204 }, {  1000, 240, 312 } },
+	{  6000, {  1679, 240, 312 }, {  1679, 240, 312 } },
+	{  7000, {  1843, 240, 624 }, {  1975, 324, 408 } },
+	{  8000, {  2843, 240, 624 }, {  2306, 420, 624 } },
+	{  9000, {  3843, 240, 624 }, {  2606, 420, 792 } },
+	{ 10000, {  4565, 240, 792 }, {  3398, 528, 792 } },
+	{ 11000, {  5565, 240, 792 }, {  4398, 528, 792 } },
+	{ 12000, {  6565, 240, 792 }, {  4277, 600, 792 } },
+	{ 13000, {  7565, 240, 792 }, {  5277, 600, 792 } },
+	{ 14000, {  8565, 240, 792 }, {  6277, 600, 792 } },
+	{ 15000, {  9565, 240, 792 }, {  7277, 600, 792 } },
+	{ 16000, { 10565, 240, 792 }, {  8277, 600, 792 } },
+	{ 17000, { 11565, 240, 792 }, {  9277, 600, 792 } },
+	{ 18000, { 12565, 240, 792 }, { 10277, 600, 792 } },
+	{ 19000, { 13565, 240, 792 }, { 11277, 600, 792 } },
+	{ 20000, { 14565, 240, 792 }, { 12277, 600, 792 } },
+	{ 23000, { 14565, 600, 792 }, { 14565, 600, 792 } },
 };
 
 static struct tegra_sysedp_platform_data pluto_sysedp_platdata = {
 	.corecap = pluto_sysedp_corecap,
-	.corecap_size = ARRAY_SIZE(pluto_sysedp_corecap)
+	.corecap_size = ARRAY_SIZE(pluto_sysedp_corecap),
+	.init_req_watts = 20000
 };
 
 static struct platform_device pluto_sysedp_device = {
@@ -945,15 +1027,17 @@ static struct platform_device pluto_sysedp_device = {
 	.dev = { .platform_data = &pluto_sysedp_platdata }
 };
 
-static __init int pluto_sysedp_init(void)
+void __init pluto_sysedp_core_init(void)
 {
+	int r;
+
 	pluto_sysedp_platdata.cpufreq_lim = tegra_get_system_edp_entries(
 			&pluto_sysedp_platdata.cpufreq_lim_size);
 	if (!pluto_sysedp_platdata.cpufreq_lim) {
 		WARN_ON(1);
-		return -ENODEV;
+		return;
 	}
 
-	return platform_device_register(&pluto_sysedp_device);
+	r = platform_device_register(&pluto_sysedp_device);
+	WARN_ON(r);
 }
-late_initcall(pluto_sysedp_init);

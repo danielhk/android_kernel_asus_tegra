@@ -113,7 +113,8 @@ static int otg_notifications(struct notifier_block *nb,
 	DBG("%s(%d) tegra->int_status = 0x%lx\n", __func__,
 				__LINE__, tegra->int_status);
 
-	schedule_work(&tegra->work);
+	if (!tegra->suspended)
+		schedule_work(&tegra->work);
 
 	DBG("%s(%d) End\n", __func__, __LINE__);
 	return NOTIFY_DONE;
@@ -767,11 +768,10 @@ static void tegra_otg_resume(struct device *dev)
 
 		spin_lock_irqsave(&tegra->lock, flags);
 		if (tegra->support_usb_id)
-			tegra->int_status = val | USB_ID_INT_EN |
-					USB_ID_PIN_WAKEUP_EN;
+			val |= USB_ID_INT_EN | USB_ID_PIN_WAKEUP_EN;
 		if (!tegra->support_pmu_vbus)
-			tegra->int_status = val | USB_VBUS_INT_EN |
-					USB_VBUS_WAKEUP_EN;
+			val |= USB_VBUS_INT_EN | USB_VBUS_WAKEUP_EN;
+		tegra->int_status = val;
 		spin_unlock_irqrestore(&tegra->lock, flags);
 	}
 

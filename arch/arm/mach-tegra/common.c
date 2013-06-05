@@ -68,7 +68,6 @@
 #define AHB_ARBITRATION_PRIORITY_CTRL		0x4
 #define   AHB_PRIORITY_WEIGHT(x)	(((x) & 0x7) << 29)
 #define   PRIORITY_SELECT_USB	BIT(6)
-#define PRIORITY_SELECT_SDMMC4	BIT(12)
 #define   PRIORITY_SELECT_USB2	BIT(18)
 #define   PRIORITY_SELECT_USB3	BIT(17)
 #define   PRIORITY_SELECT_SE BIT(14)
@@ -82,7 +81,6 @@
 #define   FORCED_RECOVERY_MODE	BIT(1)
 
 #define AHB_GIZMO_USB		0x1c
-#define AHB_GIZMO_SDMMC4	0x44
 #define AHB_GIZMO_USB2		0x78
 #define AHB_GIZMO_USB3		0x7c
 #define AHB_GIZMO_SE		0x4c
@@ -213,6 +211,7 @@ static int max_core_current;
 static int emc_max_dvfs;
 static unsigned int memory_type;
 static int usb_port_owner_info;
+static int pmic_rst_reason;
 
 /* WARNING: There is implicit client of pllp_out3 like i2c, uart, dsi
  * and so this clock (pllp_out3) should never be disabled.
@@ -367,11 +366,11 @@ static __initdata struct tegra_clk_init_table tegra11x_clk_init_table[] = {
 	{ "csite",      NULL,           0,              true },
 #endif
 	{ "pll_u",	NULL,		480000000,	true },
-	{ "pll_re_vco",	NULL,		672000000,	false },
-	{ "xusb_falcon_src",	"pll_re_vco",	224000000,	false},
-	{ "xusb_host_src",	"pll_re_vco",	112000000,	false},
-	{ "xusb_ss_src",	"pll_u_480M",	120000000,	false},
-	{ "xusb_hs_src",	"pll_u_60M",	60000000,	false},
+	{ "pll_re_vco",	NULL,		612000000,	true },
+	{ "xusb_falcon_src",	"pll_p",	204000000,	false},
+	{ "xusb_host_src",	"pll_p",	102000000,	false},
+	{ "xusb_ss_src",	"pll_re_vco",	122400000,	false},
+	{ "xusb_hs_src",	"xusb_ss_div2",	61200000,	false},
 	{ "xusb_fs_src",	"pll_u_48M",	48000000,	false},
 	{ "sdmmc1",	"pll_p",	48000000,	false},
 	{ "sdmmc3",	"pll_p",	48000000,	false},
@@ -637,10 +636,6 @@ static void __init tegra_init_ahb_gizmo_settings(void)
 	gizmo_writel(val, AHB_GIZMO_USB3);
 
 #if !defined(CONFIG_ARCH_TEGRA_2x_SOC) && !defined(CONFIG_ARCH_TEGRA_3x_SOC)
-	val = gizmo_readl(AHB_GIZMO_SDMMC4);
-	val |= IMMEDIATE;
-	gizmo_writel(val, AHB_GIZMO_SDMMC4);
-
 	val = gizmo_readl(AHB_GIZMO_SE);
 	val |= IMMEDIATE;
 	gizmo_writel(val, AHB_GIZMO_SE);
@@ -650,7 +645,7 @@ static void __init tegra_init_ahb_gizmo_settings(void)
 	val |= PRIORITY_SELECT_USB | PRIORITY_SELECT_USB2 | PRIORITY_SELECT_USB3
 				| AHB_PRIORITY_WEIGHT(7);
 #if !defined(CONFIG_ARCH_TEGRA_2x_SOC) && !defined(CONFIG_ARCH_TEGRA_3x_SOC)
-	val |= PRIORITY_SELECT_SE | PRIORITY_SELECT_SDMMC4;
+	val |= PRIORITY_SELECT_SE;
 #endif
 	gizmo_writel(val, AHB_ARBITRATION_PRIORITY_CTRL);
 
@@ -681,8 +676,7 @@ static void __init tegra_init_ahb_gizmo_settings(void)
 #if !defined(CONFIG_ARCH_TEGRA_2x_SOC) && !defined(CONFIG_ARCH_TEGRA_3x_SOC)
 	val = gizmo_readl(AHB_MEM_PREFETCH_CFG5);
 	val &= ~MST_ID(~0);
-	val |= PREFETCH_ENB | SDMMC4_MST_ID | ADDR_BNDRY(0xc) |
-		INACTIVITY_TIMEOUT(0x1000);
+	val |= PREFETCH_ENB | SDMMC4_MST_ID;
 	gizmo_writel(val, AHB_MEM_PREFETCH_CFG5);
 
 	val = gizmo_readl(AHB_MEM_PREFETCH_CFG6);
@@ -1337,6 +1331,38 @@ int tegra_get_commchip_id(void)
 }
 
 __setup("commchip_id=", tegra_commchip_id);
+
+int tegra_get_pmic_rst_reason(void)
+{
+	return pmic_rst_reason;
+}
+
+static int __init tegra_pmic_rst_reason(char *id)
+{
+	char *p = id;
+	pmic_rst_reason = memparse(p, &p);
+	return 1;
+}
+
+__setup("pmic_rst_reason=", tegra_pmic_rst_reason);
+
+#ifdef CONFIG_ANDROID
+static bool androidboot_mode_charger;
+
+bool get_androidboot_mode_charger(void)
+{
+	return androidboot_mode_charger;
+}
+static int __init tegra_androidboot_mode(char *options)
+{
+	if (!strcmp(options, "charger"))
+		androidboot_mode_charger = true;
+	else
+		androidboot_mode_charger = false;
+	return 1;
+}
+__setup("androidboot.mode=", tegra_androidboot_mode);
+#endif
 
 /*
  * Tegra has a protected aperture that prevents access by most non-CPU

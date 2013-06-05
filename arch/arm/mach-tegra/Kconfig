@@ -113,7 +113,6 @@ config ARCH_TEGRA_11x_SOC
 	select USB_ULPI_VIEWPORT if USB_SUPPORT
 	select REPORT_PRESENT_CPUS if TEGRA_AUTO_HOTPLUG
 	select TEGRA_LP2_CPU_TIMER if !TEGRA_RAIL_OFF_MULTIPLE_CPUS
-	select CPA
 	select NVMAP_CACHE_MAINT_BY_SET_WAYS
 	select NVMAP_DEFERRED_CACHE_MAINT
 	select ARCH_TEGRA_HAS_CL_DVFS
@@ -128,6 +127,7 @@ config ARCH_TEGRA_11x_SOC
 	select TEGRA_ISOMGR_DEBUG
 	select TEGRA_ERRATA_1157520
 	select TEGRA_CORE_EDP_LIMITS
+	select TEGRA_VDD_CORE_OVERRIDE if TEGRA_EMC_SCALING_ENABLE
 	select TEGRA_THERMAL_THROTTLE_EXACT_FREQ
 	select ARM_ERRATA_799270
 	select ARM_ERRATA_798181
@@ -324,6 +324,7 @@ config MACH_MACALLAN
        depends on ARCH_TEGRA_11x_SOC
        select MACH_HAS_SND_SOC_TEGRA_RT5639 if SND_SOC
        select MACH_HAS_SND_SOC_TEGRA_RT5640 if SND_SOC
+       select EDP_FRAMEWORK
        help
          Support for NVIDIA MACALLAN development platform
 
@@ -629,9 +630,20 @@ config TEGRA_GADGET_BOOST_CPU_FREQ
 	help
 	  Devices need to boost frequency of CPU when they are connected
 	  to host pc through usb cable for better performance. This value
-	  is the amount of the frequency (in mhz) to be boosted. If it is
+	  is the amount of the frequency (in Mhz) to be boosted. If it is
 	  zero boosting frequency will not be enabled. This value will be
 	  used only by usb gadget driver.
+
+config TEGRA_EHCI_BOOST_CPU_FREQ
+        int "Boost cpu frequency(in Mhz) for tegra usb host"
+        range 0 1300 if ARCH_TEGRA_3x_SOC
+        range 0 1800 if ARCH_TEGRA_11x_SOC
+        range 0 2000 if ARCH_TEGRA_14x_SOC
+        default 0
+        help
+          This value is the amount of the cpu frequency (in Mhz)
+          to be boosted. If it is zero boosting frequency will not
+          be enabled. This value will be used only by usb ehci driver.
 
 config TEGRA_DYNAMIC_PWRDET
 	bool "Enable dynamic activation of IO level auto-detection"
@@ -922,4 +934,13 @@ config TEGRA_USE_NCT
 	bool "Enable NCT partition access"
 	help
 	  When enabled, we can read non-volatile items from NCT partition.
+
+config TEGRA_VDD_CORE_OVERRIDE
+	bool "Enable core rail override support"
+	depends on TEGRA_SILICON_PLATFORM
+	default n
+	help
+	  When enabled, core rail can be fixed and locked at specified voltage
+	  within override range, and core modules clocks are capped at rates
+	  safe at override level.
 endif

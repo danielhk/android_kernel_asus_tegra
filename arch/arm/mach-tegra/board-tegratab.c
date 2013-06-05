@@ -34,6 +34,7 @@
 #include <linux/platform_data/tegra_usb_modem_power.h>
 #include <linux/spi/spi.h>
 #include <linux/spi/rm31080a_ts.h>
+#include <linux/maxim_sti.h>
 #include <linux/tegra_uart.h>
 #include <linux/memblock.h>
 #include <linux/spi-tegra.h>
@@ -53,7 +54,7 @@
 #include <mach/iomap.h>
 #include <mach/irqs.h>
 #include <mach/pinmux.h>
-#include <mach/pinmux-tegra30.h>
+#include <mach/pinmux-t11.h>
 #include <mach/iomap.h>
 #include <mach/io.h>
 #include <mach/io_dpd.h>
@@ -69,6 +70,7 @@
 #include "board-touch-raydium.h"
 #include "board.h"
 #include "board-common.h"
+#include "board-touch-maxim_sti.h"
 #include "clock.h"
 #include "board-tegratab.h"
 #include "devices.h"
@@ -100,7 +102,13 @@ static struct platform_device btwilink_device = {
 
 static noinline void __init tegratab_bt_st(void)
 {
+	struct board_info board_info;
+
 	pr_info("tegratab_bt_st");
+	tegra_get_board_info(&board_info);
+
+	if (board_info.board_id == BOARD_P1640)
+		tegratab_wilink_pdata.nshutdown_gpio = TEGRA_GPIO_PR1;
 
 	platform_device_register(&wl128x_device);
 	platform_device_register(&btwilink_device);
@@ -182,7 +190,7 @@ static struct tegra_i2c_platform_data tegratab_i2c2_platform_data = {
 static struct tegra_i2c_platform_data tegratab_i2c3_platform_data = {
 	.adapter_nr	= 2,
 	.bus_count	= 1,
-	.bus_clk_rate	= { 100000, 0 },
+	.bus_clk_rate	= { 400000, 0 },
 	.scl_gpio		= {TEGRA_GPIO_I2C3_SCL, 0},
 	.sda_gpio		= {TEGRA_GPIO_I2C3_SDA, 0},
 	.arb_recovery = arb_lost_recovery,
@@ -210,9 +218,20 @@ static struct i2c_board_info __initdata rt5640_board_info = {
 	I2C_BOARD_INFO("rt5640", 0x1c),
 };
 
+static struct i2c_board_info __initdata rt5639_board_info = {
+	I2C_BOARD_INFO("rt5639", 0x1c),
+};
+
 static void tegratab_i2c_init(void)
 {
-	i2c_register_board_info(0, &rt5640_board_info, 1);
+	struct board_info board_info;
+
+	tegra_get_board_info(&board_info);
+
+	if (board_info.board_id == BOARD_P1640)
+		i2c_register_board_info(0, &rt5639_board_info, 1);
+	else
+		i2c_register_board_info(0, &rt5640_board_info, 1);
 }
 
 static struct platform_device *tegratab_uart_devices[] __initdata = {
@@ -360,6 +379,7 @@ static struct tegra_usb_platform_data tegra_udc_pdata = {
 	.port_otg = true,
 	.has_hostpc = true,
 	.support_pmu_vbus = true,
+	.id_det_type = TEGRA_USB_PMU_ID,
 	.phy_intf = TEGRA_USB_PHY_INTF_UTMI,
 	.op_mode = TEGRA_USB_OPMODE_DEVICE,
 	.u_data.dev = {
@@ -385,6 +405,7 @@ static struct tegra_usb_platform_data tegra_ehci1_utmi_pdata = {
 	.port_otg = true,
 	.has_hostpc = true,
 	.support_pmu_vbus = true,
+	.id_det_type = TEGRA_USB_PMU_ID,
 	.unaligned_dma_buf_supported = false,
 	.phy_intf = TEGRA_USB_PHY_INTF_UTMI,
 	.op_mode = TEGRA_USB_OPMODE_HOST,
@@ -393,6 +414,7 @@ static struct tegra_usb_platform_data tegra_ehci1_utmi_pdata = {
 		.hot_plug = false,
 		.remote_wakeup_supported = true,
 		.power_off_on_suspend = true,
+		.turn_off_vbus_on_lp0 = true,
 	},
 	.u_cfg.utmi = {
 		.hssync_start_delay = 0,
@@ -402,9 +424,10 @@ static struct tegra_usb_platform_data tegra_ehci1_utmi_pdata = {
 		.xcvr_setup = 15,
 		.xcvr_lsfslew = 2,
 		.xcvr_lsrslew = 2,
-		.xcvr_setup_offset = 0,
+		.xcvr_setup_offset = -5,
 		.xcvr_use_fuses = 1,
 		.vbus_oc_map = 0x4,
+		.xcvr_hsslew_lsb = 3,
 	},
 };
 
@@ -412,6 +435,7 @@ static struct tegra_usb_otg_data tegra_otg_pdata = {
 	.ehci_device = &tegra_ehci1_device,
 	.ehci_pdata = &tegra_ehci1_utmi_pdata,
 	.vbus_extcon_dev_name = "palmas-extcon",
+	.id_extcon_dev_name = "palmas-extcon",
 };
 
 static void tegratab_usb_init(void)
@@ -422,12 +446,6 @@ static void tegratab_usb_init(void)
 	tegra_set_usb_wake_source();
 
 	if (!(usb_port_owner_info & UTMI1_PORT_OWNER_XUSB)) {
-		if (tegra_get_chipid() == TEGRA_CHIPID_TEGRA11 &&
-			tegra_revision == TEGRA_REVISION_A02) {
-			tegra_ehci1_utmi_pdata \
-			.unaligned_dma_buf_supported = true;
-			tegra_udc_pdata.unaligned_dma_buf_supported = true;
-		}
 		tegra_otg_device.dev.platform_data = &tegra_otg_pdata;
 		platform_device_register(&tegra_otg_device);
 		/* Setup the udc platform data */
@@ -504,10 +522,6 @@ static void tegratab_modem_init(void)
 	switch (modem_id) {
 	case TEGRA_BB_NEMO: /* on board i500 HSIC */
 		if (!(usb_port_owner_info & HSIC1_PORT_OWNER_XUSB)) {
-			if ((tegra_get_chipid() == TEGRA_CHIPID_TEGRA11) &&
-				(tegra_revision == TEGRA_REVISION_A02))
-				tegra_ehci2_hsic_baseband_pdata \
-				.unaligned_dma_buf_supported = true;
 			platform_device_register(&icera_nemo_device);
 		}
 		break;
@@ -525,8 +539,13 @@ static void tegratab_audio_init(void)
 
 	tegra_get_board_info(&board_info);
 
-	tegratab_audio_pdata.codec_name = "rt5640.0-001c";
-	tegratab_audio_pdata.codec_dai_name = "rt5640-aif1";
+	if (board_info.board_id == BOARD_P1640) {
+		tegratab_audio_pdata.codec_name = "rt5639.0-001c";
+		tegratab_audio_pdata.codec_dai_name = "rt5639-aif1";
+	} else {
+		tegratab_audio_pdata.codec_name = "rt5640.0-001c";
+		tegratab_audio_pdata.codec_dai_name = "rt5640-aif1";
+	}
 }
 
 
@@ -586,6 +605,37 @@ static __initdata struct tegra_clk_init_table touch_clk_init_table[] = {
 	{ NULL,         NULL,           0,              0},
 };
 
+#if defined(CONFIG_TOUCHSCREEN_MAXIM_STI) || \
+	defined(CONFIG_TOUCHSCREEN_MAXIM_STI_MODULE)
+struct maxim_sti_pdata maxim_sti_pdata = {
+	.touch_fusion         = "/vendor/bin/touch_fusion",
+	.config_file          = "/vendor/firmware/touch_fusion.cfg",
+	.nl_family            = TF_FAMILY_NAME,
+	.nl_mc_groups         = 5,
+	.chip_access_method   = 2,
+	.default_reset_state  = 1,
+	.tx_buf_size          = 4100,
+	.rx_buf_size          = 4100,
+	.gpio_reset           = TOUCH_GPIO_RST_MAXIM_STI_SPI,
+	.gpio_irq             = TOUCH_GPIO_IRQ_MAXIM_STI_SPI
+};
+
+static struct tegra_spi_device_controller_data dev_cdata = {
+	.rx_clk_tap_delay = 0,
+	.is_hw_based_cs = true,
+	.tx_clk_tap_delay = 0,
+};
+
+struct spi_board_info maxim_sti_spi_board = {
+	.modalias = MAXIM_STI_NAME,
+	.bus_num = 0,
+	.chip_select = 0,
+	.max_speed_hz = 12 * 1000 * 1000,
+	.mode = SPI_MODE_0,
+	.platform_data = &maxim_sti_pdata,
+	.controller_data = &dev_cdata
+};
+#else
 struct rm_spi_ts_platform_data rm31080ts_tegratab_data = {
 	.gpio_reset = TOUCH_GPIO_RST_RAYDIUM_SPI,
 	.config = 0,
@@ -596,7 +646,7 @@ struct rm_spi_ts_platform_data rm31080ts_tegratab_data = {
 
 static struct tegra_spi_device_controller_data dev_cdata = {
 	.rx_clk_tap_delay = 0,
-	.tx_clk_tap_delay = 16,
+	.tx_clk_tap_delay = 0,
 };
 
 struct spi_board_info rm31080a_tegratab_spi_board[1] = {
@@ -610,6 +660,7 @@ struct spi_board_info rm31080a_tegratab_spi_board[1] = {
 	 .platform_data = &rm31080ts_tegratab_data,
 	 },
 };
+#endif
 
 static int __init tegratab_touch_init(void)
 {
@@ -617,6 +668,10 @@ static int __init tegratab_touch_init(void)
 
 	tegra_get_display_board_info(&board_info);
 	tegra_clk_init_from_table(touch_clk_init_table);
+#if defined(CONFIG_TOUCHSCREEN_MAXIM_STI) || \
+	defined(CONFIG_TOUCHSCREEN_MAXIM_STI_MODULE)
+	(void)touch_init_maxim_sti(&maxim_sti_spi_board);
+#else
 	rm31080ts_tegratab_data.platform_id = RM_PLATFORM_D010;
 	mdelay(20);
 	rm31080a_tegratab_spi_board[0].irq =
@@ -626,6 +681,7 @@ static int __init tegratab_touch_init(void)
 				&rm31080ts_tegratab_data,
 				&rm31080a_tegratab_spi_board[0],
 				ARRAY_SIZE(rm31080a_tegratab_spi_board));
+#endif
 	return 0;
 }
 
@@ -640,6 +696,20 @@ static void __init tegra_tegratab_early_init(void)
 }
 
 struct of_dev_auxdata tegratab_auxdata_lookup[] __initdata = {
+	OF_DEV_AUXDATA("nvidia,tegra114-host1x", TEGRA_HOST1X_BASE, "host1x",
+				NULL),
+	OF_DEV_AUXDATA("nvidia,tegra114-gr3d", TEGRA_GR3D_BASE, "gr3d",
+				NULL),
+	OF_DEV_AUXDATA("nvidia,tegra114-gr2d", TEGRA_GR2D_BASE, "gr2d",
+				NULL),
+	OF_DEV_AUXDATA("nvidia,tegra114-msenc", TEGRA_MSENC_BASE, "msenc",
+				NULL),
+	OF_DEV_AUXDATA("nvidia,tegra114-vi", TEGRA_VI_BASE, "vi",
+				NULL),
+	OF_DEV_AUXDATA("nvidia,tegra114-isp", TEGRA_ISP_BASE, "isp",
+				NULL),
+	OF_DEV_AUXDATA("nvidia,tegra114-tsec", TEGRA_TSEC_BASE, "tsec",
+				NULL),
 	OF_DEV_AUXDATA("nvidia,tegra114-i2c", 0x7000c000, "tegra11-i2c.0",
 		&tegratab_i2c1_platform_data),
 	OF_DEV_AUXDATA("nvidia,tegra114-i2c", 0x7000c400, "tegra11-i2c.1",
@@ -669,6 +739,7 @@ static void __init tegra_tegratab_late_init(void)
 	tegra_ram_console_debug_init();
 	tegra_io_dpd_init();
 	tegratab_regulator_init();
+	tegratab_power_off_init();
 	tegratab_sdhci_init();
 	tegratab_suspend_init();
 	tegratab_emc_init();

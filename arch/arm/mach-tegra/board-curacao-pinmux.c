@@ -20,31 +20,9 @@
 #include <mach/pinmux.h>
 #include <mach/pinmux-t11.h>
 
-#define DEFAULT_DRIVE(_name)					\
-	{							\
-		.pingroup = TEGRA_DRIVE_PINGROUP_##_name,	\
-		.hsm = TEGRA_HSM_DISABLE,			\
-		.schmitt = TEGRA_SCHMITT_ENABLE,		\
-		.drive = TEGRA_DRIVE_DIV_1,			\
-		.pull_down = TEGRA_PULL_31,			\
-		.pull_up = TEGRA_PULL_31,			\
-		.slew_rising = TEGRA_SLEW_SLOWEST,		\
-		.slew_falling = TEGRA_SLEW_SLOWEST,		\
-	}
-
-
 static __initdata struct tegra_drive_pingroup_config curacao_drive_pinmux[] = {
 	/* DEFAULT_DRIVE(<pin_group>), */
 };
-
-#define DEFAULT_PINMUX(_pingroup, _mux, _pupd, _tri, _io)	\
-	{							\
-		.pingroup	= TEGRA_PINGROUP_##_pingroup,	\
-		.func		= TEGRA_MUX_##_mux,		\
-		.pupd		= TEGRA_PUPD_##_pupd,		\
-		.tristate	= TEGRA_TRI_##_tri,		\
-		.io		= TEGRA_PIN_##_io,		\
-	}
 
 static __initdata struct tegra_pingroup_config curacao_pinmux[] = {
 	DEFAULT_PINMUX(ULPI_DATA0,      ULPI,            NORMAL,    NORMAL,     INPUT),
@@ -145,7 +123,6 @@ static __initdata struct tegra_pingroup_config curacao_pinmux[] = {
 	DEFAULT_PINMUX(SDMMC4_DAT5,     SDMMC4,          PULL_UP,   NORMAL,     INPUT),
 	DEFAULT_PINMUX(SDMMC4_DAT6,     SDMMC4,          PULL_UP,   NORMAL,     INPUT),
 	DEFAULT_PINMUX(SDMMC4_DAT7,     SDMMC4,          PULL_UP,   NORMAL,     INPUT),
-	DEFAULT_PINMUX(SDMMC4_RST_N,    RSVD1,           PULL_DOWN, NORMAL,     INPUT),
 	DEFAULT_PINMUX(CAM_MCLK,        VI,              NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(GPIO_PCC1,       I2S4,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(GPIO_PBB0,       I2S4,            NORMAL,    NORMAL,     INPUT),
