@@ -88,19 +88,6 @@ static struct resource sdhci_resource0[] = {
 	},
 };
 
-static struct resource sdhci_resource2[] = {
-	[0] = {
-		.start  = INT_SDMMC3,
-		.end    = INT_SDMMC3,
-		.flags  = IORESOURCE_IRQ,
-	},
-	[1] = {
-		.start	= TEGRA_SDMMC3_BASE,
-		.end	= TEGRA_SDMMC3_BASE + TEGRA_SDMMC3_SIZE-1,
-		.flags	= IORESOURCE_MEM,
-	},
-};
-
 static struct resource sdhci_resource3[] = {
 	[0] = {
 		.start  = INT_SDMMC4,
@@ -154,20 +141,6 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data0 = {
 	.edp_support = false,
 };
 
-static struct tegra_sdhci_platform_data tegra_sdhci_platform_data2 = {
-	.cd_gpio = MOLLY_SD_CD,
-	.wp_gpio = -1,
-	.power_gpio = -1,
-	.tap_delay = 0x3,
-	.trim_delay = 0x3,
-	.ddr_clk_limit = 41000000,
-	.max_clk_limit = 82000000,
-	.uhs_mask = MMC_UHS_MASK_DDR50,
-	.edp_support = true,
-	.edp_states = {966, 0},
-	.power_off_rail = true,
-};
-
 static struct tegra_sdhci_platform_data tegra_sdhci_platform_data3 = {
 	.cd_gpio = -1,
 	.wp_gpio = -1,
@@ -192,16 +165,6 @@ static struct platform_device tegra_sdhci_device0 = {
 	.num_resources	= ARRAY_SIZE(sdhci_resource0),
 	.dev = {
 		.platform_data = &tegra_sdhci_platform_data0,
-	},
-};
-
-static struct platform_device tegra_sdhci_device2 = {
-	.name		= "sdhci-tegra",
-	.id		= 2,
-	.resource	= sdhci_resource2,
-	.num_resources	= ARRAY_SIZE(sdhci_resource2),
-	.dev = {
-		.platform_data = &tegra_sdhci_platform_data2,
 	},
 };
 
@@ -403,8 +366,15 @@ int __init molly_sdhci_init(void)
 		tegra_sdhci_platform_data3.nominal_vcore_uV = nominal_core_mv *
 			1000;
 	}
+	/* device0 uses resource0, which is sdmmc1.  used for WiFi
+	 * device2 uses resource2, which is sdmmc3.  for external SD slot
+	 *   on dalmore.  molly needs SDMMC lines for ubik SPI.
+	 * device3 uses resource3, which is sdmmc4.  used for eMMC.
+	 *
+	 * sdmmc2 is used for modem on dalmore, not configured here.  no
+	 * modem in molly
+	 */
 	platform_device_register(&tegra_sdhci_device3);
-	platform_device_register(&tegra_sdhci_device2);
 	platform_device_register(&tegra_sdhci_device0);
 	molly_wifi_init();
 	return 0;
