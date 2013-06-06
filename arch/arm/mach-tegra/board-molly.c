@@ -34,15 +34,12 @@
 #include <linux/platform_data/tegra_usb.h>
 #include <linux/platform_data/tegra_xusb.h>
 #include <linux/spi/spi.h>
-#include <linux/spi/rm31080a_ts.h>
 #include <linux/tegra_uart.h>
 #include <linux/memblock.h>
 #include <linux/spi-tegra.h>
 #include <linux/rfkill-gpio.h>
 #include <linux/skbuff.h>
 #include <linux/regulator/consumer.h>
-#include <linux/smb349-charger.h>
-#include <linux/max17048_battery.h>
 #include <linux/of_platform.h>
 #include <linux/edp.h>
 
@@ -67,7 +64,6 @@
 #include <linux/athome_radio.h>
 #include <mach/hardware.h>
 
-#include "board-touch-raydium.h"
 #include "board.h"
 #include "board-common.h"
 #include "clock.h"
@@ -78,7 +74,6 @@
 #include "pm.h"
 #include "pm-irq.h"
 #include "common.h"
-#include "tegra-board-id.h"
 
 #if defined(CONFIG_BT_BLUESLEEP) || defined(CONFIG_BT_BLUESLEEP_MODULE)
 static struct rfkill_gpio_platform_data molly_bt_rfkill_pdata = {
@@ -283,8 +278,6 @@ static struct i2c_board_info __initdata i2c_bus2[] = {
 
 static void molly_i2c_init(void)
 {
-	struct board_info board_info;
-
 	/* Tegra4 has five i2c controllers:
 	 * I2C_1 is called GEN1_I2C in pinmux/schematics
 	 * I2C_2 is called GEN2_I2C in pinmux/schematics
@@ -298,7 +291,6 @@ static void molly_i2c_init(void)
 	 * I2C5/PWR is for PMIC TPS65913B2B5
 	 */
 
-	tegra_get_board_info(&board_info);
 	tegra11_i2c_device1.dev.platform_data = &molly_i2c1_platform_data;
 	tegra11_i2c_device2.dev.platform_data = &molly_i2c2_platform_data;
 	tegra11_i2c_device3.dev.platform_data = &molly_i2c3_platform_data;
@@ -396,36 +388,6 @@ static struct platform_device tegra_rtc_device = {
 	.num_resources = ARRAY_SIZE(tegra_rtc_resources),
 };
 
-static struct tegra_asoc_platform_data molly_audio_pdata = {
-	.gpio_spkr_en		= TEGRA_GPIO_SPKR_EN,
-	.gpio_hp_det		= TEGRA_GPIO_HP_DET,
-	.gpio_hp_mute		= -1,
-	.gpio_int_mic_en	= TEGRA_GPIO_INT_MIC_EN,
-	.gpio_ext_mic_en	= TEGRA_GPIO_EXT_MIC_EN,
-	.gpio_ldo1_en		= TEGRA_GPIO_LDO1_EN,
-	.gpio_codec1 = TEGRA_GPIO_CODEC1_EN,
-	.gpio_codec2 = TEGRA_GPIO_CODEC2_EN,
-	.gpio_codec3 = TEGRA_GPIO_CODEC3_EN,
-	.i2s_param[HIFI_CODEC]	= {
-		.audio_port_id	= 1,
-		.is_i2s_master	= 1,
-		.i2s_mode	= TEGRA_DAIFMT_I2S,
-	},
-	.i2s_param[BT_SCO]	= {
-		.audio_port_id	= 3,
-		.is_i2s_master	= 1,
-		.i2s_mode	= TEGRA_DAIFMT_DSP_A,
-	},
-};
-
-static struct platform_device molly_audio_device = {
-	.name	= "tegra-snd-rt5640",
-	.id	= 0,
-	.dev	= {
-		.platform_data = &molly_audio_pdata,
-	},
-};
-
 static struct platform_device *molly_devices[] __initdata = {
 	&tegra_pmu_device,
 	&tegra_rtc_device,
@@ -450,7 +412,6 @@ static struct platform_device *molly_devices[] __initdata = {
 	&spdif_dit_device,
 	&bluetooth_dit_device,
 	&tegra_pcm_device,
-	&molly_audio_device,
 	&tegra_hda_device,
 #if defined(CONFIG_TEGRA_CEC_SUPPORT)
 	&tegra_cec_device,
@@ -629,17 +590,6 @@ static void molly_usb_init(void) { }
 static void molly_xusb_init(void) { }
 #endif
 
-static void molly_audio_init(void)
-{
-	struct board_info board_info;
-
-	tegra_get_board_info(&board_info);
-
-	molly_audio_pdata.codec_name = "rt5640.0-001c";
-	molly_audio_pdata.codec_dai_name = "rt5640-aif1";
-}
-
-
 #define ATHOME_RADIO_INT_GPIO     TEGRA_GPIO_PB4 /* SDMMC3_DAT3/GPIO_PB4 */
 #define ATHOME_RADIO_RESET_N_GPIO TEGRA_GPIO_PB5 /* SDMMC3_DAT2/GPIO_PB5 */
 #define ATHOME_RADIO_SPI_CS_GPIO  TEGRA_GPIO_PA7 /* SDMMC3_CMD/GPIO_PA7 */
@@ -754,9 +704,6 @@ static void __init molly_spi_init(void)
 
 static void __init tegra_molly_init(void)
 {
-	struct board_info board_info;
-
-	tegra_get_display_board_info(&board_info);
 	tegra_clk_init_from_table(molly_clk_init_table);
 	tegra_clk_verify_parents();
 	tegra_soc_device_init("molly");
@@ -768,7 +715,6 @@ static void __init tegra_molly_init(void)
 	molly_usb_init();
 	molly_xusb_init();
 	molly_uart_init();
-	molly_audio_init();
 	platform_add_devices(molly_devices, ARRAY_SIZE(molly_devices));
 	tegra_ram_console_debug_init();
 	tegra_io_dpd_init();
