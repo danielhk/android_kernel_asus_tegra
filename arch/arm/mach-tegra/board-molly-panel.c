@@ -378,51 +378,32 @@ static struct tegra_dc_sd_settings molly_sd_settings = {
 #if 1
 static void molly_panel_select(void)
 {
-	struct tegra_panel *panel = NULL;
-	struct board_info board;
+	struct tegra_panel *panel = &dsi_p_wuxga_10_1;
 
-	tegra_get_display_board_info(&board);
+	if (panel->init_sd_settings)
+		panel->init_sd_settings(&sd_settings);
 
-	switch (board.board_id) {
-	case BOARD_E1639:
-		panel = &dsi_s_wqxga_10_1;
-		break;
-	case BOARD_E1631:
-		panel = &dsi_a_1080p_11_6;
-		break;
-	case BOARD_E1627:
-	/* fall through */
-	default:
-		panel = &dsi_p_wuxga_10_1;
-		break;
-	}
-	if (panel) {
-		if (panel->init_sd_settings)
-			panel->init_sd_settings(&sd_settings);
+	if (panel->init_dc_out)
+		panel->init_dc_out(&molly_disp1_out);
 
-		if (panel->init_dc_out)
-			panel->init_dc_out(&molly_disp1_out);
+	if (panel->init_fb_data)
+		panel->init_fb_data(&molly_disp1_fb_data);
 
-		if (panel->init_fb_data)
-			panel->init_fb_data(&molly_disp1_fb_data);
+	if (panel->init_cmu_data)
+		panel->init_cmu_data(&molly_disp1_pdata);
 
-		if (panel->init_cmu_data)
-			panel->init_cmu_data(&molly_disp1_pdata);
+	if (panel->set_disp_device)
+		panel->set_disp_device(&molly_disp1_device);
 
-		if (panel->set_disp_device)
-			panel->set_disp_device(&molly_disp1_device);
+	if (panel->init_resources)
+		panel->init_resources(molly_disp1_resources,
+				      ARRAY_SIZE(molly_disp1_resources));
 
-		if (panel->init_resources)
-			panel->init_resources(molly_disp1_resources,
-				ARRAY_SIZE(molly_disp1_resources));
+	if (panel->register_bl_dev)
+		panel->register_bl_dev();
 
-		if (panel->register_bl_dev)
-			panel->register_bl_dev();
-
-		if (panel->register_i2c_bridge)
-			panel->register_i2c_bridge();
-	}
-
+	if (panel->register_i2c_bridge)
+		panel->register_i2c_bridge();
 }
 #endif
 
