@@ -360,9 +360,7 @@ static void __init molly_uart_init(void)
 	tegra_uartc_device.dev.platform_data = &molly_uart_pdata;
 	tegra_uartd_device.dev.platform_data = &molly_uart_pdata;
 
-	/* Register low speed only if it is selected */
-	if (!is_tegra_debug_uartport_hs())
-		uart_debug_init();
+	uart_debug_init();
 
 	platform_add_devices(molly_uart_devices,
 				ARRAY_SIZE(molly_uart_devices));
@@ -421,7 +419,6 @@ static struct platform_device *molly_devices[] __initdata = {
 #endif
 };
 
-#ifdef CONFIG_USB_SUPPORT
 static struct tegra_usb_platform_data tegra_udc_pdata = {
 	.port_otg = true,
 	.has_hostpc = true,
@@ -473,32 +470,6 @@ static struct tegra_usb_platform_data tegra_ehci1_utmi_pdata = {
 	},
 };
 
-static struct tegra_usb_platform_data tegra_ehci3_utmi_pdata = {
-	.port_otg = false,
-	.has_hostpc = true,
-	.unaligned_dma_buf_supported = false,
-	.phy_intf = TEGRA_USB_PHY_INTF_UTMI,
-	.op_mode = TEGRA_USB_OPMODE_HOST,
-	.u_data.host = {
-		.vbus_gpio = -1,
-		.hot_plug = false,
-		.remote_wakeup_supported = true,
-		.power_off_on_suspend = true,
-	},
-	.u_cfg.utmi = {
-	.hssync_start_delay = 0,
-		.elastic_limit = 16,
-		.idle_wait_delay = 17,
-		.term_range_adj = 6,
-		.xcvr_setup = 8,
-		.xcvr_lsfslew = 2,
-		.xcvr_lsrslew = 2,
-		.xcvr_setup_offset = 0,
-		.xcvr_use_fuses = 1,
-		.vbus_oc_map = 0x5,
-	},
-};
-
 static struct tegra_usb_otg_data tegra_otg_pdata = {
 	.ehci_device = &tegra_ehci1_device,
 	.ehci_pdata = &tegra_ehci1_utmi_pdata,
@@ -506,33 +477,17 @@ static struct tegra_usb_otg_data tegra_otg_pdata = {
 
 static void molly_usb_init(void)
 {
-	int usb_port_owner_info = tegra_get_usb_port_owner_info();
-
 	/* Set USB wake sources for molly */
 	tegra_set_usb_wake_source();
 
-	if (!(usb_port_owner_info & UTMI1_PORT_OWNER_XUSB)) {
-		if (tegra_get_chipid() == TEGRA_CHIPID_TEGRA11 &&
-			tegra_revision == TEGRA_REVISION_A02) {
-			tegra_ehci1_utmi_pdata \
-			.unaligned_dma_buf_supported = false;
-			tegra_udc_pdata.unaligned_dma_buf_supported = false;
-		}
-		tegra_otg_device.dev.platform_data = &tegra_otg_pdata;
-		platform_device_register(&tegra_otg_device);
-		/* Setup the udc platform data */
-		tegra_udc_device.dev.platform_data = &tegra_udc_pdata;
+	if (tegra_revision == TEGRA_REVISION_A02) {
+		tegra_ehci1_utmi_pdata.unaligned_dma_buf_supported = false;
+		tegra_udc_pdata.unaligned_dma_buf_supported = false;
 	}
-
-	if (!(usb_port_owner_info & UTMI2_PORT_OWNER_XUSB)) {
-		if (tegra_get_chipid() == TEGRA_CHIPID_TEGRA11 &&
-			tegra_revision == TEGRA_REVISION_A02) {
-			tegra_ehci3_utmi_pdata \
-			.unaligned_dma_buf_supported = false;
-		}
-		tegra_ehci3_device.dev.platform_data = &tegra_ehci3_utmi_pdata;
-		platform_device_register(&tegra_ehci3_device);
-	}
+	tegra_otg_device.dev.platform_data = &tegra_otg_pdata;
+	platform_device_register(&tegra_otg_device);
+	/* Setup the udc platform data */
+	tegra_udc_device.dev.platform_data = &tegra_udc_pdata;
 }
 
 static struct tegra_xusb_pad_data xusb_padctl_data = {
@@ -559,36 +514,27 @@ static struct tegra_xusb_pad_data xusb_padctl_data = {
 
 static void molly_xusb_init(void)
 {
-	int usb_port_owner_info = tegra_get_usb_port_owner_info();
+	u32 usb_calib0 = tegra_fuse_readl(FUSE_SKU_USB_CALIB_0);
 
-	if (usb_port_owner_info & UTMI2_PORT_OWNER_XUSB) {
-		u32 usb_calib0 = tegra_fuse_readl(FUSE_SKU_USB_CALIB_0);
+	pr_info("molly_xusb_init: usb_calib0 = 0x%08x\n", usb_calib0);
+	/*
+	 * read from usb_calib0 and pass to driver
+	 * set HS_CURR_LEVEL (PAD0)	= usb_calib0[5:0]
+	 * set TERM_RANGE_ADJ		= usb_calib0[10:7]
+	 * set HS_SQUELCH_LEVEL		= usb_calib0[12:11]
+	 * set HS_IREF_CAP		= usb_calib0[14:13]
+	 * set HS_CURR_LEVEL (PAD1)	= usb_calib0[20:15]
+	 */
 
-		pr_info("molly_xusb_init: usb_calib0 = 0x%08x\n", usb_calib0);
-		/*
-		 * read from usb_calib0 and pass to driver
-		 * set HS_CURR_LEVEL (PAD0)	= usb_calib0[5:0]
-		 * set TERM_RANGE_ADJ		= usb_calib0[10:7]
-		 * set HS_SQUELCH_LEVEL		= usb_calib0[12:11]
-		 * set HS_IREF_CAP		= usb_calib0[14:13]
-		 * set HS_CURR_LEVEL (PAD1)	= usb_calib0[20:15]
-		 */
+	xusb_padctl_data.hs_curr_level_pad0 = (usb_calib0 >> 0) & 0x3f;
+	xusb_padctl_data.hs_term_range_adj = (usb_calib0 >> 7) & 0xf;
+	xusb_padctl_data.hs_squelch_level = (usb_calib0 >> 11) & 0x3;
+	xusb_padctl_data.hs_iref_cap = (usb_calib0 >> 13) & 0x3;
+	xusb_padctl_data.hs_curr_level_pad1 = (usb_calib0 >> 15) & 0x3f;
 
-		xusb_padctl_data.hs_curr_level_pad0 = (usb_calib0 >> 0) & 0x3f;
-		xusb_padctl_data.hs_term_range_adj = (usb_calib0 >> 7) & 0xf;
-		xusb_padctl_data.hs_squelch_level = (usb_calib0 >> 11) & 0x3;
-		xusb_padctl_data.hs_iref_cap = (usb_calib0 >> 13) & 0x3;
-		xusb_padctl_data.hs_curr_level_pad1 = (usb_calib0 >> 15) & 0x3f;
-
-		tegra_xhci_device.dev.platform_data = &xusb_padctl_data;
-		platform_device_register(&tegra_xhci_device);
-	}
+	tegra_xhci_device.dev.platform_data = &xusb_padctl_data;
+	platform_device_register(&tegra_xhci_device);
 }
-
-#else
-static void molly_usb_init(void) { }
-static void molly_xusb_init(void) { }
-#endif
 
 #define ATHOME_RADIO_INT_GPIO     TEGRA_GPIO_PB4 /* SDMMC3_DAT3/GPIO_PB4 */
 #define ATHOME_RADIO_RESET_N_GPIO TEGRA_GPIO_PB5 /* SDMMC3_DAT2/GPIO_PB5 */
