@@ -53,74 +53,76 @@
 /** Define struct m_dev */
 struct m_dev
 {
-    char name[DEV_NAME_LEN];
-    int index;
-    unsigned long flags;
-    spinlock_t lock;
-    struct semaphore req_lock;
-    struct sk_buff_head rx_q;
-    wait_queue_head_t req_wait_q;
-    struct hci_dev_stats stat;
-    struct module *owner;
-    void *dev_pointer;
-    int dev_type;
-    int spec_type;
-    void *driver_data;
+	char name[DEV_NAME_LEN];
+	int index;
+	unsigned long flags;
+	spinlock_t lock;
+	struct semaphore req_lock;
+	struct sk_buff_head rx_q;
+	wait_queue_head_t req_wait_q;
+	struct hci_dev_stats stat;
+	struct module *owner;
+	void *dev_pointer;
+	int dev_type;
+	int spec_type;
+	void *driver_data;
+	int read_continue_flag;
 
-    int (*open) (struct m_dev * m_dev);
-    int (*close) (struct m_dev * m_dev);
-    int (*flush) (struct m_dev * m_dev);
-    int (*send) (struct m_dev * m_dev, struct sk_buff * skb);
-    void (*destruct) (struct m_dev * m_dev);
-    void (*notify) (struct m_dev * m_dev, unsigned int evt);
-    int (*ioctl) (struct m_dev * m_dev, unsigned int cmd, unsigned long arg);
-    void (*query) (struct m_dev * m_dev, unsigned long arg);
+	int (*open) (struct m_dev * m_dev);
+	int (*close) (struct m_dev * m_dev);
+	int (*flush) (struct m_dev * m_dev);
+	int (*send) (struct m_dev * m_dev, struct sk_buff * skb);
+	void (*destruct) (struct m_dev * m_dev);
+	void (*notify) (struct m_dev * m_dev, unsigned int evt);
+	int (*ioctl) (struct m_dev * m_dev, unsigned int cmd,
+		      unsigned long arg);
+	void (*query) (struct m_dev * m_dev, unsigned long arg);
 
 };
 
 /** Define struct mbt_dev */
 struct mbt_dev
 {
-        /** maybe could add some private member later */
-    char name[DEV_NAME_LEN];
-    unsigned long flags;
-    __u8 type;
+	/** maybe could add some private member later */
+	char name[DEV_NAME_LEN];
+	unsigned long flags;
+	__u8 type;
 
-    __u16 pkt_type;
-    __u16 esco_type;
-    __u16 link_policy;
-    __u16 link_mode;
+	__u16 pkt_type;
+	__u16 esco_type;
+	__u16 link_policy;
+	__u16 link_mode;
 
-    __u32 idle_timeout;
-    __u16 sniff_min_interval;
-    __u16 sniff_max_interval;
+	__u32 idle_timeout;
+	__u16 sniff_min_interval;
+	__u16 sniff_max_interval;
 
-    struct sk_buff *reassembly[3];
+	struct sk_buff *reassembly[3];
 
-    atomic_t promisc;
+	atomic_t promisc;
 };
 
 /** Define 'fm' interface specific struct fm_dev */
 struct fm_dev
 {
-        /** maybe could add some private member later */
-    char name[DEV_NAME_LEN];
-    unsigned long flags;
+	/** maybe could add some private member later */
+	char name[DEV_NAME_LEN];
+	unsigned long flags;
 };
 
 /** Define 'nfc' interface specific struct fm_dev */
 struct nfc_dev
 {
-        /** maybe could add some private member later */
-    char name[DEV_NAME_LEN];
-    unsigned long flags;
+	/** maybe could add some private member later */
+	char name[DEV_NAME_LEN];
+	unsigned long flags;
 };
 
 struct debug_dev
 {
-        /** maybe could add some private member later */
-    char name[DEV_NAME_LEN];
-    unsigned long flags;
+	/** maybe could add some private member later */
+	char name[DEV_NAME_LEN];
+	unsigned long flags;
 };
 
 /** This function frees m_dev allocation */
@@ -135,26 +137,26 @@ void free_m_dev(struct m_dev *m_dev);
 static inline int
 mdev_recv_frame(struct sk_buff *skb)
 {
-    struct m_dev *m_dev = (struct m_dev *) skb->dev;
-    if (!m_dev || (!test_bit(HCI_UP, &m_dev->flags)
-                   && !test_bit(HCI_INIT, &m_dev->flags))) {
-        kfree_skb(skb);
-        return -ENXIO;
-    }
+	struct m_dev *m_dev = (struct m_dev *)skb->dev;
+	if (!m_dev || (!test_bit(HCI_UP, &m_dev->flags)
+		       && !test_bit(HCI_INIT, &m_dev->flags))) {
+		kfree_skb(skb);
+		return -ENXIO;
+	}
 
-    /* Incomming skb */
-    bt_cb(skb)->incoming = 1;
+	/* Incomming skb */
+	bt_cb(skb)->incoming = 1;
 
-    /* Time stamp */
-    __net_timestamp(skb);
+	/* Time stamp */
+	__net_timestamp(skb);
 
-    /* Queue frame for rx task */
-    skb_queue_tail(&m_dev->rx_q, skb);
+	/* Queue frame for rx task */
+	skb_queue_tail(&m_dev->rx_q, skb);
 
-    /* Wakeup rx thread */
-    wake_up_interruptible(&m_dev->req_wait_q);
+	/* Wakeup rx thread */
+	wake_up_interruptible(&m_dev->req_wait_q);
 
-    return 0;
+	return 0;
 }
 
 /**
@@ -166,7 +168,7 @@ mdev_recv_frame(struct sk_buff *skb)
 static inline int
 mbt_hci_suspend_dev(struct m_dev *m_dev)
 {
-    return 0;
+	return 0;
 }
 
 /**
@@ -178,7 +180,7 @@ mbt_hci_suspend_dev(struct m_dev *m_dev)
 static inline int
 mbt_hci_resume_dev(struct m_dev *m_dev)
 {
-    return 0;
+	return 0;
 }
 
 #endif /* _HCI_WRAPPER_H_ */

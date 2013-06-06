@@ -133,24 +133,24 @@ extern u32 mbt_drvdbg;
 static inline void
 hexdump(char *prompt, u8 * buf, int len)
 {
-    int i;
-    char dbgdumpbuf[DBG_DUMP_BUF_LEN];
-    char *ptr = dbgdumpbuf;
+	int i;
+	char dbgdumpbuf[DBG_DUMP_BUF_LEN];
+	char *ptr = dbgdumpbuf;
 
-    printk(KERN_DEBUG "%s: len=%d\n", prompt, len);
-    for (i = 1; i <= len; i++) {
-        ptr += snprintf(ptr, 4, "%02x ", *buf);
-        buf++;
-        if (i % MAX_DUMP_PER_LINE == 0) {
-            *ptr = 0;
-            printk(KERN_DEBUG "%s\n", dbgdumpbuf);
-            ptr = dbgdumpbuf;
-        }
-    }
-    if (len % MAX_DUMP_PER_LINE) {
-        *ptr = 0;
-        printk(KERN_DEBUG "%s\n", dbgdumpbuf);
-    }
+	printk(KERN_DEBUG "%s: len=%d\n", prompt, len);
+	for (i = 1; i <= len; i++) {
+		ptr += snprintf(ptr, 4, "%02x ", *buf);
+		buf++;
+		if (i % MAX_DUMP_PER_LINE == 0) {
+			*ptr = 0;
+			printk(KERN_DEBUG "%s\n", dbgdumpbuf);
+			ptr = dbgdumpbuf;
+		}
+	}
+	if (len % MAX_DUMP_PER_LINE) {
+		*ptr = 0;
+		printk(KERN_DEBUG "%s\n", dbgdumpbuf);
+	}
 }
 
 /** Debug hexdump of debug data */
@@ -212,56 +212,56 @@ hexdump(char *prompt, u8 * buf, int len)
 
 typedef struct
 {
-        /** Task */
-    struct task_struct *task;
-        /** Queue */
-    wait_queue_head_t waitQ;
-        /** PID */
-    pid_t pid;
-        /** Private structure */
-    void *priv;
+	/** Task */
+	struct task_struct *task;
+	/** Queue */
+	wait_queue_head_t waitQ;
+	/** PID */
+	pid_t pid;
+	/** Private structure */
+	void *priv;
 } bt_thread;
 
 static inline void
 bt_activate_thread(bt_thread * thr)
 {
-        /** Initialize the wait queue */
-    init_waitqueue_head(&thr->waitQ);
+	/** Initialize the wait queue */
+	init_waitqueue_head(&thr->waitQ);
 
-        /** Record the thread pid */
-    thr->pid = current->pid;
+	/** Record the thread pid */
+	thr->pid = current->pid;
 }
 
 static inline void
 bt_deactivate_thread(bt_thread * thr)
 {
-    thr->pid = 0;
-    return;
+	thr->pid = 0;
+	return;
 }
 
 static inline void
 bt_create_thread(int (*btfunc) (void *), bt_thread * thr, char *name)
 {
-    thr->task = kthread_run(btfunc, thr, "%s", name);
+	thr->task = kthread_run(btfunc, thr, "%s", name);
 }
 
 static inline int
 bt_terminate_thread(bt_thread * thr)
 {
-    /* Check if the thread is active or not */
-    if (!thr->pid)
-        return -1;
+	/* Check if the thread is active or not */
+	if (!thr->pid)
+		return -1;
 
-    kthread_stop(thr->task);
-    return 0;
+	kthread_stop(thr->task);
+	return 0;
 }
 
 static inline void
 os_sched_timeout(u32 millisec)
 {
-    set_current_state(TASK_INTERRUPTIBLE);
+	set_current_state(TASK_INTERRUPTIBLE);
 
-    schedule_timeout((millisec * HZ) / 1000);
+	schedule_timeout((millisec * HZ) / 1000);
 }
 
 #ifndef __ATTRIB_ALIGN__
@@ -275,103 +275,103 @@ os_sched_timeout(u32 millisec)
 /** Data structure for the Marvell Bluetooth device */
 typedef struct _bt_dev
 {
-        /** device name */
-    char name[DEV_NAME_LEN];
-        /** card pointer */
-    void *card;
-        /** IO port */
-    u32 ioport;
+	/** device name */
+	char name[DEV_NAME_LEN];
+	/** card pointer */
+	void *card;
+	/** IO port */
+	u32 ioport;
 
-    struct m_dev m_dev[MAX_RADIO_FUNC];
+	struct m_dev m_dev[MAX_RADIO_FUNC];
 
-        /** Tx download ready flag */
-    u8 tx_dnld_rdy;
-        /** Function */
-    u8 fn;
-        /** Rx unit */
-    u8 rx_unit;
-        /** Power Save mode : Timeout configuration */
-    u16 idle_timeout;
-        /** Power Save mode */
-    u8 psmode;
-        /** Power Save command */
-    u8 pscmd;
-        /** Host Sleep mode */
-    u8 hsmode;
-        /** Host Sleep command */
-    u8 hscmd;
-        /** Low byte is gap, high byte is GPIO */
-    u16 gpio_gap;
-        /** Host Sleep configuration command */
-    u8 hscfgcmd;
-        /** Host Send Cmd Flag		 */
-    u8 sendcmdflag;
-        /** ocf for Send Cmd */
-    u16 send_cmd_ocf;
-        /** Device Type			*/
-    u8 devType;
-        /** Device Features    */
-    u8 devFeature;
-        /** cmd52 function */
-    u8 cmd52_func;
-        /** cmd52 register */
-    u8 cmd52_reg;
-        /** cmd52 value */
-    u8 cmd52_val;
-        /** SDIO pull control command */
-    u8 sdio_pull_ctrl;
-        /** Low 2 bytes is pullUp, high 2 bytes for pull-down */
-    u32 sdio_pull_cfg;
+	/** Tx download ready flag */
+	u8 tx_dnld_rdy;
+	/** Function */
+	u8 fn;
+	/** Rx unit */
+	u8 rx_unit;
+	/** Power Save mode : Timeout configuration */
+	u16 idle_timeout;
+	/** Power Save mode */
+	u8 psmode;
+	/** Power Save command */
+	u8 pscmd;
+	/** Host Sleep mode */
+	u8 hsmode;
+	/** Host Sleep command */
+	u8 hscmd;
+	/** Low byte is gap, high byte is GPIO */
+	u16 gpio_gap;
+	/** Host Sleep configuration command */
+	u8 hscfgcmd;
+	/** Host Send Cmd Flag		 */
+	u8 sendcmdflag;
+	/** ocf for Send Cmd */
+	u16 send_cmd_ocf;
+	/** Device Type			*/
+	u8 devType;
+	/** Device Features    */
+	u8 devFeature;
+	/** cmd52 function */
+	u8 cmd52_func;
+	/** cmd52 register */
+	u8 cmd52_reg;
+	/** cmd52 value */
+	u8 cmd52_val;
+	/** SDIO pull control command */
+	u8 sdio_pull_ctrl;
+	/** Low 2 bytes is pullUp, high 2 bytes for pull-down */
+	u32 sdio_pull_cfg;
 } bt_dev_t, *pbt_dev_t;
 
 typedef struct _bt_adapter
 {
-        /** Chip revision ID */
-    u8 chip_rev;
-        /** Surprise removed flag */
-    u8 SurpriseRemoved;
-        /** IRQ number */
-    int irq;
-        /** Interrupt counter */
-    u32 IntCounter;
-        /** Tx packet queue */
-    struct sk_buff_head tx_queue;
-        /** Pending Tx packet queue */
-    struct sk_buff_head pending_queue;
-        /** tx lock flag */
-    u8 tx_lock;
-        /** Power Save mode */
-    u8 psmode;
-        /** Power Save state */
-    u8 ps_state;
-        /** Host Sleep state */
-    u8 hs_state;
-        /** hs skip count */
-    u32 hs_skip;
-        /** suspend_fail flag */
-    u8 suspend_fail;
-        /** suspended flag */
-    u8 is_suspended;
-        /** Number of wakeup tries */
-    u8 WakeupTries;
-        /** Host Sleep wait queue */
-    wait_queue_head_t cmd_wait_q __ATTRIB_ALIGN__;
-        /** Host Cmd complet state */
-    u8 cmd_complete;
-        /** last irq recv */
-    u8 irq_recv;
-        /** last irq processed */
-    u8 irq_done;
-        /** sdio int status */
-    u8 sd_ireg;
-        /** tx pending */
-    u32 skb_pending;
+	/** Chip revision ID */
+	u8 chip_rev;
+	/** Surprise removed flag */
+	u8 SurpriseRemoved;
+	/** IRQ number */
+	int irq;
+	/** Interrupt counter */
+	u32 IntCounter;
+	/** Tx packet queue */
+	struct sk_buff_head tx_queue;
+	/** Pending Tx packet queue */
+	struct sk_buff_head pending_queue;
+	/** tx lock flag */
+	u8 tx_lock;
+	/** Power Save mode */
+	u8 psmode;
+	/** Power Save state */
+	u8 ps_state;
+	/** Host Sleep state */
+	u8 hs_state;
+	/** hs skip count */
+	u32 hs_skip;
+	/** suspend_fail flag */
+	u8 suspend_fail;
+	/** suspended flag */
+	u8 is_suspended;
+	/** Number of wakeup tries */
+	u8 WakeupTries;
+	/** Host Sleep wait queue */
+	wait_queue_head_t cmd_wait_q __ATTRIB_ALIGN__;
+	/** Host Cmd complet state */
+	u8 cmd_complete;
+	/** last irq recv */
+	u8 irq_recv;
+	/** last irq processed */
+	u8 irq_done;
+	/** sdio int status */
+	u8 sd_ireg;
+	/** tx pending */
+	u32 skb_pending;
 /** Version string buffer length */
 #define MAX_VER_STR_LEN         128
-        /** Driver version */
-    u8 drv_ver[MAX_VER_STR_LEN];
-        /** Number of command timeout */
-    u32 num_cmd_timeout;
+	/** Driver version */
+	u8 drv_ver[MAX_VER_STR_LEN];
+	/** Number of command timeout */
+	u32 num_cmd_timeout;
 } bt_adapter, *pbt_adapter;
 
 /** Length of prov name */
@@ -379,71 +379,71 @@ typedef struct _bt_adapter
 
 struct item_data
 {
-        /** Name */
-    char name[PROC_NAME_LEN];
-        /** Size */
-    u32 size;
-        /** Address */
-    t_ptr addr;
-        /** Offset */
-    u32 offset;
-        /** Flag */
-    u32 flag;
+	/** Name */
+	char name[PROC_NAME_LEN];
+	/** Size */
+	u32 size;
+	/** Address */
+	t_ptr addr;
+	/** Offset */
+	u32 offset;
+	/** Flag */
+	u32 flag;
 };
 
 struct proc_private_data
 {
-        /** Name */
-    char name[PROC_NAME_LEN];
-        /** File flag */
-    u32 fileflag;
-        /** Buffer size */
-    u32 bufsize;
-        /** Number of items */
-    u32 num_items;
-        /** Item data */
-    struct item_data *pdata;
-        /** Private structure */
-    struct _bt_private *pbt;
-        /** File operations */
-    const struct file_operations *fops;
+	/** Name */
+	char name[PROC_NAME_LEN];
+	/** File flag */
+	u32 fileflag;
+	/** Buffer size */
+	u32 bufsize;
+	/** Number of items */
+	u32 num_items;
+	/** Item data */
+	struct item_data *pdata;
+	/** Private structure */
+	struct _bt_private *pbt;
+	/** File operations */
+	const struct file_operations *fops;
 };
 
 struct device_proc
 {
-        /** Proc directory entry */
-    struct proc_dir_entry *proc_entry;
-        /** num of proc files */
-    u8 num_proc_files;
-        /** pointer to proc_private_data */
-    struct proc_private_data *pfiles;
+	/** Proc directory entry */
+	struct proc_dir_entry *proc_entry;
+	/** num of proc files */
+	u8 num_proc_files;
+	/** pointer to proc_private_data */
+	struct proc_private_data *pfiles;
 };
 
 /** Private structure for the MV device */
 typedef struct _bt_private
 {
-        /** Bluetooth device */
-    bt_dev_t bt_dev;
-        /** Adapter */
-    bt_adapter *adapter;
-        /** Firmware helper */
-    const struct firmware *fw_helper;
-        /** Firmware */
-    const struct firmware *firmware;
-        /** Firmware request start time */
-    struct timeval req_fw_time;
-        /** Hotplug device */
-    struct device *hotplug_device;
-        /** thread to service interrupts */
-    bt_thread MainThread;
-         /** proc data */
-    struct device_proc dev_proc[MAX_RADIO_FUNC];
-        /** Driver lock */
-    spinlock_t driver_lock;
-        /** Driver lock flags */
-    ulong driver_flags;
-    int debug_device_pending;
-    int debug_ocf_ogf[2];
+	/** Bluetooth device */
+	bt_dev_t bt_dev;
+	/** Adapter */
+	bt_adapter *adapter;
+	/** Firmware helper */
+	const struct firmware *fw_helper;
+	/** Firmware */
+	const struct firmware *firmware;
+	/** Firmware request start time */
+	struct timeval req_fw_time;
+	/** Hotplug device */
+	struct device *hotplug_device;
+	/** thread to service interrupts */
+	bt_thread MainThread;
+	 /** proc data */
+	struct device_proc dev_proc[MAX_RADIO_FUNC];
+	/** Driver lock */
+	spinlock_t driver_lock;
+	/** Driver lock flags */
+	ulong driver_flags;
+	int debug_device_pending;
+	int debug_ocf_ogf[2];
 
 } bt_private, *pbt_private;
 
@@ -575,22 +575,22 @@ int fm_set_intr_mask(bt_private * priv, u32 mask);
 
 typedef struct _BT_CMD
 {
-        /** OCF OGF */
-    u16 ocf_ogf;
-        /** Length */
-    u8 length;
-        /** Data */
-    u8 data[6];
+	/** OCF OGF */
+	u16 ocf_ogf;
+	/** Length */
+	u8 length;
+	/** Data */
+	u8 data[32];
 } __ATTRIB_PACK__ BT_CMD;
 
 typedef struct _BT_EVENT
 {
-        /** Event Counter */
-    u8 EC;
-        /** Length */
-    u8 length;
-        /** Data */
-    u8 data[8];
+	/** Event Counter */
+	u8 EC;
+	/** Length */
+	u8 length;
+	/** Data */
+	u8 data[8];
 } BT_EVENT;
 
 /** This function verify the received event pkt */
@@ -661,32 +661,34 @@ int sd_download_firmware_w_helper(bt_private * priv);
 #define BT_CMD_CONFIG_MAC_ADDR		0x22
 /** Bluetooth command : Write CSU register */
 #define BT_CMD_CSU_WRITE_REG		0x66
+/** Bluetooth command : Load calibrate data */
+#define BT_CMD_LOAD_CONFIG_DATA     0x61
 
 /** Bluetooth command : BLE deepsleep */
 #define BT_CMD_BLE_DEEP_SLEEP       0x8b
 
 typedef struct _BT_BLE_CMD
 {
-        /** OCF OGF */
-    u16 ocf_ogf;
-        /** Length */
-    u8 length;
-        /** deepsleep flag */
-    u8 deepsleep;
+	/** OCF OGF */
+	u16 ocf_ogf;
+	/** Length */
+	u8 length;
+	/** deepsleep flag */
+	u8 deepsleep;
 } __ATTRIB_PACK__ BT_BLE_CMD;
 
 typedef struct _BT_CSU_CMD
 {
-        /** OCF OGF */
-    u16 ocf_ogf;
-        /** Length */
-    u8 length;
-        /** reg type */
-    u8 type;
-        /** address */
-    u8 offset[4];
-        /** Data */
-    u8 value[2];
+	/** OCF OGF */
+	u16 ocf_ogf;
+	/** Length */
+	u8 length;
+	/** reg type */
+	u8 type;
+	/** address */
+	u8 offset[4];
+	/** Data */
+	u8 value[2];
 } __ATTRIB_PACK__ BT_CSU_CMD;
 
 /** This function sets mac address */
@@ -695,19 +697,23 @@ int bt_set_mac_address(bt_private * priv, u8 * mac);
 int bt_write_reg(bt_private * priv, u8 type, u32 offset, u16 value);
 /** BT set user defined init data and param */
 int bt_init_config(bt_private * priv, char *cfg_file);
+/** This function load the calibrate data */
+int bt_load_cal_data(bt_private * priv, u8 * config_data, u8 * mac);
+/** BT set user defined calibration data */
+int bt_cal_config(bt_private * priv, char *cfg_file, char *mac);
 
 typedef struct _BT_HCI_CMD
 {
-        /** OCF OGF */
-    u16 ocf_ogf;
-        /** Length */
-    u8 length;
-        /** cmd type */
-    u8 cmd_type;
-        /** cmd len */
-    u8 cmd_len;
-        /** Data */
-    u8 data[6];
+	/** OCF OGF */
+	u16 ocf_ogf;
+	/** Length */
+	u8 length;
+	/** cmd type */
+	u8 cmd_type;
+	/** cmd len */
+	u8 cmd_len;
+	/** Data */
+	u8 data[6];
 } __ATTRIB_PACK__ BT_HCI_CMD;
 
 #endif /* _BT_DRV_H_ */
