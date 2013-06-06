@@ -28,7 +28,6 @@
 #include <linux/io.h>
 #include <linux/interrupt.h>
 #include <mach/edp.h>
-#include <linux/edp.h>
 #include <mach/gpio-tegra.h>
 #include <mach/pinmux-t11.h>
 #include <mach/pinmux.h>
@@ -49,8 +48,8 @@
 #include "dvfs.h"
 #include "pm.h"
 
-#define NTC_10K_TGAIN   0xE6A2
-#define NTC_10K_TOFF    0x2694
+#define NTC_10K_TGAIN   0xBC94
+#define NTC_10K_TOFF    0x84BA
 
 static struct nvc_gpio_pdata imx091_gpio_pdata[] = {
 	{IMX091_GPIO_RESET, CAM_RSTN, true, false},
@@ -64,27 +63,27 @@ static struct max17042_config_data conf_data = {
 	.talrt_thresh = 0xff00,
 	.soc_alrt_thresh = 0xff00,
 	.shdntimer = 0xe000,
-	.design_cap = 0x07d0,
+	.design_cap = 0x1085,
 	.at_rate = 0x0000,
 	.tgain = NTC_10K_TGAIN,
 	.toff = NTC_10K_TOFF,
-	.vempty = 0xACDA,
-	.qrtbl00 = 0x5C80,
-	.qrtbl10 = 0x438C,
-	.qrtbl20 = 0x1198,
-	.qrtbl30 = 0x0E19,
+	.vempty = 0x93DA,
+	.qrtbl00 = 0x2184,
+	.qrtbl10 = 0x1300,
+	.qrtbl20 = 0x0c00,
+	.qrtbl30 = 0x0880,
 	.full_soc_thresh = 0x5A00,
-	.rcomp0 = 0x0077,
-	.tcompc0 = 0x1F2A,
-	.ichgt_term = 0x0320,
+	.rcomp0 = 0x0052,
+	.tcompc0 = 0x1F2D,
+	.ichgt_term = 0x0140,
 	.temp_nom = 0x1400,
 	.temp_lim = 0x2305,
 	.filter_cfg = 0x87A4,
 	.config = 0x2210,
 	.learn_cfg = 0x2606,
 	.misc_cfg = 0x0810,
-	.fullcap =  0x07d0,
-	.fullcapnom = 0x07d0,
+	.fullcap =  0x1085,
+	.fullcapnom = 0x1085,
 	.lavg_empty = 0x1000,
 	.dqacc = 0x01f4,
 	.dpacc = 0x3200,
@@ -93,39 +92,18 @@ static struct max17042_config_data conf_data = {
 	.cell_technology = POWER_SUPPLY_TECHNOLOGY_LION,
 	.cell_char_tbl = {
 		/* Data to be written from 0x80h */
-		0x9180, 0xA4C0, 0xB6A0, 0xB760, 0xB980, 0xBB30,
-		0xBBC0, 0xBC50, 0xBD50, 0xBE50, 0xBF80, 0xC290,
-		0xC470, 0xC7D0, 0xCC40, 0xCFB0,
+		0x9380, 0xAB70, 0xAFA0, 0xB3E0, 0xB790, 0xBB40,
+		0xBBD0, 0xBC70, 0xBD90, 0xBE30, 0xC0F0, 0xC380,
+		0xC710, 0xCA90, 0xCF70, 0xD480,
 		/* Data to be written from 0x90h */
-		0x00C0, 0x0200, 0x1C10, 0x0B00, 0x0900, 0x1F00,
-		0x1F00, 0x23C0, 0x1990, 0x19F0, 0x09A0, 0x0CE0,
-		0x0BE0, 0x07D0, 0x0990, 0x0990,
+		0x00B0, 0x0610, 0x0600, 0x06F0, 0x0700, 0x2410,
+		0x2040, 0x2460, 0x1CE0, 0x09F0, 0x0AB0, 0x08E0,
+		0x0880, 0x06F0, 0x05D0, 0x05D0,
 		/* Data to be written from 0xA0h */
 		0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100,
 		0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100,
 		0x0100, 0x0100, 0x0100, 0x0100,
 	},
-};
-
-static unsigned int bat_depl_states[] = {
-	9900, 9600, 9300, 9000, 8700, 8400, 8100, 7800,
-	7500, 7200, 6900, 6600, 6300, 6000, 5800, 5600,
-	5400, 5200, 5000, 4800, 4600, 4400, 4200, 4000,
-	3800, 3600, 3400, 3200, 3000, 2800, 2600, 2400,
-	2200, 2000, 1900, 1800, 1700, 1600, 1500, 1400,
-	1300, 1200, 1100, 1000,  900,  800,  700,  600,
-	 500,  400,  300,  200,  100,    0
-};
-
-static struct edp_client bat_depl_client = {
-	.states = bat_depl_states,
-	.num_states = ARRAY_SIZE(bat_depl_states),
-	.e0_index = 16,
-	.priority = EDP_MAX_PRIO
-};
-
-struct max17042_rbat_map max17042_rbat_map[] = {
-	{   0, 150000 }
 };
 
 static struct max17042_platform_data max17042_pdata = {
@@ -135,8 +113,7 @@ static struct max17042_platform_data max17042_pdata = {
 	.enable_por_init = 1, /* Use POR init from Maxim appnote */
 	.enable_current_sense = 1,
 	.r_sns = 0,
-	.rbat_map = max17042_rbat_map,
-	.edp_client = &bat_depl_client
+	.is_battery_present = false, /* False as default */
 };
 
 static struct i2c_board_info max17042_device[] = {
@@ -258,6 +235,7 @@ static struct max77665_charger_plat_data max77665_charger = {
 	.cables = maxim_cable,
 	.extcon_name = "tegra-udc",
 	.update_status = max17042_update_status,
+	.is_battery_present = false, /* false as default */
 };
 
 static struct max77665_muic_platform_data max77665_muic = {
@@ -1042,7 +1020,7 @@ static struct thermal_trip_info skin_trips[] = {
 
 static struct therm_est_subdevice skin_devs[] = {
 	{
-		.dev_data = "nct_ext",
+		.dev_data = "Tdiode",
 		.coeffs = {
 			2, 1, 1, 1,
 			1, 1, 1, 1,
@@ -1052,7 +1030,7 @@ static struct therm_est_subdevice skin_devs[] = {
 		},
 	},
 	{
-		.dev_data = "nct_int",
+		.dev_data = "Tboard",
 		.coeffs = {
 			-11, -7, -5, -3,
 			-3, -2, -1, 0,
@@ -1158,6 +1136,10 @@ void __init max77665_init(void)
 {
 	int err;
 
+	/* For battery presence into charger driver */
+	if (get_power_supply_type() == POWER_SUPPLY_TYPE_BATTERY)
+		max77665_charger.is_battery_present = true;
+
 	err = i2c_register_board_info(4, pluto_i2c_board_info_max77665,
 		ARRAY_SIZE(pluto_i2c_board_info_max77665));
 	if (err)
@@ -1187,10 +1169,14 @@ int __init pluto_sensors_init(void)
 	mpuirq_init();
 	max77665_init();
 
+	if (get_power_supply_type() == POWER_SUPPLY_TYPE_BATTERY)
+		max17042_pdata.is_battery_present = true;
+
 	err = i2c_register_board_info(0, max17042_device,
 				ARRAY_SIZE(max17042_device));
 	if (err)
 		pr_err("%s: max17042 device register failed.\n", __func__);
+
 
 
 	return 0;

@@ -26,8 +26,8 @@
 
 #define MAX_DVFS_FREQS	40
 #define MAX_DVFS_TABLES	80
-#define DVFS_RAIL_STATS_TOP_BIN	60
-#define MAX_THERMAL_FLOORS	8
+#define DVFS_RAIL_STATS_TOP_BIN	100
+#define MAX_THERMAL_LIMITS	8
 
 struct clk;
 struct dvfs_rail;
@@ -63,8 +63,12 @@ struct dvfs_rail {
 	int max_millivolts;
 	int reg_max_millivolts;
 	int nominal_millivolts;
+	int override_millivolts;
+	int min_override_millivolts;
 	const int *therm_mv_floors;
 	int therm_mv_floors_num;
+	const int *therm_mv_caps;
+	int therm_mv_caps_num;
 
 	int step;
 	bool jmp_to_zero;
@@ -83,9 +87,9 @@ struct dvfs_rail {
 	bool suspended;
 	bool dfll_mode;
 	bool dfll_mode_updating;
-	int thermal_idx;
-	struct tegra_cooling_device *pll_mode_cdev;
-	struct tegra_cooling_device *dfll_mode_cdev;
+	int therm_floor_idx;
+	struct tegra_cooling_device *vmin_cdev;
+	struct tegra_cooling_device *vmax_cdev;
 	struct rail_stats stats;
 };
 
@@ -158,8 +162,8 @@ struct cpu_cvb_dvfs {
 	int speedo_scale;
 	int voltage_scale;
 	struct cpu_cvb_dvfs_table cvb_table[MAX_DVFS_FREQS];
-	int therm_trips_table[MAX_THERMAL_FLOORS];
-	int therm_floors_table[MAX_THERMAL_FLOORS];
+	int therm_trips_table[MAX_THERMAL_LIMITS];
+	int therm_floors_table[MAX_THERMAL_LIMITS];
 };
 
 extern struct dvfs_rail *tegra_cpu_rail;
@@ -214,16 +218,15 @@ struct dvfs_rail *tegra_dvfs_get_rail_by_name(const char *reg_id);
 int tegra_dvfs_predict_millivolts(struct clk *c, unsigned long rate);
 int tegra_dvfs_predict_millivolts_pll(struct clk *c, unsigned long rate);
 int tegra_dvfs_predict_millivolts_dfll(struct clk *c, unsigned long rate);
-void tegra_dvfs_core_cap_enable(bool enable);
-void tegra_dvfs_core_cap_level_set(int level);
+int tegra_dvfs_core_cap_level_apply(int level);
 int tegra_dvfs_alt_freqs_set(struct dvfs *d, unsigned long *alt_freqs);
 int tegra_cpu_dvfs_alter(int edp_thermal_index, const cpumask_t *cpus,
 			 bool before_clk_update, int cpu_event);
 int tegra_dvfs_dfll_mode_set(struct dvfs *d, unsigned long rate);
 int tegra_dvfs_dfll_mode_clear(struct dvfs *d, unsigned long rate);
-struct tegra_cooling_device *tegra_dvfs_get_cpu_dfll_cdev(void);
-struct tegra_cooling_device *tegra_dvfs_get_cpu_pll_cdev(void);
-struct tegra_cooling_device *tegra_dvfs_get_core_cdev(void);
+struct tegra_cooling_device *tegra_dvfs_get_cpu_vmax_cdev(void);
+struct tegra_cooling_device *tegra_dvfs_get_cpu_vmin_cdev(void);
+struct tegra_cooling_device *tegra_dvfs_get_core_vmin_cdev(void);
 int tegra_dvfs_rail_dfll_mode_set_cold(struct dvfs_rail *rail);
 
 #ifndef CONFIG_ARCH_TEGRA_2x_SOC
@@ -307,9 +310,16 @@ static inline int tegra_dvfs_rail_get_nominal_millivolts(struct dvfs_rail *rail)
 static inline int tegra_dvfs_rail_get_thermal_floor(struct dvfs_rail *rail)
 {
 	if (rail && rail->therm_mv_floors &&
-	    (rail->thermal_idx < rail->therm_mv_floors_num))
-		return rail->therm_mv_floors[rail->thermal_idx];
+	    (rail->therm_floor_idx < rail->therm_mv_floors_num))
+		return rail->therm_mv_floors[rail->therm_floor_idx];
 	return 0;
+}
+
+static inline int tegra_dvfs_rail_get_override_floor(struct dvfs_rail *rail)
+{
+	if (rail)
+		return rail->min_override_millivolts;
+	return -ENOENT;
 }
 
 #endif

@@ -48,7 +48,11 @@ static bool emc_enable;
 #endif
 module_param(emc_enable, bool, 0644);
 
-u8 tegra_emc_bw_efficiency = 100;
+u8 tegra_emc_bw_efficiency = 80;
+static struct emc_iso_usage tegra11_emc_iso_usage[] = {
+	{ BIT(EMC_USER_DC),			80 },
+	{ BIT(EMC_USER_DC) | BIT(EMC_USER_VI),	45 },
+};
 
 #define PLL_C_DIRECT_FLOOR		333500000
 #define EMC_STATUS_UPDATE_TIMEOUT	100
@@ -630,7 +634,10 @@ static noinline void emc_set_clock(const struct tegra11_emc_table *next_timing,
 		wmb();
 	}
 
-	/* 15. restore auto-cal - removed */
+	/* 15. set auto-cal interval */
+	if (next_timing->rev >= 0x42)
+		emc_writel(next_timing->emc_acal_interval,
+			   EMC_AUTO_CAL_INTERVAL);
 
 	/* 16. restore dynamic self-refresh */
 	if (next_timing->emc_cfg & EMC_CFG_DYN_SREF_ENABLE) {
@@ -1439,11 +1446,6 @@ static struct platform_driver tegra11_emc_driver = {
 		.of_match_table = tegra11_emc_of_match,
 	},
 	.probe          = tegra11_emc_probe,
-};
-
-static struct emc_iso_usage tegra11_emc_iso_usage[] = {
-	{ BIT(EMC_USER_DC),			80 },
-	{ BIT(EMC_USER_DC) | BIT(EMC_USER_VI),	45 },
 };
 
 int __init tegra11_emc_init(void)

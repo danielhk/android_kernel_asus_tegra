@@ -283,6 +283,8 @@ static int tegra_fb_blank(int blank, struct fb_info *info)
 		dev_dbg(&tegra_fb->ndev->dev, "unblank\n");
 		tegra_fb->win->flags = TEGRA_WIN_FLAG_ENABLED;
 		tegra_dc_enable(tegra_fb->win->dc);
+		tegra_dc_update_windows(&tegra_fb->win, 1);
+		tegra_dc_sync_windows(&tegra_fb->win, 1);
 		return 0;
 
 	case FB_BLANK_NORMAL:
@@ -438,6 +440,8 @@ static int tegra_fb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long 
 }
 
 int tegra_fb_get_mode(struct tegra_dc *dc) {
+	if (!dc->fb->info->mode)
+		return -1;
 	return dc->fb->info->mode->refresh;
 }
 

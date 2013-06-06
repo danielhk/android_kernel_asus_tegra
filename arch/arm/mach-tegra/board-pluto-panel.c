@@ -1,12 +1,11 @@
 /*
  * arch/arm/mach-tegra/board-pluto-panel.c
  *
- * Copyright (c) 2011-2012, NVIDIA Corporation.
+ * Copyright (C) 2012-2013 NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -62,6 +61,8 @@ struct platform_device * __init pluto_host1x_init(void)
 
 /* hdmi related regulators */
 static struct regulator *pluto_hdmi_vddio;
+static struct regulator *pluto_hdmi_reg;
+static struct regulator *pluto_hdmi_pll;
 
 static struct resource pluto_disp1_resources[] = {
 	{
@@ -132,13 +133,52 @@ static struct tegra_dc_out pluto_disp1_out = {
 
 static int pluto_hdmi_enable(struct device *dev)
 {
-	/* TODO */
+	int ret;
+	if (!pluto_hdmi_reg) {
+		pluto_hdmi_reg = regulator_get(dev, "avdd_hdmi");
+		if (IS_ERR_OR_NULL(pluto_hdmi_reg)) {
+			pr_err("hdmi: couldn't get regulator avdd_hdmi\n");
+			pluto_hdmi_reg = NULL;
+			return PTR_ERR(pluto_hdmi_reg);
+		}
+	}
+	ret = regulator_enable(pluto_hdmi_reg);
+	if (ret < 0) {
+		pr_err("hdmi: couldn't enable regulator avdd_hdmi\n");
+		return ret;
+	}
+	if (!pluto_hdmi_pll) {
+		pluto_hdmi_pll = regulator_get(dev, "avdd_hdmi_pll");
+		if (IS_ERR_OR_NULL(pluto_hdmi_pll)) {
+			pr_err("hdmi: couldn't get regulator avdd_hdmi_pll\n");
+			pluto_hdmi_pll = NULL;
+			regulator_put(pluto_hdmi_reg);
+			pluto_hdmi_reg = NULL;
+			return PTR_ERR(pluto_hdmi_pll);
+		}
+	}
+	ret = regulator_enable(pluto_hdmi_pll);
+	if (ret < 0) {
+		pr_err("hdmi: couldn't enable regulator avdd_hdmi_pll\n");
+		return ret;
+	}
 	return 0;
 }
 
 static int pluto_hdmi_disable(void)
 {
-	/* TODO */
+	if (pluto_hdmi_reg) {
+		regulator_disable(pluto_hdmi_reg);
+		regulator_put(pluto_hdmi_reg);
+		pluto_hdmi_reg = NULL;
+	}
+
+	if (pluto_hdmi_pll) {
+		regulator_disable(pluto_hdmi_pll);
+		regulator_put(pluto_hdmi_pll);
+		pluto_hdmi_pll = NULL;
+	}
+
 	return 0;
 }
 
@@ -270,7 +310,7 @@ static struct nvmap_platform_data pluto_nvmap_data = {
 	.nr_carveouts	= ARRAY_SIZE(pluto_carveouts),
 };
 
-static struct platform_device pluto_nvmap_device __initdata = {
+static struct platform_device pluto_nvmap_device = {
 	.name	= "tegra-nvmap",
 	.id	= -1,
 	.dev	= {
@@ -414,22 +454,6 @@ int __init pluto_panel_init(void)
 		tegra_fb_start, tegra_bootloader_fb_start,
 			min(tegra_fb_size, tegra_bootloader_fb_size));
 
-	/*
-	 * If the bootloader fb2 is valid, copy it to the fb2, or else
-	 * clear fb2 to avoid garbage on dispaly2.
-	 */
-	if (tegra_bootloader_fb2_size)
-		tegra_move_framebuffer(tegra_fb2_start,
-			tegra_bootloader_fb2_start,
-			min(tegra_fb2_size, tegra_bootloader_fb2_size));
-	else
-		tegra_clear_framebuffer(tegra_fb2_start, tegra_fb2_size);
-
-	res = platform_get_resource_byname(&pluto_disp2_device,
-		IORESOURCE_MEM, "fbmem");
-	res->start = tegra_fb2_start;
-	res->end = tegra_fb2_start + tegra_fb2_size - 1;
-
 	pluto_disp1_device.dev.parent = &phost1x->dev;
 	err = platform_device_register(&pluto_disp1_device);
 	if (err) {
@@ -437,12 +461,9 @@ int __init pluto_panel_init(void)
 		return err;
 	}
 
-	pluto_disp2_device.dev.parent = &phost1x->dev;
-	err = platform_device_register(&pluto_disp2_device);
-	if (err) {
-		pr_err("disp2 device registration failed\n");
+	err = tegra_init_hdmi(&pluto_disp2_device, phost1x);
+	if (err)
 		return err;
-	}
 
 #ifdef CONFIG_TEGRA_NVAVP
 	nvavp_device.dev.parent = &phost1x->dev;

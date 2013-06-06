@@ -143,6 +143,7 @@
 #define   UTMIP_XCVR_LSBIAS_SEL			(1 << 21)
 #define   UTMIP_XCVR_SETUP_MSB(x)		(((x) & 0x7) << 22)
 #define   UTMIP_XCVR_HSSLEW_MSB(x)		(((x) & 0x7f) << 25)
+#define   UTMIP_XCVR_HSSLEW_LSB(x)		(((x) & 0x3) << 4)
 #define   UTMIP_XCVR_MAX_OFFSET		2
 #define   UTMIP_XCVR_SETUP_MAX_VALUE	0x7f
 #define   UTMIP_XCVR_SETUP_MIN_VALUE	0
@@ -235,11 +236,13 @@
 
 #define UHSIC_PADS_CFG0				0xc1c
 #define   UHSIC_TX_RTUNEN			0xf000
-#define   UHSIC_TX_RTUNE(x)			(((x) & 0xf) << 12)
+#define   UHSIC_TX_RTUNEP			0xf00
+#define   UHSIC_TX_RTUNE_P(x)			(((x) & 0xf) << 8)
 #define   UHSIC_TX_SLEWP			(0xf << 16)
 #define   UHSIC_TX_SLEWN			(0xf << 20)
 
 #define UHSIC_PADS_CFG1				0xc20
+#define   UHSIC_AUTO_RTERM_EN			(1 << 0)
 #define   UHSIC_PD_BG				(1 << 2)
 #define   UHSIC_PD_TX				(1 << 3)
 #define   UHSIC_PD_TRK				(1 << 4)
@@ -566,8 +569,8 @@ static void utmi_phy_enable_trking_data(struct tegra_usb_phy *phy)
 
 	/* Read RCTRL and TCTRL from UTMIP space */
 	val = readl(base + UTMIP_BIAS_STS0);
-	pmc_data[phy->inst].utmip_rctrl_val = ffz(UTMIP_RCTRL_VAL(val));
-	pmc_data[phy->inst].utmip_tctrl_val = ffz(UTMIP_TCTRL_VAL(val));
+	pmc_data[phy->inst].utmip_rctrl_val = 0xf + ffz(UTMIP_RCTRL_VAL(val));
+	pmc_data[phy->inst].utmip_tctrl_val = 0xf + ffz(UTMIP_TCTRL_VAL(val));
 
 	/* PD_TRK=1 */
 	val = readl(base + UTMIP_BIAS_CFG1);
@@ -944,6 +947,9 @@ static int utmi_phy_power_off(struct tegra_usb_phy *phy)
 		writel(val, base + UTMIP_PMC_WAKEUP0);
 		PHY_DBG("%s ENABLE_PMC inst = %d\n", __func__, phy->inst);
 
+		val = readl(base + USB_SUSP_CTRL);
+		val &= ~USB_WAKE_ON_CNNT_EN_DEV;
+		writel(val, base + USB_SUSP_CTRL);
 	}
 
 	if (!phy->hot_plug) {
@@ -1096,6 +1102,8 @@ static int utmi_phy_power_on(struct tegra_usb_phy *phy)
 	val |= UTMIP_XCVR_LSRSLEW(config->xcvr_lsrslew);
 	if (!config->xcvr_use_lsb)
 		val |= UTMIP_XCVR_HSSLEW_MSB(0x3);
+	if (config->xcvr_hsslew_lsb)
+		val |= UTMIP_XCVR_HSSLEW_LSB(config->xcvr_hsslew_lsb);
 	writel(val, base + UTMIP_XCVR_CFG0);
 
 	val = readl(base + UTMIP_XCVR_CFG1);
@@ -1271,6 +1279,8 @@ static int utmi_phy_resume(struct tegra_usb_phy *phy)
 {
 	int status = 0;
 	unsigned long val;
+	int port_connected = 0;
+	int is_lp0;
 	void __iomem *base = phy->regs;
 	struct tegra_usb_pmc_data *pmc = &pmc_data[phy->inst];
 
@@ -1280,7 +1290,12 @@ static int utmi_phy_resume(struct tegra_usb_phy *phy)
 			!phy->pdata->u_data.host.power_off_on_suspend)
 			return 0;
 
-		if (phy->port_speed < USB_PHY_PORT_SPEED_UNKNOWN) {
+		val = readl(base + USB_PORTSC);
+		port_connected = val & USB_PORTSC_CCS;
+		is_lp0 = !(readl(base + USB_ASYNCLISTADDR));
+
+		if ((phy->port_speed < USB_PHY_PORT_SPEED_UNKNOWN) &&
+			(port_connected ^ is_lp0)) {
 			utmi_phy_restore_start(phy);
 			usb_phy_bringup_host_controller(phy);
 			utmi_phy_restore_end(phy);
@@ -1499,6 +1514,15 @@ NOT_NON_STD_CHARGER:
 
 }
 
+static void utmi_phy_pmc_disable(struct tegra_usb_phy *phy)
+{
+	struct tegra_usb_pmc_data *pmc = &pmc_data[phy->inst];
+	if (phy->pdata->u_data.host.turn_off_vbus_on_lp0 &&
+					phy->pdata->port_otg) {
+		pmc->pmc_ops->disable_pmc_bus_ctrl(pmc);
+		pmc->pmc_ops->powerdown_pmc_wake_detect(pmc);
+	}
+}
 static bool utmi_phy_nv_charger_detect(struct tegra_usb_phy *phy)
 {
 	int status1;
@@ -1853,6 +1877,7 @@ static int uhsic_phy_power_on(struct tegra_usb_phy *phy)
 	writel(val, base + UHSIC_PADS_CFG1);
 
 	val |= (UHSIC_RX_SEL | UHSIC_PD_TX);
+	val |= UHSIC_AUTO_RTERM_EN;
 	writel(val, base + UHSIC_PADS_CFG1);
 
 	val = readl(base + USB_SUSP_CTRL);
@@ -1937,10 +1962,10 @@ static int uhsic_phy_power_on(struct tegra_usb_phy *phy)
 	writel(val, base + USB_PORTSC);
 
 	val = readl(base + UHSIC_PADS_CFG0);
-	/* Clear RTUNEN, SLEWP & SLEWN bit fields */
-	val &= ~(UHSIC_TX_RTUNEN | UHSIC_TX_SLEWP | UHSIC_TX_SLEWN);
+	/* Clear RTUNEP SLEWP & SLEWN bit fields */
+	val &= ~(UHSIC_TX_RTUNEP | UHSIC_TX_SLEWP | UHSIC_TX_SLEWN);
 	/* set Rtune impedance to 50 ohm */
-	val |= UHSIC_TX_RTUNE(0xC);
+	val |= UHSIC_TX_RTUNE_P(0xC);
 	writel(val, base + UHSIC_PADS_CFG0);
 
 	if (usb_phy_reg_status_wait(base + USB_SUSP_CTRL,
@@ -2717,6 +2742,7 @@ static struct tegra_usb_phy_ops utmi_phy_ops = {
 	.resume	= utmi_phy_resume,
 	.charger_detect = utmi_phy_charger_detect,
 	.nv_charger_detect = utmi_phy_nv_charger_detect,
+	.pmc_disable = utmi_phy_pmc_disable,
 };
 
 static struct tegra_usb_phy_ops uhsic_phy_ops = {

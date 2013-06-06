@@ -119,13 +119,20 @@ static int bq2419x_charger_enable(struct bq2419x_chip *bq2419x)
 	if (bq2419x->chg_enable) {
 		dev_info(bq2419x->dev, "Charging enabled\n");
 		ret = regmap_update_bits(bq2419x->regmap, BQ2419X_PWR_ON_REG,
-				BQ2419X_ENABLE_CHARGE_MASK,
-				BQ2419X_ENABLE_CHARGE);
+				 BQ2419X_ENABLE_CHARGE_MASK, 0);
+		if (ret < 0) {
+			dev_err(bq2419x->dev,
+				"register update failed, err %d\n", ret);
+			return ret;
+		}
+
+		ret = regmap_update_bits(bq2419x->regmap, BQ2419X_PWR_ON_REG,
+			 BQ2419X_ENABLE_CHARGE_MASK, BQ2419X_ENABLE_CHARGE);
 	} else {
 		dev_info(bq2419x->dev, "Charging disabled\n");
 		ret = regmap_update_bits(bq2419x->regmap, BQ2419X_PWR_ON_REG,
-				BQ2419X_ENABLE_CHARGE_MASK,
-				BQ2419X_DISABLE_CHARGE);
+				 BQ2419X_ENABLE_CHARGE_MASK,
+				 BQ2419X_DISABLE_CHARGE);
 	}
 	if (ret < 0)
 		dev_err(bq2419x->dev, "register update failed, err %d\n", ret);
@@ -217,38 +224,41 @@ static int bq2419x_usb_get_property(struct power_supply *psy,
 
 static int bq2419x_init(struct bq2419x_chip *bq2419x)
 {
-	int val, ret = 0;
+	int val = 0;
+	int ret = 0;
+	int floor = 0;
+
+	/* Configure input voltage to 4.52 in case of NV charger */
+	if (bq2419x->in_current_limit == 2000)
+		val |= BQ2419x_NVCHARGER_INPUT_VOL_SEL;
+	else
+		val |= BQ2419x_DEFAULT_INPUT_VOL_SEL;
 
 	/* Clear EN_HIZ */
-	ret = regmap_update_bits(bq2419x->regmap,
-			BQ2419X_INPUT_SRC_REG, BQ2419X_EN_HIZ, 0);
+	ret = regmap_update_bits(bq2419x->regmap, BQ2419X_INPUT_SRC_REG,
+			BQ2419X_EN_HIZ | BQ2419x_INPUT_VOLTAGE_MASK, val);
 	if (ret < 0) {
-		dev_err(bq2419x->dev, "error reading reg: 0x%x\n",
-			BQ2419X_INPUT_SRC_REG);
+		dev_err(bq2419x->dev, "INPUT_SRC_REG update failed %d\n", ret);
 		return ret;
 	}
 
 	/* Configure input current limit */
 	val = current_to_reg(iinlim, ARRAY_SIZE(iinlim),
 				bq2419x->in_current_limit);
-	if (val < 0)
+
+	/* Start from 500mA and then step to val */
+	floor = current_to_reg(iinlim, ARRAY_SIZE(iinlim), 500);
+	if (val < 0 || floor < 0)
 		return 0;
 
-	val &= ~(BQ2419x_INPUT_VOLTAGE_MASK);
-	/* Configure inout voltage to 4.52 in case of NV
-	*  NV charger.
-	*/
-	if (bq2419x->in_current_limit == 2000)
-		val |= BQ2419x_NVCHARGER_INPUT_VOL_SEL;
-	else
-		val |= BQ2419x_DEFAULT_INPUT_VOL_SEL;
-
-	ret = regmap_update_bits(bq2419x->regmap,
-			BQ2419X_INPUT_SRC_REG, BQ2419x_CONFIG_MASK |
-			BQ2419x_INPUT_VOLTAGE_MASK, val);
-	if (ret < 0)
-		dev_err(bq2419x->dev, "error reading reg: 0x%x\n",
-			BQ2419X_INPUT_SRC_REG);
+	for (; floor <= val; floor++) {
+		udelay(BQ2419x_CHARGING_CURRENT_STEP_DELAY_US);
+		ret = regmap_update_bits(bq2419x->regmap, BQ2419X_INPUT_SRC_REG,
+				BQ2419x_CONFIG_MASK, floor);
+		if (ret < 0)
+			dev_err(bq2419x->dev,
+				"INPUT_SRC_REG update failed: %d\n", ret);
+	}
 	return ret;
 }
 
@@ -256,8 +266,8 @@ static int bq2419x_charger_init(struct bq2419x_chip *bq2419x)
 {
 	int ret;
 
-	/* Configure Output Current Control to 3A*/
-	ret = regmap_write(bq2419x->regmap, BQ2419X_CHRG_CTRL_REG, 0xC0);
+	/* Configure Output Current Control to 2.25A*/
+	ret = regmap_write(bq2419x->regmap, BQ2419X_CHRG_CTRL_REG, 0x6c);
 	if (ret < 0) {
 		dev_err(bq2419x->dev, "CHRG_CTRL_REG write failed %d\n", ret);
 		return ret;
@@ -464,6 +474,8 @@ static void bq2419x_work_thread(struct kthread_work *work)
 	struct bq2419x_chip *bq2419x = container_of(work,
 			struct bq2419x_chip, bq_wdt_work);
 	int ret;
+	int val = 0;
+	int type;
 
 	for (;;) {
 		if (bq2419x->stop_thread)
@@ -477,7 +489,33 @@ static void bq2419x_work_thread(struct kthread_work *work)
 				if (ret < 0)
 					dev_err(bq2419x->dev,
 					"Charger enable failed %d", ret);
+				ret = regmap_read(bq2419x->regmap,
+					BQ2419X_SYS_STAT_REG, &val);
+				if (ret < 0)
+					dev_err(bq2419x->dev,
+					"SYS_STAT_REG read failed %d\n", ret);
+				/*
+				* Update Charging status based on STAT register
+				*/
+				type = bq2419x->ac_online ? 1 : 2;
+				if ((val & BQ2419x_CHRG_STATE_MASK) ==
+					BQ2419x_CHRG_STATE_NOTCHARGING) {
+					bq2419x->status = 0;
+					if (bq2419x->update_status)
+						bq2419x->update_status
+							(bq2419x->status, type);
+					bq2419x->chg_restart_timeout =
+						bq2419x->chg_restart_time /
+						bq2419x->wdt_refresh_timeout;
+				} else {
+					bq2419x->status = 1;
+					if (bq2419x->update_status)
+						bq2419x->update_status
+							(bq2419x->status, type);
+				}
+
 			}
+
 			if (bq2419x->suspended)
 				bq2419x->chg_restart_timeout = 0;
 
@@ -493,11 +531,33 @@ static void bq2419x_work_thread(struct kthread_work *work)
 	}
 }
 
+static int bq2419x_reset_safety_timer(struct bq2419x_chip *bq2419x)
+{
+	int ret;
+
+	ret = regmap_update_bits(bq2419x->regmap, BQ2419X_TIME_CTRL_REG,
+			BQ2419X_EN_SFT_TIMER_MASK, 0);
+	if (ret < 0) {
+		dev_err(bq2419x->dev,
+				"TIME_CTRL_REG update failed: %d\n", ret);
+		return ret;
+	}
+
+	ret = regmap_update_bits(bq2419x->regmap, BQ2419X_TIME_CTRL_REG,
+			BQ2419X_EN_SFT_TIMER_MASK, BQ2419X_EN_SFT_TIMER_MASK);
+	if (ret < 0)
+		dev_err(bq2419x->dev,
+				"TIME_CTRL_REG update failed: %d\n", ret);
+	return ret;
+}
+
 static irqreturn_t bq2419x_irq(int irq, void *data)
 {
 	struct bq2419x_chip *bq2419x = data;
 	int ret;
 	unsigned int val;
+	int check_chg_state = 0;
+	int type;
 
 	ret = regmap_read(bq2419x->regmap, BQ2419X_FAULT_REG, &val);
 	if (ret < 0) {
@@ -541,20 +601,31 @@ static irqreturn_t bq2419x_irq(int irq, void *data)
 		break;
 	case BQ2419x_FAULT_CHRG_THERMAL:
 		dev_err(bq2419x->dev, "Charging Fault: Thermal shutdown\n");
+		check_chg_state = 1;
 		break;
 	case BQ2419x_FAULT_CHRG_SAFTY:
 		dev_err(bq2419x->dev,
 			"Charging Fault: Safety timer expiration\n");
 		bq2419x->chg_restart_timeout = bq2419x->chg_restart_time /
 						bq2419x->wdt_refresh_timeout;
+		ret = bq2419x_reset_safety_timer(bq2419x);
+		if (ret < 0) {
+			dev_err(bq2419x->dev, "Reset safety timer failed %d\n",
+							ret);
+			return ret;
+		}
+
+		check_chg_state = 1;
 		break;
 	default:
 		break;
 	}
 
-	if (val & BQ2419x_FAULT_NTC_FAULT)
+	if (val & BQ2419x_FAULT_NTC_FAULT) {
 		dev_err(bq2419x->dev, "Charging Fault: NTC fault %d\n",
 				val & BQ2419x_FAULT_NTC_FAULT);
+		check_chg_state = 1;
+	}
 
 	ret = bq2419x_fault_clear_sts(bq2419x);
 	if (ret < 0) {
@@ -568,8 +639,30 @@ static irqreturn_t bq2419x_irq(int irq, void *data)
 		return ret;
 	}
 
-	if ((val & BQ2419x_CHRG_STATE_MASK) == BQ2419x_CHRG_STATE_CHARGE_DONE)
+	if ((val & BQ2419x_CHRG_STATE_MASK) ==
+				BQ2419x_CHRG_STATE_CHARGE_DONE) {
+		bq2419x->chg_restart_timeout = bq2419x->chg_restart_time /
+						bq2419x->wdt_refresh_timeout;
 		dev_info(bq2419x->dev, "Charging completed\n");
+		bq2419x->status = 4;
+		if (bq2419x->update_status)
+			bq2419x->update_status
+				(bq2419x->status, 2);
+	}
+
+	/*
+	* Update Charging status based on STAT register
+	*/
+	if (check_chg_state) {
+		if ((val & BQ2419x_CHRG_STATE_MASK) ==
+				BQ2419x_CHRG_STATE_NOTCHARGING) {
+			type = bq2419x->ac_online ? 1 : 2;
+			bq2419x->status = 0;
+			if (bq2419x->update_status)
+				bq2419x->update_status
+					(bq2419x->status, type);
+		}
+	}
 
 	return IRQ_HANDLED;
 }
@@ -761,6 +854,9 @@ static int bq2419x_wakealarm(struct bq2419x_chip *bq2419x, int time_sec)
 	struct rtc_wkalrm alm;
 	int alarm_time = time_sec;
 
+	if (!alarm_time)
+		return 0;
+
 	alm.enabled = true;
 	ret = rtc_read_time(bq2419x->rtc, &alm.time);
 	if (ret < 0) {
@@ -769,8 +865,6 @@ static int bq2419x_wakealarm(struct bq2419x_chip *bq2419x, int time_sec)
 	}
 	rtc_tm_to_time(&alm.time, &now);
 
-	if (!alarm_time)
-		alarm_time = 3600;
 	rtc_time_to_tm(now + alarm_time, &alm.time);
 	ret = rtc_set_alarm(bq2419x->rtc, &alm);
 	if (ret < 0) {
@@ -824,7 +918,10 @@ static int __devinit bq2419x_probe(struct i2c_client *client,
 	bq2419x->wdt_refresh_timeout = 25;
 	i2c_set_clientdata(client, bq2419x);
 	bq2419x->irq = client->irq;
-	bq2419x->rtc = alarmtimer_get_rtcdev();
+
+	if (bq2419x->rtc_alarm_time)
+		bq2419x->rtc = alarmtimer_get_rtcdev();
+
 	mutex_init(&bq2419x->mutex);
 	bq2419x->suspended = 0;
 	bq2419x->chg_restart_timeout = 0;
@@ -950,10 +1047,10 @@ static void bq2419x_shutdown(struct i2c_client *client)
 	if (bq2419x->irq)
 		disable_irq(bq2419x->irq);
 
-	if (!bq2419x->rtc)
+	if (alarm_time && !bq2419x->rtc)
 		bq2419x->rtc = alarmtimer_get_rtcdev();
 
-	if (bq2419x->in_current_limit > 500) {
+	if (alarm_time && (bq2419x->in_current_limit > 500)) {
 		dev_info(bq2419x->dev, "HighCurrent %dmA charger is connectd\n",
 			bq2419x->in_current_limit);
 		ret = bq2419x_reset_wdt(bq2419x, "shutdown");
@@ -971,7 +1068,7 @@ static void bq2419x_shutdown(struct i2c_client *client)
 	if (ret < 0)
 		dev_err(bq2419x->dev, "Charger enable failed %d", ret);
 
-	if (bq2419x->in_current_limit <= 500) {
+	if (alarm_time && (bq2419x->in_current_limit <= 500)) {
 		/* Configure charging current to 500mA */
 		ret = regmap_write(bq2419x->regmap,
 				BQ2419X_INPUT_SRC_REG, 0x32);

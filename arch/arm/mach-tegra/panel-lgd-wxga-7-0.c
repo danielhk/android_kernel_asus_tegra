@@ -36,10 +36,17 @@
 
 #define DSI_PANEL_RESET		0
 #define DSI_PANEL_BL_PWM	TEGRA_GPIO_PH1
-#define DC_CTRL_MODE	TEGRA_DC_OUT_CONTINUOUS_MODE
+#define DC_CTRL_MODE	(TEGRA_DC_OUT_CONTINUOUS_MODE | \
+			TEGRA_DC_OUT_INITIALIZED_MODE)
+
+/*
+ * TODO: This flag and continuous video clk mode
+ * support will be removed in near future.
+ * Tx Only video clk mode will be enabled all the time.
+ */
+#define VIDEO_CLK_MODE_TX_ONLY		1
 
 static bool reg_requested;
-static bool gpio_requested;
 static struct platform_device *disp_device;
 static struct regulator *avdd_lcd_3v3;
 static struct regulator *vdd_lcd_bl_en;
@@ -90,9 +97,11 @@ static struct tegra_dsi_out dsi_lgd_wxga_7_0_pdata = {
 	.panel_reset = DSI_PANEL_RESET,
 	.power_saving_suspend = true,
 	.video_data_type = TEGRA_DSI_VIDEO_TYPE_VIDEO_MODE,
-
+#if VIDEO_CLK_MODE_TX_ONLY
+	.video_clock_mode = TEGRA_DSI_VIDEO_CLOCK_TX_ONLY,
+#else
 	.video_clock_mode = TEGRA_DSI_VIDEO_CLOCK_CONTINUOUS,
-
+#endif
 	.dsi_init_cmd = dsi_lgd_wxga_7_0_init_cmd,
 	.n_init_cmd = ARRAY_SIZE(dsi_lgd_wxga_7_0_init_cmd),
 
@@ -133,26 +142,6 @@ fail:
 	return err;
 }
 
-static int tegratab_dsi_gpio_get(void)
-{
-	int err = 0;
-
-	if (gpio_requested)
-		return 0;
-
-	/* free pwm GPIO */
-	err = gpio_request(DSI_PANEL_BL_PWM, "panel pwm");
-	if (err < 0) {
-		pr_err("panel pwm gpio request failed\n");
-		goto fail;
-	}
-	gpio_free(DSI_PANEL_BL_PWM);
-	gpio_requested = true;
-	return 0;
-fail:
-	return err;
-}
-
 static int dsi_lgd_wxga_7_0_enable(struct device *dev)
 {
 	int err = 0;
@@ -161,13 +150,6 @@ static int dsi_lgd_wxga_7_0_enable(struct device *dev)
 
 	if (err < 0) {
 		pr_err("dsi regulator get failed\n");
-		goto fail;
-	}
-
-	err = tegratab_dsi_gpio_get();
-
-	if (err < 0) {
-		pr_err("dsi gpio request failed\n");
 		goto fail;
 	}
 
@@ -248,26 +230,40 @@ static int dsi_lgd_wxga_7_0_postsuspend(void)
  * v_total =
  * Vert_BackPorch + Vert_SyncWidth + Vert_DispActive + Vert_FrontPorch;
  * panel_freq = ( h_total * v_total * refresh_freq );
- * h_total = 40 + 8 + 800 + 16 = 864
- * v_total = 2 + 1 + 1280 + 5 = 1288
- * panel_freq = 864 * 1288 * 60 = 66769920  ==> let's set it to 67000000 !
  */
-
+#if VIDEO_CLK_MODE_TX_ONLY
 static struct tegra_dc_mode dsi_lgd_wxga_7_0_modes[] = {
 	{
-		.pclk = 67000000,
+		.pclk = 71000000, /* 890 * 1323 * 60 = 70648200 */
 		.h_ref_to_sync = 10,
 		.v_ref_to_sync = 1,
-		.h_sync_width = 8,
+		.h_sync_width = 1,
 		.v_sync_width = 1,
-		.h_back_porch = 40, /*48 - 8(h_sync_width)*/
-		.v_back_porch = 2, /*3 - 1(v_sync_width)*/
+		.h_back_porch = 57,
+		.v_back_porch = 14,
 		.h_active = 800,
 		.v_active = 1280,
-		.h_front_porch = 16,
-		.v_front_porch = 5,
+		.h_front_porch = 32,
+		.v_front_porch = 28,
 	},
 };
+#else
+static struct tegra_dc_mode dsi_lgd_wxga_7_0_modes[] = {
+	{
+		.pclk = 68600000, /* 890 * 1284 * 60 = 68565600 */
+		.h_ref_to_sync = 10,
+		.v_ref_to_sync = 1,
+		.h_sync_width = 1,
+		.v_sync_width = 1,
+		.h_back_porch = 57,
+		.v_back_porch = 2,
+		.h_active = 800,
+		.v_active = 1280,
+		.h_front_porch = 32,
+		.v_front_porch = 1,
+	},
+};
+#endif
 
 static int dsi_lgd_wxga_7_0_bl_notify(struct device *unused, int brightness)
 {
@@ -298,10 +294,11 @@ static struct platform_pwm_backlight_data dsi_lgd_wxga_7_0_bl_data = {
 	.notify		= dsi_lgd_wxga_7_0_bl_notify,
 	/* Only toggle backlight on fb blank notifications for disp1 */
 	.check_fb	= dsi_lgd_wxga_7_0_check_fb,
+	.pwm_gpio	= DSI_PANEL_BL_PWM,
 };
 
 static struct platform_device __maybe_unused
-		dsi_lgd_wxga_7_0_bl_device __initdata = {
+		dsi_lgd_wxga_7_0_bl_device = {
 	.name	= "pwm-backlight",
 	.id	= -1,
 	.dev	= {
@@ -318,6 +315,11 @@ static struct platform_device __maybe_unused
 static int  __init dsi_lgd_wxga_7_0_register_bl_dev(void)
 {
 	int err = 0;
+
+#ifdef CONFIG_ANDROID
+	if (get_androidboot_mode_charger())
+		dsi_lgd_wxga_7_0_bl_data.dft_brightness = 60;
+#endif
 	err = platform_add_devices(dsi_lgd_wxga_7_0_bl_devices,
 				ARRAY_SIZE(dsi_lgd_wxga_7_0_bl_devices));
 	if (err) {
@@ -349,13 +351,22 @@ resources, int n_resources)
 
 static void dsi_lgd_wxga_7_0_dc_out_init(struct tegra_dc_out *dc)
 {
+	/*
+	 * Values to meet D-Phy timings,
+	 * These values are get from measurement with target panel.
+	 */
+	dsi_lgd_wxga_7_0_pdata.phy_timing.t_clkprepare_ns = 27;
+	dsi_lgd_wxga_7_0_pdata.phy_timing.t_clkzero_ns = 330;
+	dsi_lgd_wxga_7_0_pdata.phy_timing.t_hsprepare_ns = 30;
+	dsi_lgd_wxga_7_0_pdata.phy_timing.t_datzero_ns = 270;
+
 	dc->dsi = &dsi_lgd_wxga_7_0_pdata;
 	dc->parent_clk = "pll_d_out0";
 	dc->modes = dsi_lgd_wxga_7_0_modes;
 	dc->n_modes = ARRAY_SIZE(dsi_lgd_wxga_7_0_modes);
 	dc->enable = dsi_lgd_wxga_7_0_enable;
 	dc->disable = dsi_lgd_wxga_7_0_disable;
-	dc->postsuspend	= dsi_lgd_wxga_7_0_postsuspend,
+	dc->postsuspend = dsi_lgd_wxga_7_0_postsuspend,
 	dc->width = 94;
 	dc->height = 150;
 	dc->flags = DC_CTRL_MODE;

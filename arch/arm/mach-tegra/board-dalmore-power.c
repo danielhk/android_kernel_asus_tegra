@@ -60,7 +60,7 @@
 #define PMC_CTRL		0x0
 #define PMC_CTRL_INTR_LOW	(1 << 17)
 #define TPS65090_CHARGER_INT	TEGRA_GPIO_PJ0
-#define POWER_CONFIG2	0x01
+#define POWER_CONFIG2	0x02
 
 /*TPS65090 consumer rails */
 static struct regulator_consumer_supply tps65090_dcdc1_supply[] = {
@@ -645,6 +645,10 @@ static struct regulator_consumer_supply palmas_ldoln_supply[] = {
 	REGULATOR_SUPPLY("hvdd_usb", "tegra-xhci"),
 };
 
+static struct regulator_consumer_supply palmas_ldoln_fab05_supply[] = {
+	REGULATOR_SUPPLY("avdd_hdmi", "tegradc.1"),
+};
+
 static struct regulator_consumer_supply palmas_ldousb_supply[] = {
 	REGULATOR_SUPPLY("avdd_usb", "tegra-udc.0"),
 	REGULATOR_SUPPLY("avdd_usb", "tegra-ehci.0"),
@@ -653,27 +657,59 @@ static struct regulator_consumer_supply palmas_ldousb_supply[] = {
 	REGULATOR_SUPPLY("avdd_hdmi", "tegradc.1"),
 };
 
-PALMAS_PDATA_INIT(smps12, 1350,  1350, tps65090_rails(DCDC3), 0, 0, 0, NORMAL);
-PALMAS_PDATA_INIT(smps3, 1800,  1800, tps65090_rails(DCDC3), 0, 0, 0, NORMAL);
-PALMAS_PDATA_INIT(smps45, 900,  1400, tps65090_rails(DCDC2), 1, 1, 0, NORMAL);
-PALMAS_PDATA_INIT(smps457, 900,  1400, tps65090_rails(DCDC2), 1, 1, 0, NORMAL);
-PALMAS_PDATA_INIT(smps8, 1050,  1050, tps65090_rails(DCDC2), 0, 1, 1, NORMAL);
-PALMAS_PDATA_INIT(smps8_config2, 1050,  1050, tps65090_rails(DCDC2), 0, 1, 1,
-	NORMAL);
-PALMAS_PDATA_INIT(smps9, 2800,  2800, tps65090_rails(DCDC2), 1, 0, 0, NORMAL);
-PALMAS_PDATA_INIT(ldo1, 2800,  2800, tps65090_rails(DCDC2), 0, 0, 1, 0);
-PALMAS_PDATA_INIT(ldo1_config2, 1200,  1200, tps65090_rails(DCDC2), 0, 0, 1, 0);
-PALMAS_PDATA_INIT(ldo2, 2800,  2800, tps65090_rails(DCDC2), 0, 0, 1, 0);
-PALMAS_PDATA_INIT(ldo2_config2, 2800,  2800, tps65090_rails(DCDC2), 0, 0, 1, 0);
-PALMAS_PDATA_INIT(ldo3, 1200,  1200, palmas_rails(smps3), 0, 0, 1, 0);
-PALMAS_PDATA_INIT(ldo4_config2, 1200,  1200, tps65090_rails(DCDC2), 0, 0, 1, 0);
-PALMAS_PDATA_INIT(ldo4, 1800,  1800, tps65090_rails(DCDC2), 0, 0, 0, 0);
-PALMAS_PDATA_INIT(ldo6, 2850,  2850, tps65090_rails(DCDC2), 0, 0, 1, 0);
-PALMAS_PDATA_INIT(ldo7, 2800,  2800, tps65090_rails(DCDC2), 0, 0, 1, 0);
-PALMAS_PDATA_INIT(ldo8, 900,  900, tps65090_rails(DCDC3), 1, 1, 1, 0);
-PALMAS_PDATA_INIT(ldo9, 1800,  3300, palmas_rails(smps9), 0, 0, 1, 0);
-PALMAS_PDATA_INIT(ldoln, 3300, 3300, tps65090_rails(DCDC1), 0, 0, 1, 0);
-PALMAS_PDATA_INIT(ldousb, 3300,  3300, tps65090_rails(DCDC1), 0, 0, 1, 0);
+static struct regulator_consumer_supply palmas_ldousb_fab05_supply[] = {
+	REGULATOR_SUPPLY("hvdd_usb", "tegra-ehci.2"),
+	REGULATOR_SUPPLY("hvdd_usb", "tegra-xhci"),
+	REGULATOR_SUPPLY("avdd_usb", "tegra-udc.0"),
+	REGULATOR_SUPPLY("avdd_usb", "tegra-ehci.0"),
+	REGULATOR_SUPPLY("avdd_usb", "tegra-ehci.1"),
+	REGULATOR_SUPPLY("avdd_usb", "tegra-ehci.2"),
+};
+
+PALMAS_REGS_PDATA(smps12, 1350,  1350, tps65090_rails(DCDC3), 0, 0, 0, NORMAL,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(smps3, 1800,  1800, tps65090_rails(DCDC3), 0, 0, 0, NORMAL,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(smps45, 900,  1400, tps65090_rails(DCDC2), 1, 1, 0, NORMAL,
+	0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+PALMAS_REGS_PDATA(smps457, 900,  1400, tps65090_rails(DCDC2), 1, 1, 0, NORMAL,
+	0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+PALMAS_REGS_PDATA(smps8, 1050,  1050, tps65090_rails(DCDC2), 0, 1, 1, NORMAL,
+	0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+PALMAS_REGS_PDATA(smps8_config2, 1050,  1050, tps65090_rails(DCDC2), 0, 1, 1,
+	NORMAL, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+PALMAS_REGS_PDATA(smps9, 2800,  2800, tps65090_rails(DCDC2), 1, 0, 0, NORMAL,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo1, 2800,  2800, tps65090_rails(DCDC2), 0, 0, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo1_config2, 1200,  1200, tps65090_rails(DCDC2), 0, 0, 1, 0,
+	1, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo2, 2800,  2800, tps65090_rails(DCDC2), 0, 0, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo2_config2, 2800,  2800, tps65090_rails(DCDC2), 0, 0, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo3, 1200,  1200, palmas_rails(smps3), 0, 0, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo4_config2, 1200,  1200, tps65090_rails(DCDC2), 0, 0, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo4, 1800,  1800, tps65090_rails(DCDC2), 0, 0, 0, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo6, 2850,  2850, tps65090_rails(DCDC2), 0, 0, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo7, 2800,  2800, tps65090_rails(DCDC2), 0, 0, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo8, 900,  900, tps65090_rails(DCDC3), 1, 1, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo9, 1800,  3300, palmas_rails(smps9), 0, 0, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldoln, 3300, 3300, tps65090_rails(DCDC1), 0, 0, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldoln_fab05, 3300, 3300, tps65090_rails(DCDC1), 0, 0, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldousb, 3300,  3300, tps65090_rails(DCDC1), 0, 0, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldousb_fab05, 3300,  3300, tps65090_rails(DCDC1), 0, 0, 1, 0,
+	0, 0, 0, 0, 0);
 
 #define PALMAS_REG_PDATA(_sname) &reg_idata_##_sname
 
@@ -706,71 +742,34 @@ static struct regulator_init_data *dalmore_e1611_reg_data[PALMAS_NUM_REGS] = {
 	NULL,
 };
 
-#define PALMAS_REG_INIT(_name, _warm_reset, _roof_floor, _mode_sleep,	\
-		_tstep, _vsel)						\
-	static struct palmas_reg_init reg_init_data_##_name = {		\
-		.warm_reset = _warm_reset,				\
-		.roof_floor =	_roof_floor,				\
-		.mode_sleep = _mode_sleep,				\
-		.tstep = _tstep,					\
-		.vsel = _vsel,						\
-	}
-
-PALMAS_REG_INIT(smps12, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(smps123, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(smps3, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(smps45, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(smps457, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(smps6, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(smps7, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(smps8, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REG_INIT(smps9, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(smps10, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(ldo1, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(ldo2, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(ldo3, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(ldo4, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(ldo5, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(ldo6, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(ldo7, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(ldo8, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(ldo9, 1, 0, 0, 0, 0);
-PALMAS_REG_INIT(ldoln, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(ldousb, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(regen1, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(regen2, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(regen3, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(sysen1, 0, 0, 0, 0, 0);
-PALMAS_REG_INIT(sysen2, 0, 0, 0, 0, 0);
-
 #define PALMAS_REG_INIT_DATA(_sname) &reg_init_data_##_sname
 static struct palmas_reg_init *dalmore_e1611_reg_init[PALMAS_NUM_REGS] = {
 	PALMAS_REG_INIT_DATA(smps12),
-	PALMAS_REG_INIT_DATA(smps123),
+	NULL,
 	PALMAS_REG_INIT_DATA(smps3),
 	PALMAS_REG_INIT_DATA(smps45),
 	PALMAS_REG_INIT_DATA(smps457),
-	PALMAS_REG_INIT_DATA(smps6),
-	PALMAS_REG_INIT_DATA(smps7),
+	NULL,
+	NULL,
 	PALMAS_REG_INIT_DATA(smps8),
 	PALMAS_REG_INIT_DATA(smps9),
-	PALMAS_REG_INIT_DATA(smps10),
+	NULL,
 	PALMAS_REG_INIT_DATA(ldo1),
 	PALMAS_REG_INIT_DATA(ldo2),
 	PALMAS_REG_INIT_DATA(ldo3),
 	PALMAS_REG_INIT_DATA(ldo4),
-	PALMAS_REG_INIT_DATA(ldo5),
+	NULL,
 	PALMAS_REG_INIT_DATA(ldo6),
 	PALMAS_REG_INIT_DATA(ldo7),
 	PALMAS_REG_INIT_DATA(ldo8),
 	PALMAS_REG_INIT_DATA(ldo9),
 	PALMAS_REG_INIT_DATA(ldoln),
 	PALMAS_REG_INIT_DATA(ldousb),
-	PALMAS_REG_INIT_DATA(regen1),
-	PALMAS_REG_INIT_DATA(regen2),
-	PALMAS_REG_INIT_DATA(regen3),
-	PALMAS_REG_INIT_DATA(sysen1),
-	PALMAS_REG_INIT_DATA(sysen2),
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
 };
 
 static struct palmas_pmic_platform_data pmic_platform = {
@@ -811,6 +810,12 @@ static struct palmas_platform_data palmas_pdata = {
 	.rtc_pdata = &rtc_platform,
 	.use_power_off = true,
 	.pinctrl_pdata = &palmas_pinctrl_pdata,
+	#ifndef CONFIG_ANDROID
+	.long_press_delay = PALMAS_LONG_PRESS_KEY_TIME_8SECONDS,
+	#else
+	/* Retaining default value, 12 Seconds */
+	.long_press_delay = PALMAS_LONG_PRESS_KEY_TIME_DEFAULT,
+	#endif
 };
 
 static struct i2c_board_info palma_device[] = {
@@ -998,16 +1003,37 @@ static struct platform_device *fixed_reg_devs_dalmore_config2[] = {
 	DALMORE_POWER_CONFIG_2
 };
 
+static void set_dalmore_power_fab05(void)
+{
+	dalmore_e1611_reg_data[PALMAS_REG_LDOLN] =
+				PALMAS_REG_PDATA(ldoln_fab05);
+	dalmore_e1611_reg_init[PALMAS_REG_LDOLN] =
+				PALMAS_REG_INIT_DATA(ldoln_fab05);
+	dalmore_e1611_reg_data[PALMAS_REG_LDOUSB] =
+				PALMAS_REG_PDATA(ldousb_fab05);
+	dalmore_e1611_reg_init[PALMAS_REG_LDOUSB] =
+				PALMAS_REG_INIT_DATA(ldousb_fab05);
+	return;
+}
+
 static void set_dalmore_power_config2(void)
 {
 	dalmore_e1611_reg_data[PALMAS_REG_SMPS8] =
 				PALMAS_REG_PDATA(smps8_config2);
+	dalmore_e1611_reg_init[PALMAS_REG_SMPS8] =
+				PALMAS_REG_INIT_DATA(smps8_config2);
 	dalmore_e1611_reg_data[PALMAS_REG_LDO1] =
 				PALMAS_REG_PDATA(ldo1_config2);
+	dalmore_e1611_reg_init[PALMAS_REG_LDO1] =
+				PALMAS_REG_INIT_DATA(ldo1_config2);
 	dalmore_e1611_reg_data[PALMAS_REG_LDO2] =
 				PALMAS_REG_PDATA(ldo2_config2);
+	dalmore_e1611_reg_init[PALMAS_REG_LDO2] =
+				PALMAS_REG_INIT_DATA(ldo2_config2);
 	dalmore_e1611_reg_data[PALMAS_REG_LDO4] =
 				PALMAS_REG_PDATA(ldo4_config2);
+	dalmore_e1611_reg_init[PALMAS_REG_LDO4] =
+				PALMAS_REG_INIT_DATA(ldo4_config2);
 	return;
 }
 
@@ -1016,7 +1042,10 @@ int __init dalmore_palmas_regulator_init(void)
 	void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
 	u32 pmc_ctrl;
 	u8 power_config;
+	struct board_info board_info;
 	int i;
+
+	tegra_get_board_info(&board_info);
 
 	/* TPS65913: Normal state of INT request line is LOW.
 	 * configure the power management controller to trigger PMU
@@ -1026,8 +1055,12 @@ int __init dalmore_palmas_regulator_init(void)
 	writel(pmc_ctrl | PMC_CTRL_INTR_LOW, pmc + PMC_CTRL);
 
 	power_config = get_power_config();
-	if (power_config && POWER_CONFIG2)
+	if (board_info.fab == BOARD_FAB_A05) {
 		set_dalmore_power_config2();
+		set_dalmore_power_fab05();
+	} else if (power_config & POWER_CONFIG2) {
+		set_dalmore_power_config2();
+	}
 
 	for (i = 0; i < PALMAS_NUM_REGS ; i++) {
 		pmic_platform.reg_data[i] = dalmore_e1611_reg_data[i];
@@ -1131,7 +1164,7 @@ static int __init dalmore_cl_dvfs_init(void)
 {
 	fill_reg_map();
 	if (tegra_revision < TEGRA_REVISION_A02)
-		dalmore_cl_dvfs_data.out_quiet_then_disable = true;
+		dalmore_cl_dvfs_data.flags = TEGRA_CL_DVFS_FLAGS_I2C_WAIT_QUIET;
 	tegra_cl_dvfs_device.dev.platform_data = &dalmore_cl_dvfs_data;
 	platform_device_register(&tegra_cl_dvfs_device);
 
@@ -1193,7 +1226,8 @@ static int __init dalmore_fixed_regulator_init(void)
 	power_config = get_power_config();
 	tegra_get_board_info(&board_info);
 
-	if (power_config && POWER_CONFIG2)
+	/* Fab05 and power-type2 have the same fixed regs */
+	if (board_info.fab == BOARD_FAB_A05 || power_config & POWER_CONFIG2)
 		platform_add_devices(fixed_reg_devs_dalmore_config2,
 				ARRAY_SIZE(fixed_reg_devs_dalmore_config2));
 

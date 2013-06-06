@@ -20,9 +20,10 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/list.h>
-#include <linux/spinlock.h>
+#include <linux/mutex.h>
 #include <linux/delay.h>
 #include <linux/err.h>
+#include <linux/gpio.h>
 #include <linux/io.h>
 #include <linux/clk.h>
 #include <linux/cpufreq.h>
@@ -41,6 +42,7 @@
 
 #include "tegra3_tsensor.h"
 #include "tegra11_soctherm.h"
+#include "gpio-names.h"
 
 /* Min temp granularity specified as X in 2^X.
  * -1: Hi precision option: 2^-1 = 0.5C
@@ -451,7 +453,7 @@ static const void __iomem *clk_reset_base = IO_ADDRESS(TEGRA_CLK_RESET_BASE);
 	(soctherm_suspended ? 0 :	\
 		__raw_readl((u32)reg_soctherm_base + (reg)))
 
-static DEFINE_SPINLOCK(soctherm_suspend_resume_lock);
+static DEFINE_MUTEX(soctherm_suspend_resume_lock);
 
 static int soctherm_suspend(void);
 static int soctherm_resume(void);
@@ -565,6 +567,15 @@ static const struct soctherm_sensor sensor_defaults = {
 	.ten_count = 1,
 	.tsample   = 163,
 	.pdiv      = 10,
+};
+
+/* SOC- OCx to theirt GPIO which is wakeup capable. This is T114 specific */
+static int soctherm_ocx_to_wake_gpio[TEGRA_SOC_OC_IRQ_MAX] = {
+	TEGRA_GPIO_PEE3,	/* TEGRA_SOC_OC_IRQ_1 */
+	TEGRA_GPIO_INVALID,	/* TEGRA_SOC_OC_IRQ_2 */
+	TEGRA_GPIO_INVALID,	/* TEGRA_SOC_OC_IRQ_3 */
+	TEGRA_GPIO_PJ2,		/* TEGRA_SOC_OC_IRQ_4 */
+	TEGRA_GPIO_INVALID,	/* TEGRA_SOC_OC_IRQ_5 */
 };
 
 static const unsigned long default_soctherm_clk_rate = 51000000;
@@ -1351,7 +1362,7 @@ static int soctherm_handle_alarm(enum soctherm_throttle_id alarm)
 		break;
 
 	case THROTTLE_OC4:
-		pr_info("soctherm: Successfully handled OC4 alarm\n");
+		pr_debug("soctherm: Successfully handled OC4 alarm\n");
 		/* TODO: add OC4 alarm handling code here */
 		rv = 0;
 
@@ -1837,10 +1848,8 @@ static int soctherm_init_platform_data(void)
 	return 0;
 }
 
-static int soctherm_suspend(void)
+static void soctherm_suspend_locked(void)
 {
-	spin_lock(&soctherm_suspend_resume_lock);
-
 	if (!soctherm_suspended) {
 		soctherm_writel((u32)-1, TH_INTR_DISABLE);
 		soctherm_writel((u32)-1, OC_INTR_DISABLE);
@@ -1850,15 +1859,18 @@ static int soctherm_suspend(void)
 		soctherm_init_platform_done = false;
 		soctherm_suspended = true;
 	}
+}
 
-	spin_unlock(&soctherm_suspend_resume_lock);
+static int soctherm_suspend(void)
+{
+	mutex_lock(&soctherm_suspend_resume_lock);
+	soctherm_suspend_locked();
+	mutex_unlock(&soctherm_suspend_resume_lock);
 	return 0;
 }
 
-static int soctherm_resume(void)
+static void soctherm_resume_locked(void)
 {
-	spin_lock(&soctherm_suspend_resume_lock);
-
 	if (soctherm_suspended) {
 		soctherm_suspended = false;
 		soctherm_clk_enable(true);
@@ -1868,10 +1880,31 @@ static int soctherm_resume(void)
 		enable_irq(INT_THERMAL);
 		enable_irq(INT_EDP);
 	}
+}
 
-	spin_unlock(&soctherm_suspend_resume_lock);
+static int soctherm_resume(void)
+{
+	mutex_lock(&soctherm_suspend_resume_lock);
+	soctherm_resume_locked();
+	mutex_unlock(&soctherm_suspend_resume_lock);
 	return 0;
 }
+
+static int soctherm_sync(void)
+{
+	mutex_lock(&soctherm_suspend_resume_lock);
+
+	if (soctherm_suspended) {
+		soctherm_resume_locked();
+		soctherm_suspend_locked();
+	} else {
+		soctherm_update();
+	}
+
+	mutex_unlock(&soctherm_suspend_resume_lock);
+	return 0;
+}
+late_initcall_sync(soctherm_sync);
 
 static int soctherm_pm_notify(struct notifier_block *nb,
 				unsigned long event, void *data)
@@ -1923,6 +1956,27 @@ static int soctherm_oc_irq_set_type(struct irq_data *data, unsigned int type)
 	return 0;
 }
 
+static int soctherm_oc_irq_set_wake(struct irq_data *data, unsigned int on)
+{
+	int gpio;
+	int gpio_irq;
+
+	gpio = soctherm_ocx_to_wake_gpio[data->hwirq];
+	if (!gpio_is_valid(gpio)) {
+		pr_err("No wakeup supported for irq %lu\n", data->hwirq);
+		return -EINVAL;
+	}
+
+	gpio_irq = gpio_to_irq(gpio);
+	if (gpio_irq < 0) {
+		pr_err("No gpio_to_irq for gpio %d\n", gpio);
+		return gpio;
+	}
+
+	irq_set_irq_wake(gpio_irq, on);
+	return 0;
+}
+
 static int soctherm_oc_irq_map(struct irq_domain *h, unsigned int virq,
 		irq_hw_number_t hw)
 {
@@ -1956,6 +2010,7 @@ static int tegra11_soctherem_oc_int_init(int irq_base, int num_irqs)
 	soc_irq_cdata.irq_chip.irq_disable = soctherm_oc_irq_disable,
 	soc_irq_cdata.irq_chip.irq_enable = soctherm_oc_irq_enable,
 	soc_irq_cdata.irq_chip.irq_set_type = soctherm_oc_irq_set_type,
+	soc_irq_cdata.irq_chip.irq_set_wake = soctherm_oc_irq_set_wake,
 
 	irq_base = irq_alloc_descs(irq_base, 0, num_irqs, 0);
 	if (irq_base < 0) {

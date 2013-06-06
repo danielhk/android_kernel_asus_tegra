@@ -20,7 +20,6 @@
 
 / {
 	host1x {
-		status = "okay";
 		hdmi {
 			status = "okay";
 		};
@@ -40,11 +39,29 @@
 		};
 
 		/* Compass sensor */
-		akm8963@0d {
+		ak8963c@0d {
 			compatible = "ak,ak8963";
 			reg = <0x0d>;
-			orientation = [00 01 00 ff 00 00 00 00 01];
+			orientation = [00 ff 00 ff 00 00 00 00 ff];
 			config = "mpu";
+		};
+	};
+
+	/* CAM */
+	i2c@7000c500 {
+		status = "okay";
+		ad5823@0c {
+			compatible = "nvidia,ad5823";
+			reg = <0x0c>;
+			af-pwdn-gpios = <&gpio 223 0>; /* gpio PBB7 */
+		};
+		ov5693@10 {
+			compatible = "nvidia,ov5693";
+			reg = <0x10>;
+			nvidia,num = <0>;
+			nvidia,dev-name = "camera";
+			nvidia,use-vcm-vdd;
+			reset-gpios = <&gpio 221 0>; /* gpio PBB5 */
 		};
 	};
 };
