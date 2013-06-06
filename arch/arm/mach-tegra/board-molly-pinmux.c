@@ -260,16 +260,6 @@ static __initdata struct tegra_pingroup_config molly_pinmux_set_nontristate[] = 
 
 #include "board-molly-pinmux-t11x.h"
 
-static __initdata struct tegra_pingroup_config molly_e1611_1000[] = {
-	/* io rdy Lock rotation */
-	DEFAULT_PINMUX(GMI_IORDY,	GMI,	NORMAL,	NORMAL,	INPUT),
-};
-
-static __initdata struct tegra_pingroup_config molly_e1611_1001[] = {
-	/* kbcol1 rdy Lock rotation */
-	DEFAULT_PINMUX(KB_COL1,       KBC,         NORMAL,   NORMAL, INPUT),
-};
-
 static void __init molly_gpio_init_configure(void)
 {
 	int len;
@@ -288,10 +278,6 @@ static void __init molly_gpio_init_configure(void)
 
 int __init molly_pinmux_init(void)
 {
-	struct board_info board_info;
-
-	tegra_get_board_info(&board_info);
-
 	tegra_pinmux_config_table(molly_pinmux_set_nontristate,
 					ARRAY_SIZE(molly_pinmux_set_nontristate));
 	molly_gpio_init_configure();
@@ -301,13 +287,6 @@ int __init molly_pinmux_init(void)
 					ARRAY_SIZE(molly_drive_pinmux));
 	tegra_pinmux_config_table(unused_pins_lowpower,
 		ARRAY_SIZE(unused_pins_lowpower));
-
-	if ((board_info.board_id == BOARD_E1611) && (board_info.sku == 1000))
-		tegra_pinmux_config_table(molly_e1611_1000,
-			ARRAY_SIZE(molly_e1611_1000));
-	else if ((board_info.board_id == BOARD_E1611) && (board_info.sku == 1001))
-		tegra_pinmux_config_table(molly_e1611_1001,
-			ARRAY_SIZE(molly_e1611_1001));
 
 	return 0;
 }
