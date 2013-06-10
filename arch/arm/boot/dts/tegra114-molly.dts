@@ -1,0 +1,253 @@
+/dts-v1/;
+
+/include/ "tegra114.dtsi"
+
+/ {
+	model = "Google Tegra114 Molly board";
+	compatible = "google,molly", "nvidia,tegra114";
+
+	pinmux {
+		pinctrl-names = "default";
+		pinctrl-0 = <&state_default>;
+
+		state_default: pinmux {
+			cam_i2c_scl_pbb1 {
+				nvidia,pins = "cam_i2c_scl_pbb1",
+						"cam_i2c_sda_pbb2";
+				nvidia,function = "i2c3";
+				nvidia,pull = <0>;
+				nvidia,tristate = <0>;
+				nvidia,enable-input = <1>;
+				nvidia,lock = <0>;
+				nvidia,open-drain = <0>;
+			};
+			gen2_i2c_scl_pt5 {
+				nvidia,pins = "gen2_i2c_scl_pt5",
+						"gen2_i2c_sda_pt6";
+				nvidia,function = "i2c2";
+				nvidia,pull = <0>;
+				nvidia,tristate = <0>;
+				nvidia,enable-input = <1>;
+				nvidia,lock = <0>;
+				nvidia,open-drain = <0>;
+			};
+			gmi_a16_pj7 {
+				nvidia,pins = "gmi_a16_pj7";
+				nvidia,function = "uartd";
+				nvidia,pull = <0>;
+				nvidia,tristate = <0>;
+				nvidia,enable-input = <0>;
+			};
+			gmi_a17_pb0 {
+				nvidia,pins = "gmi_a17_pb0",
+						"gmi_a18_pb1";
+				nvidia,function = "uartd";
+				nvidia,pull = <0>;
+				nvidia,tristate = <1>;
+				nvidia,enable-input = <1>;
+			};
+			gmi_a19_pk7 {
+				nvidia,pins = "gmi_a19_pk7";
+				nvidia,function = "uartd";
+				nvidia,pull = <0>;
+				nvidia,tristate = <0>;
+				nvidia,enable-input = <0>;
+			};
+			gmi_cs1_n_pj2 {
+				nvidia,pins = "gmi_cs1_n_pj2";
+				nvidia,function = "soc";
+				nvidia,pull = <0>;
+				nvidia,tristate = <1>;
+				nvidia,enable-input = <1>;
+			};
+			sdmmc1_clk_pz0 {
+				nvidia,pins = "sdmmc1_clk_pz0";
+				nvidia,function = "sdmmc1";
+				nvidia,pull = <0>;
+				nvidia,tristate = <0>;
+				nvidia,enable-input = <1>;
+			};
+			sdmmc1_cmd_pz1 {
+				nvidia,pins = "sdmmc1_cmd_pz1",
+						"sdmmc1_dat0_py7",
+						"sdmmc1_dat1_py6",
+						"sdmmc1_dat2_py5",
+						"sdmmc1_dat3_py4";
+				nvidia,function = "sdmmc1";
+				nvidia,pull = <2>;
+				nvidia,tristate = <0>;
+				nvidia,enable-input = <1>;
+			};
+			kb_col0_pq0 {
+				nvidia,pins = "kb_col0_pq0";
+				nvidia,function = "spi2";
+				nvidia,pull = <0>;
+				nvidia,tristate = <0>;
+				nvidia,enable-input = <0>;
+			};
+			kb_col1_pq1 {
+				nvidia,pins = "kb_col1_pq1";
+				nvidia,function = "spi2";
+				nvidia,pull = <0>;
+				nvidia,tristate = <0>;
+				nvidia,enable-input = <1>;
+			};
+			kb_row5_pr5 {
+				nvidia,pins = "kb_row5_pr5";
+				nvidia,function = "spi2";
+				nvidia,pull = <0>;
+				nvidia,tristate = <0>;
+				nvidia,enable-input = <0>;
+			};
+			sdmmc3_clk_pa6 {
+				nvidia,pins = "sdmmc3_clk_pa6";
+				nvidia,function = "spi3";
+				nvidia,pull = <0>;
+				nvidia,tristate = <0>;
+				nvidia,enable-input = <0>;
+			};
+			sdmmc3_dat0_pb7 {
+				nvidia,pins = "sdmmc3_dat0_pb7";
+				nvidia,function = "spi3";
+				nvidia,pull = <0>;
+				nvidia,tristate = <0>;
+				nvidia,enable-input = <1>;
+			};
+			sdmmc3_dat1_pb6 {
+				nvidia,pins = "sdmmc3_dat1_pb6";
+				nvidia,function = "spi3";
+				nvidia,pull = <0>;
+				nvidia,tristate = <0>;
+				nvidia,enable-input = <0>;
+			};
+			sdmmc4_clk_pcc4 {
+				nvidia,pins = "sdmmc4_clk_pcc4";
+				nvidia,function = "sdmmc4";
+				nvidia,pull = <0>;
+				nvidia,tristate = <0>;
+				nvidia,enable-input = <1>;
+			};
+			sdmmc4_cmd_pt7 {
+				nvidia,pins = "sdmmc4_cmd_pt7",
+						"sdmmc4_dat0_paa0",
+						"sdmmc4_dat1_paa1",
+						"sdmmc4_dat2_paa2",
+						"sdmmc4_dat3_paa3",
+						"sdmmc4_dat4_paa4",
+						"sdmmc4_dat5_paa5",
+						"sdmmc4_dat6_paa6",
+						"sdmmc4_dat7_paa7";
+				nvidia,function = "sdmmc4";
+				nvidia,pull = <2>;
+				nvidia,tristate = <0>;
+				nvidia,enable-input = <1>;
+			};
+			clk_32k_out_pa0 {
+				nvidia,pins = "clk_32k_out_pa0";
+				nvidia,function = "soc";
+				nvidia,pull = <0>;
+				nvidia,tristate = <1>;
+				nvidia,enable-input = <1>;
+			};
+			pwr_i2c_scl_pz6 {
+				nvidia,pins = "pwr_i2c_scl_pz6",
+						"pwr_i2c_sda_pz7";
+				nvidia,function = "i2cpwr";
+				nvidia,pull = <0>;
+				nvidia,tristate = <0>;
+				nvidia,enable-input = <1>;
+				nvidia,lock = <0>;
+				nvidia,open-drain = <0>;
+			};
+			core_pwr_req {
+				nvidia,pins = "core_pwr_req";
+				nvidia,function = "pwron";
+				nvidia,pull = <0>;
+				nvidia,tristate = <0>;
+				nvidia,enable-input = <0>;
+			};
+			cpu_pwr_req {
+				nvidia,pins = "cpu_pwr_req";
+				nvidia,function = "cpu";
+				nvidia,pull = <0>;
+				nvidia,tristate = <0>;
+				nvidia,enable-input = <0>;
+			};
+			pwr_int_n {
+				nvidia,pins = "pwr_int_n";
+				nvidia,function = "pmi";
+				nvidia,pull = <0>;
+				nvidia,tristate = <1>;
+				nvidia,enable-input = <1>;
+			};
+			reset_out_n {
+				nvidia,pins = "reset_out_n";
+				nvidia,function = "reset_out_n";
+				nvidia,pull = <0>;
+				nvidia,tristate = <0>;
+				nvidia,enable-input = <0>;
+			};
+			gen1_i2c_scl_pc4 {
+				nvidia,pins = "gen1_i2c_scl_pc4",
+						"gen1_i2c_sda_pc5";
+				nvidia,function = "i2c1";
+				nvidia,pull = <0>;
+				nvidia,tristate = <0>;
+				nvidia,enable-input = <1>;
+				nvidia,lock = <0>;
+				nvidia,open-drain = <0>;
+			};
+			uart3_cts_n_pa1 {
+				nvidia,pins = "uart3_cts_n_pa1",
+						"uart3_rxd_pw7";
+				nvidia,function = "uartc";
+				nvidia,pull = <0>;
+				nvidia,tristate = <1>;
+				nvidia,enable-input = <1>;
+			};
+			uart3_rts_n_pc0 {
+				nvidia,pins = "uart3_rts_n_pc0",
+						"uart3_txd_pw6";
+				nvidia,function = "uartc";
+				nvidia,pull = <0>;
+				nvidia,tristate = <0>;
+				nvidia,enable-input = <0>;
+			};
+			hdmi_cec_pee3 {
+				nvidia,pins = "hdmi_cec_pee3";
+				nvidia,function = "cec";
+				nvidia,pull = <0>;
+				nvidia,tristate = <0>;
+				nvidia,enable-input = <1>;
+				nvidia,lock = <0>;
+				nvidia,open-drain = <0>;
+			};
+			ddc_scl_pv4 {
+				nvidia,pins = "ddc_scl_pv4",
+						"ddc_sda_pv5";
+				nvidia,function = "i2c4";
+				nvidia,pull = <0>;
+				nvidia,tristate = <0>;
+				nvidia,enable-input = <1>;
+				nvidia,lock = <0>;
+				nvidia,rcv-sel = <1>;
+			};
+			usb_vbus_en0_pn4 {
+				nvidia,pins = "usb_vbus_en0_pn4";
+				nvidia,function = "usb";
+				nvidia,pull = <2>;
+				nvidia,tristate = <0>;
+				nvidia,enable-input = <1>;
+				nvidia,lock = <0>;
+				nvidia,open-drain = <1>;
+			};
+			hdmi_int_pn7 {
+				nvidia,pins = "hdmi_int_pn7";
+				nvidia,function = "rsvd1";
+				nvidia,pull = <1>;
+				nvidia,tristate = <0>;
+				nvidia,enable-input = <1>;
+			};
+		};
+	};
+};
