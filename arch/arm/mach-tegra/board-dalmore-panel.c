@@ -42,7 +42,7 @@
 #include "common.h"
 #include "tegra11_host1x_devices.h"
 
-#define PRIMARY_DISP_HDMI 0
+#define PRIMARY_DISP_HDMI 1
 
 struct platform_device * __init dalmore_host1x_init(void)
 {
