@@ -358,14 +358,27 @@ subsys_initcall_sync(molly_wifi_prepower);
 int __init molly_sdhci_init(void)
 {
 	int nominal_core_mv;
+	int min_vcore_override_mv;
+
 	nominal_core_mv =
 		tegra_dvfs_rail_get_nominal_millivolts(tegra_core_rail);
 	if (nominal_core_mv) {
-		tegra_sdhci_platform_data0.nominal_vcore_uV = nominal_core_mv *
-			1000;
-		tegra_sdhci_platform_data3.nominal_vcore_uV = nominal_core_mv *
-			1000;
+		tegra_sdhci_platform_data0.nominal_vcore_mv = nominal_core_mv;
+		tegra_sdhci_platform_data3.nominal_vcore_mv = nominal_core_mv;
 	}
+	min_vcore_override_mv =
+		tegra_dvfs_rail_get_override_floor(tegra_core_rail);
+	if (min_vcore_override_mv) {
+		tegra_sdhci_platform_data0.min_vcore_override_mv =
+			min_vcore_override_mv;
+		tegra_sdhci_platform_data3.min_vcore_override_mv =
+			min_vcore_override_mv;
+	}
+	if ((tegra_sdhci_platform_data3.uhs_mask & MMC_MASK_HS200)
+		&& (!(tegra_sdhci_platform_data3.uhs_mask &
+		MMC_UHS_MASK_DDR50)))
+		tegra_sdhci_platform_data3.trim_delay = 0;
+
 	/* device0 uses resource0, which is sdmmc1.  used for WiFi
 	 * device2 uses resource2, which is sdmmc3.  for external SD slot
 	 *   on dalmore.  molly needs SDMMC lines for ubik SPI.

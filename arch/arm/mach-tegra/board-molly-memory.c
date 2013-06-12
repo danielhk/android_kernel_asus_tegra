@@ -2200,6 +2200,7 @@ int __init molly_emc_init(void)
 #define T40T_SKU 0x4
 #define T40S_SKU 0x5
 	WARN(tegra_sku_id != T40X_SKU, "expecting T40X");
+	pr_info("tegra_sku_id == 0x%x\n", tegra_sku_id);
 
 	tegra_emc_device.dev.platform_data = &e1611_h5tc4g63afr_rda_T40T_pdata;
 	platform_device_register(&tegra_emc_device);
