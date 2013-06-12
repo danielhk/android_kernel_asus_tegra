@@ -32,6 +32,7 @@
 #include <mach/clk.h>
 #include <mach/tegra_usb_pad_ctrl.h>
 #include <mach/tegra_usb_pmc.h>
+#include <mach/mc.h>
 #include "xhci-tegra.h"
 #include "xhci.h"
 
@@ -231,6 +232,8 @@ struct tegra_xhci_hcd {
 	struct clk *plle_clk;
 	struct clk *pll_u_480M;
 	struct clk *clk_m;
+	/* refPLLE clk */
+	struct clk *pll_re_vco_clk;
 	/*
 	 * XUSB/IPFS specific registers these need to be saved/restored in
 	 * addition to spec defined registers
@@ -530,11 +533,25 @@ static int tegra_xusb_partitions_clk_init(struct tegra_xhci_hcd *tegra)
 	struct platform_device *pdev = tegra->pdev;
 	int err = 0;
 
+	tegra->emc_clk = devm_clk_get(&pdev->dev, "emc");
+	if (IS_ERR(tegra->emc_clk)) {
+		dev_err(&pdev->dev, "Failed to get xusb.emc clock\n");
+		return PTR_ERR(tegra->emc_clk);
+	}
+
+	tegra->pll_re_vco_clk = devm_clk_get(&pdev->dev, "pll_re_vco");
+	if (IS_ERR(tegra->pll_re_vco_clk)) {
+		dev_err(&pdev->dev, "Failed to get refPLLE clock\n");
+		err = PTR_ERR(tegra->pll_re_vco_clk);
+		goto get_emc_clk_failed;
+	}
+
 	/* get the clock handle of 120MHz clock source */
 	tegra->pll_u_480M = devm_clk_get(&pdev->dev, "pll_u_480M");
 	if (IS_ERR(tegra->pll_u_480M)) {
 		dev_err(&pdev->dev, "Failed to get pll_u_480M clk handle\n");
-		return PTR_ERR(tegra->pll_u_480M);
+		err = PTR_ERR(tegra->pll_u_480M);
+		goto get_pll_u_480M_failed;
 	}
 
 	/* get the clock handle of 12MHz clock source */
@@ -569,6 +586,11 @@ static int tegra_xusb_partitions_clk_init(struct tegra_xhci_hcd *tegra)
 		goto get_ss_clk_failed;
 	}
 
+	err = clk_enable(tegra->pll_re_vco_clk);
+	if (err) {
+		dev_err(&pdev->dev, "Failed to enable host partition clk\n");
+		goto enable_pll_re_vco_clk_failed;
+	}
 	/* enable ss clock */
 	err = clk_enable(tegra->host_clk);
 	if (err) {
@@ -582,12 +604,24 @@ static int tegra_xusb_partitions_clk_init(struct tegra_xhci_hcd *tegra)
 		goto eanble_ss_clk_failed;
 	}
 
+	err = clk_enable(tegra->emc_clk);
+	if (err) {
+		dev_err(&pdev->dev, "Failed to enable xusb.emc clk\n");
+		goto eanble_emc_clk_failed;
+	}
+
 	return 0;
+
+eanble_emc_clk_failed:
+	clk_disable(tegra->ss_clk);
 
 eanble_ss_clk_failed:
 	clk_disable(tegra->host_clk);
 
 enable_host_clk_failed:
+	clk_disable(tegra->pll_re_vco_clk);
+
+enable_pll_re_vco_clk_failed:
 	tegra->ss_clk = NULL;
 
 get_ss_clk_failed:
@@ -602,6 +636,12 @@ get_ss_src_clk_failed:
 clk_get_clk_m_failed:
 	tegra->pll_u_480M = NULL;
 
+get_pll_u_480M_failed:
+	tegra->pll_re_vco_clk = NULL;
+
+get_emc_clk_failed:
+	tegra->emc_clk = NULL;
+
 	return err;
 }
 
@@ -609,11 +649,13 @@ static void tegra_xusb_partitions_clk_deinit(struct tegra_xhci_hcd *tegra)
 {
 	clk_disable(tegra->ss_clk);
 	clk_disable(tegra->host_clk);
+	clk_disable(tegra->pll_re_vco_clk);
 	tegra->ss_clk = NULL;
 	tegra->host_clk = NULL;
 	tegra->ss_src_clk = NULL;
 	tegra->clk_m = NULL;
 	tegra->pll_u_480M = NULL;
+	tegra->pll_re_vco_clk = NULL;
 }
 
 static void tegra_xhci_rx_idle_mode_override(struct tegra_xhci_hcd *tegra,
@@ -653,6 +695,10 @@ tegra_xusb_request_clk_rate(struct tegra_xhci_hcd *tegra,
 	int ret = 0;
 	enum MBOX_CMD_TYPE cmd_ack = MBOX_CMD_ACK;
 	int fw_req_rate = rate, cur_rate;
+
+	/* Do not handle clock change as needed for HS disconnect issue */
+	*sw_resp = fw_req_rate | (MBOX_CMD_ACK << MBOX_CMD_SHIFT);
+	return ret;
 
 	/* frequency request from firmware is in KHz.
 	 * Convert it to MHz
@@ -1080,7 +1126,7 @@ tegra_xhci_padctl_portmap_and_caps(struct tegra_xhci_hcd *tegra)
 	writel(reg, tegra->padctl_base + USB2_OTG_PAD1_CTL_1_0);
 
 	reg = readl(tegra->padctl_base + USB2_BIAS_PAD_CTL_0_0);
-	reg &= ~((0x1f << 0) | (0x3 << 12));
+	reg &= ~(0x1f << 0);
 	reg |= xusb_padctl->hs_squelch_level | xusb_padctl->hs_disc_lvl;
 	writel(reg, tegra->padctl_base + USB2_BIAS_PAD_CTL_0_0);
 
@@ -1455,7 +1501,6 @@ static int tegra_xhci_host_elpg_entry(struct tegra_xhci_hcd *tegra)
 {
 	struct xhci_hcd *xhci = tegra->xhci;
 	struct usb_hcd *hcd = xhci_to_hcd(xhci);
-	u32 val;
 	u32 ret;
 	u32 portsc;
 
@@ -1493,10 +1538,7 @@ static int tegra_xhci_host_elpg_entry(struct tegra_xhci_hcd *tegra)
 	else
 		pmc_data.port_speed = USB_PMC_PORT_SPEED_UNKNOWN;
 
-	/* FIXME: rctrl and tctrl currently returning zero */
-	val = readl(tegra->padctl_base + USB2_BIAS_PAD_CTL_1_0);
-	pmc_data.utmip_rctrl_val = RCTRL(val);
-	pmc_data.utmip_tctrl_val = TCTRL(val);
+	/* RCTRL and TCTRL is programmed in pmc_data.utmip_r/tctrl_val */
 	pmc_data.pmc_ops->setup_pmc_wake_detect(&pmc_data);
 
 	tegra_xhci_hs_wake_on_interrupts(tegra, true);
@@ -1525,6 +1567,8 @@ static int tegra_xhci_host_elpg_entry(struct tegra_xhci_hcd *tegra)
 	}
 	tegra->host_pwr_gated = true;
 
+	clk_disable(tegra->pll_re_vco_clk);
+	clk_disable(tegra->emc_clk);
 	/* set port ownership to SNPS */
 	tegra_xhci_release_port_ownership(tegra, true);
 
@@ -1678,6 +1722,69 @@ static void wait_remote_wakeup_ports(struct usb_hcd *hcd)
 			*remote_wakeup_ports);
 }
 
+static void tegra_xhci_war_for_tctrl_rctrl(struct tegra_xhci_hcd *tegra)
+{
+	u32 reg, utmip_rctrl_val, utmip_tctrl_val;
+	struct tegra_xusb_pad_data *xusb_padctl = tegra->xusb_padctl;
+
+	/* Program XUSB as port owner for both Port 0 and port 1 */
+	reg = readl(tegra->padctl_base + USB2_PAD_MUX_0);
+	reg &= ~(0xf << 0);
+	reg |= (1 << 0) | (1 << 2);
+	writel(reg, tegra->padctl_base + USB2_PAD_MUX_0);
+
+	/* XUSB_PADCTL_USB2_BIAS_PAD_CTL_0_0::PD = 0 and
+	 * XUSB_PADCTL_USB2_BIAS_PAD_CTL_0_0::PD_TRK = 0
+	 */
+	reg = readl(tegra->padctl_base + USB2_BIAS_PAD_CTL_0_0);
+	reg &= ~((1 << 12) | (1 << 13));
+	writel(reg, tegra->padctl_base + USB2_BIAS_PAD_CTL_0_0);
+
+	/* wait 20us */
+	usleep_range(20, 30);
+
+	/* Read XUSB_PADCTL:: XUSB_PADCTL_USB2_BIAS_PAD_CTL_1_0
+	 * :: TCTRL and RCTRL
+	 */
+	reg = readl(tegra->padctl_base + USB2_BIAS_PAD_CTL_1_0);
+	utmip_rctrl_val = RCTRL(reg);
+	utmip_tctrl_val = TCTRL(reg);
+
+	/*
+	 * tctrl_val = 0x1f - (16 - ffz(utmip_tctrl_val)
+	 * rctrl_val = 0x1f - (16 - ffz(utmip_rctrl_val)
+	 */
+	pmc_data.utmip_rctrl_val = 0xf + ffz(utmip_rctrl_val);
+	pmc_data.utmip_tctrl_val = 0xf + ffz(utmip_tctrl_val);
+
+	xhci_dbg(tegra->xhci, "rctrl_val = 0x%x, tctrl_val = 0x%x\n",
+		pmc_data.utmip_rctrl_val, pmc_data.utmip_tctrl_val);
+
+	/* XUSB_PADCTL_USB2_BIAS_PAD_CTL_0_0::PD = 1 and
+	 * XUSB_PADCTL_USB2_BIAS_PAD_CTL_0_0::PD_TRK = 1
+	 */
+	reg = readl(tegra->padctl_base + USB2_BIAS_PAD_CTL_0_0);
+	reg |= (1 << 12) | (1 << 13);
+	writel(reg, tegra->padctl_base + USB2_BIAS_PAD_CTL_0_0);
+
+	/* Program these values into PMC regiseter and program the
+	 * PMC override
+	 */
+	reg = PMC_TCTRL_VAL(pmc_data.utmip_tctrl_val) |
+		PMC_RCTRL_VAL(pmc_data.utmip_rctrl_val);
+	writel(reg, tegra->pmc_base + PMC_UTMIP_TERM_PAD_CFG);
+
+	reg = readl(tegra->pmc_base + PMC_SLEEP_CFG);
+	reg |= UTMIP_RCTRL_USE_PMC_P2 | UTMIP_TCTRL_USE_PMC_P2;
+	writel(reg, tegra->pmc_base + PMC_SLEEP_CFG);
+
+	/* Restore correct port ownership in padctl */
+	reg = readl(tegra->padctl_base + USB2_PAD_MUX_0);
+	reg &= ~(0xf << 0);
+	reg |= xusb_padctl->pad_mux;
+	writel(reg, tegra->padctl_base + USB2_PAD_MUX_0);
+}
+
 /* Host ELPG Exit triggered by PADCTL irq */
 /**
  * tegra_xhci_host_partition_elpg_exit - bring XUSBC partition out from elpg
@@ -1698,12 +1805,15 @@ tegra_xhci_host_partition_elpg_exit(struct tegra_xhci_hcd *tegra)
 	if (!tegra->hc_in_elpg)
 		return 0;
 
+	clk_enable(tegra->emc_clk);
+	clk_enable(tegra->pll_re_vco_clk);
 	/* Step 2: Enable clock to host partition */
 	clk_enable(tegra->host_clk);
 
 	if (tegra->lp0_exit) {
 		u32 reg;
 
+		tegra_xhci_war_for_tctrl_rctrl(tegra);
 		/* check if over current seen. Clear if present */
 		reg = readl(tegra->padctl_base + OC_DET_0);
 		xhci_dbg(xhci, "%s: OC_DET_0=0x%x\n", __func__, reg);
@@ -1759,10 +1869,10 @@ tegra_xhci_host_partition_elpg_exit(struct tegra_xhci_hcd *tegra)
 	if (clk_get_rate(tegra->ss_src_clk) == 12000000) {
 		clk_set_rate(tegra->ss_src_clk,  3000 * 1000);
 		clk_set_parent(tegra->ss_src_clk, tegra->pll_u_480M);
-
-		/* clear ovrd bits when SS freq is being increased */
-		tegra_xhci_rx_idle_mode_override(tegra, false);
 	}
+
+	/* clear ovrd bits */
+	tegra_xhci_rx_idle_mode_override(tegra, false);
 
 	/* Load firmware */
 	xhci_dbg(xhci, "%s: elpg_exit: loading firmware from pmc.\n"
@@ -1845,6 +1955,8 @@ tegra_xhci_process_mbox_message(struct work_struct *work)
 	struct tegra_xhci_hcd *tegra = container_of(work, struct tegra_xhci_hcd,
 					mbox_work);
 	struct xhci_hcd *xhci = tegra->xhci;
+	unsigned int freq_khz;
+	bool send_ack_to_fw = true;
 
 	mutex_lock(&tegra->mbox_lock);
 
@@ -1893,17 +2005,14 @@ tegra_xhci_process_mbox_message(struct work_struct *work)
 				__func__);
 		goto send_sw_response;
 	case MBOX_CMD_SET_BW:
-		/* make sure mem bandwidth
-		 * is requested in MB/s
-		 */
-		ret = tegra_xusb_request_clk_rate(
-				tegra,
-				tegra->emc_clk,
-				tegra->cmd_data,
-				&sw_resp);
-		if (ret)
-			xhci_err(xhci, "%s: could not set required mem bw.\n",
-				__func__);
+		/* fw sends BW request in MByte/sec */
+		freq_khz = tegra_emc_bw_to_freq_req(tegra->cmd_data << 10);
+		clk_set_rate(tegra->emc_clk, freq_khz * 1000);
+
+		/* clear mbox owner as ACK will not be sent for this request */
+		writel(0, tegra->fpci_base + XUSB_CFG_ARU_MBOX_OWNER);
+		send_ack_to_fw = false;
+
 		goto send_sw_response;
 	case MBOX_CMD_SAVE_DFE_CTLE_CTX:
 		tegra_xhci_save_dfe_ctle_context(tegra);
@@ -1926,11 +2035,12 @@ tegra_xhci_process_mbox_message(struct work_struct *work)
 	return;
 
 send_sw_response:
-	writel(sw_resp, tegra->fpci_base + XUSB_CFG_ARU_MBOX_DATA_IN);
-
-	cmd = readl(tegra->fpci_base + XUSB_CFG_ARU_MBOX_CMD);
-	cmd |= MBOX_INT_EN | MBOX_FALC_INT_EN;
-	writel(cmd, tegra->fpci_base + XUSB_CFG_ARU_MBOX_CMD);
+	if (send_ack_to_fw) {
+		writel(sw_resp, tegra->fpci_base + XUSB_CFG_ARU_MBOX_DATA_IN);
+		cmd = readl(tegra->fpci_base + XUSB_CFG_ARU_MBOX_CMD);
+		cmd |= MBOX_INT_EN | MBOX_FALC_INT_EN;
+		writel(cmd, tegra->fpci_base + XUSB_CFG_ARU_MBOX_CMD);
+	}
 
 	mutex_unlock(&tegra->mbox_lock);
 }
@@ -2155,6 +2265,13 @@ done:
 	if (xhci->main_hcd == hcd) {
 		utmi_phy_pad_disable();
 		utmi_phy_iddq_override(true);
+	} else if (xhci->shared_hcd == hcd) {
+		/* save leakage power when SS not in use.
+		 * This is also done when fw mbox message is received for freq
+		 * decrease but on T114 we don't change freq due to sw WAR
+		 * used for hs disconnect issue.
+		 */
+		tegra_xhci_rx_idle_mode_override(tegra, true);
 	}
 	mutex_unlock(&tegra->sync_lock);
 	return 0;
@@ -2194,6 +2311,9 @@ static int tegra_xhci_bus_resume(struct usb_hcd *hcd)
 	if (xhci->main_hcd == hcd && tegra->usb2_rh_suspend) {
 		utmi_phy_pad_enable();
 		utmi_phy_iddq_override(false);
+	} else if (xhci->shared_hcd == hcd && tegra->usb3_rh_suspend) {
+		/* clear ovrd bits */
+		tegra_xhci_rx_idle_mode_override(tegra, false);
 	}
 	if (tegra->usb2_rh_suspend && tegra->usb3_rh_suspend) {
 		if (tegra->ss_pwr_gated && tegra->host_pwr_gated)
@@ -2546,6 +2666,10 @@ static int tegra_xhci_probe(struct platform_device *pdev)
 
 	/* reset the pointer back to NULL. driver uses it */
 	/* platform_set_drvdata(pdev, NULL); */
+
+	/* calculate rctrl_val and tctrl_val once at boot time */
+	tegra_xhci_war_for_tctrl_rctrl(tegra);
+	pmc_init();
 
 	/* Program the XUSB pads to take ownership of ports */
 	tegra_xhci_padctl_portmap_and_caps(tegra);

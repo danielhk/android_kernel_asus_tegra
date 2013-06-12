@@ -114,6 +114,8 @@ struct palmas_reg_init {
 	 */
 	u8 vsel;
 
+	/* Configuration flags */
+	unsigned int config_flags;
 };
 
 enum palmas_regulators {
@@ -250,6 +252,9 @@ struct palmas_platform_data {
 	struct palmas_extcon_platform_data *extcon_pdata;
 
 	int watchdog_timer_initial_period;
+
+	/* Long press delay for hard shutdown */
+	int long_press_delay;
 };
 
 /* Define the palmas IRQ numbers */
@@ -303,11 +308,14 @@ struct palmas_pmic {
 
 	int smps123;
 	int smps457;
+	bool smps10_regulator_enabled;
 
 	unsigned int ramp_delay[PALMAS_NUM_REGS];
 	unsigned int current_mode_reg[PALMAS_NUM_REGS];
 
 	int range[PALMAS_REG_SMPS10];
+	unsigned long roof_floor[PALMAS_NUM_REGS];
+	unsigned long config_flags[PALMAS_NUM_REGS];
 };
 
 /* defines so we can store the mux settings */
@@ -1232,6 +1240,13 @@ struct palmas_pmic {
 #define PALMAS_LONG_PRESS_KEY_LPK_TIME_SHIFT			2
 #define PALMAS_LONG_PRESS_KEY_PWRON_DEBOUNCE_MASK		0x03
 #define PALMAS_LONG_PRESS_KEY_PWRON_DEBOUNCE_SHIFT		0
+
+/* Register bit values for various Long_Press_key durations */
+#define PALMAS_LONG_PRESS_KEY_TIME_DEFAULT	-1
+#define PALMAS_LONG_PRESS_KEY_TIME_6SECONDS	0
+#define PALMAS_LONG_PRESS_KEY_TIME_8SECONDS	1
+#define PALMAS_LONG_PRESS_KEY_TIME_10SECONDS	2
+#define PALMAS_LONG_PRESS_KEY_TIME_12SECONDS	3
 
 /* Bit definitions for OSC_THERM_CTRL */
 #define PALMAS_OSC_THERM_CTRL_VANA_ON_IN_SLEEP			0x80
@@ -2733,6 +2748,14 @@ enum {
 	PALMAS_EXT_CONTROL_NSLEEP	= 0x4,
 };
 
+/**
+ * Palmas regulator configs
+ * PALMAS_REGULATOR_CONFIG_SUSPEND_FORCE_OFF: Force off on suspend
+ */
+enum {
+	PALMAS_REGULATOR_CONFIG_SUSPEND_FORCE_OFF = 0x1,
+};
+
 /*
  *PALMAS GPIOs
  */
@@ -2935,4 +2958,6 @@ static inline int palmas_is_es_version_or_less(struct palmas *palmas,
 
 	return false;
 }
+
+extern void palmas_reset(void);
 #endif /*  __LINUX_MFD_PALMAS_H */

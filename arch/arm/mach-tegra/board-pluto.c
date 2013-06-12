@@ -50,7 +50,6 @@
 #include <linux/mfd/max8831.h>
 #include <linux/of_platform.h>
 #include <linux/a2220.h>
-#include <linux/edp.h>
 #include <linux/mfd/tlv320aic3262-registers.h>
 #include <linux/mfd/tlv320aic3xxx-core.h>
 
@@ -700,8 +699,8 @@ static struct tegra_usb_platform_data tegra_udc_pdata = {
 		.idle_wait_delay = 17,
 		.term_range_adj = 6,
 		.xcvr_setup = 8,
-		.xcvr_lsfslew = 2,
-		.xcvr_lsrslew = 2,
+		.xcvr_lsfslew = 0,
+		.xcvr_lsrslew = 3,
 		.xcvr_setup_offset = 0,
 		.xcvr_use_fuses = 1,
 	},
@@ -726,8 +725,8 @@ static struct tegra_usb_platform_data tegra_ehci1_utmi_pdata = {
 		.idle_wait_delay = 17,
 		.term_range_adj = 6,
 		.xcvr_setup = 15,
-		.xcvr_lsfslew = 2,
-		.xcvr_lsrslew = 2,
+		.xcvr_lsfslew = 0,
+		.xcvr_lsrslew = 3,
 		.xcvr_setup_offset = 0,
 		.xcvr_use_fuses = 1,
 		.vbus_oc_map = 0x7,
@@ -1032,13 +1031,6 @@ static void pluto_usb_init(void)
 	int usb_port_owner_info = tegra_get_usb_port_owner_info();
 
 	if (!(usb_port_owner_info & UTMI1_PORT_OWNER_XUSB)) {
-		if ((tegra_get_chipid() == TEGRA_CHIPID_TEGRA11) &&
-			(tegra_revision == TEGRA_REVISION_A02)) {
-			tegra_ehci1_utmi_pdata \
-			.unaligned_dma_buf_supported = true;
-			tegra_udc_pdata \
-			.unaligned_dma_buf_supported = true;
-		}
 		tegra_otg_device.dev.platform_data = &tegra_otg_pdata;
 		platform_device_register(&tegra_otg_device);
 
@@ -1059,19 +1051,11 @@ static void pluto_modem_init(void)
 	switch (modem_id) {
 	case TEGRA_BB_I500: /* on board i500 HSIC */
 		if (!(usb_port_owner_info & HSIC1_PORT_OWNER_XUSB)) {
-			if ((tegra_get_chipid() == TEGRA_CHIPID_TEGRA11) &&
-				(tegra_revision == TEGRA_REVISION_A02))
-					tegra_ehci2_hsic_baseband_pdata \
-					.unaligned_dma_buf_supported = true;
 			platform_device_register(&icera_baseband_device);
 		}
 		break;
 	case TEGRA_BB_I500SWD: /* i500 SWD HSIC */
 		if (!(usb_port_owner_info & HSIC2_PORT_OWNER_XUSB)) {
-			if ((tegra_get_chipid() == TEGRA_CHIPID_TEGRA11) &&
-				(tegra_revision == TEGRA_REVISION_A02))
-					tegra_ehci3_hsic_baseband2_pdata \
-					.unaligned_dma_buf_supported = true;
 			platform_device_register(&icera_baseband2_device);
 		}
 		break;
@@ -1087,10 +1071,6 @@ static void pluto_modem_init(void)
 			tegra_hsic_pdata.ops = &oem1_hsic_pops;
 			tegra_ehci3_device.dev.platform_data
 				= &tegra_hsic_pdata;
-			if ((tegra_get_chipid() == TEGRA_CHIPID_TEGRA11) &&
-				(tegra_revision == TEGRA_REVISION_A02))
-				tegra_hsic_pdata \
-				.unaligned_dma_buf_supported = true;
 			platform_device_register(&tegra_bb_oem1);
 		}
 		break;
@@ -1139,10 +1119,6 @@ static void pluto_modem_init(void)
 		break;
 	case TEGRA_BB_HSIC_HUB: /* HSIC hub */
 		if (!(usb_port_owner_info & HSIC2_PORT_OWNER_XUSB)) {
-			if ((tegra_get_chipid() == TEGRA_CHIPID_TEGRA11) &&
-				(tegra_revision == TEGRA_REVISION_A02))
-					tegra_ehci3_hsic_smsc_hub_pdata \
-					.unaligned_dma_buf_supported = true;
 			tegra_ehci3_device.dev.platform_data =
 				&tegra_ehci3_hsic_smsc_hub_pdata;
 			platform_device_register(&tegra_ehci3_device);
@@ -1158,7 +1134,7 @@ static struct tegra_xusb_pad_data xusb_padctl_data = {
 	.port_cap = (0x1 << 0),
 	.snps_oc_map = (0x1ff << 0),
 	.usb2_oc_map = (0x3c << 0),
-	.ss_port_map = (0x1 << 0),
+	.ss_port_map = (0x0 << 0),
 	.oc_det = (0x3f << 10),
 	.rx_wander = (0xf << 4),
 	.rx_eq = (0x3070 << 8),
@@ -1168,8 +1144,8 @@ static struct tegra_xusb_pad_data xusb_padctl_data = {
 	.ls_rslew = (0x3 << 14),
 	.otg_pad0_ctl0 = (0x0 << 19),
 	.otg_pad1_ctl0 = (0x7 << 19),
-	.otg_pad0_ctl1 = (0x3 << 0),
-	.otg_pad1_ctl1 = (0x4 << 0),
+	.otg_pad0_ctl1 = (0x0 << 0),
+	.otg_pad1_ctl1 = (0x0 << 0),
 	.hs_disc_lvl = (0x5 << 2),
 	.hsic_pad0_ctl0 = (0x00 << 8),
 	.hsic_pad0_ctl1 = (0x00 << 8),
@@ -1310,42 +1286,6 @@ static int __init pluto_touch_init(void)
 	return 0;
 }
 
-#ifdef CONFIG_EDP_FRAMEWORK
-static struct edp_manager battery_edp_manager = {
-	.name = "battery",
-	.max = 20000
-};
-
-static void __init pluto_battery_edp_init(void)
-{
-	struct edp_governor *g;
-	int r;
-
-	r = edp_register_manager(&battery_edp_manager);
-	if (r)
-		goto err_ret;
-
-	/* start with priority governor */
-	g = edp_get_governor("priority");
-	if (!g) {
-		r = -EFAULT;
-		goto err_ret;
-	}
-
-	r = edp_set_governor(&battery_edp_manager, g);
-	if (r)
-		goto err_ret;
-
-	return;
-
-err_ret:
-	pr_err("Battery EDP init failed with error %d\n", r);
-	WARN_ON(1);
-}
-#else
-static inline void pluto_battery_edp_init(void) {}
-#endif
-
 static void __init pluto_dtv_init(void)
 {
 	platform_device_register(&tegra_dtv_device);
@@ -1353,7 +1293,7 @@ static void __init pluto_dtv_init(void)
 
 static void __init tegra_pluto_init(void)
 {
-	pluto_battery_edp_init();
+	pluto_sysedp_init();
 	tegra_clk_init_from_table(pluto_clk_init_table);
 	tegra_clk_verify_parents();
 	tegra_soc_device_init("tegra_pluto");
@@ -1393,6 +1333,8 @@ static void __init tegra_pluto_init(void)
 	tegra_serial_debug_init(TEGRA_UARTD_BASE, INT_WDT_CPU, NULL, -1, -1);
 	pluto_soctherm_init();
 	tegra_register_fuse();
+	pluto_sysedp_core_init();
+	pluto_sysedp_psydepl_init();
 }
 
 static void __init pluto_ramconsole_reserve(unsigned long size)

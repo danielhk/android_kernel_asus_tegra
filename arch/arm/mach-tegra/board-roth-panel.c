@@ -31,9 +31,12 @@
 #include <mach/irqs.h>
 #include <mach/iomap.h>
 #include <mach/dc.h>
+#include <mach/pinmux.h>
+#include <mach/pinmux-t11.h>
 #include <asm/mach-types.h>
 
 #include "board.h"
+#include "board-panel.h"
 #include "devices.h"
 #include "gpio-names.h"
 #include "tegra11_host1x_devices.h"
@@ -65,8 +68,6 @@ struct platform_device * __init roth_host1x_init(void)
 
 /* HDMI Hotplug detection pin */
 #define roth_hdmi_hpd	TEGRA_GPIO_PN7
-
-static atomic_t sd_brightness = ATOMIC_INIT(255);
 
 static bool reg_requested;
 static bool gpio_requested;
@@ -520,6 +521,20 @@ static int roth_hdmi_hotplug_init(struct device *dev)
 	return 0;
 }
 
+static void roth_hdmi_hotplug_report(bool state)
+{
+	if (state) {
+		tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_DDC_SDA,
+						TEGRA_PUPD_PULL_DOWN);
+		tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_DDC_SCL,
+						TEGRA_PUPD_PULL_DOWN);
+	} else {
+		tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_DDC_SDA,
+						TEGRA_PUPD_NORMAL);
+		tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_DDC_SCL,
+						TEGRA_PUPD_NORMAL);
+	}
+}
 
 static struct tegra_dc_out roth_disp2_out = {
 	.type		= TEGRA_DC_OUT_HDMI,
@@ -538,6 +553,7 @@ static struct tegra_dc_out roth_disp2_out = {
 	.disable	= roth_hdmi_disable,
 	.postsuspend	= roth_hdmi_postsuspend,
 	.hotplug_init	= roth_hdmi_hotplug_init,
+	.hotplug_report = roth_hdmi_hotplug_report,
 };
 
 static struct tegra_fb_data roth_disp1_fb_data = {
@@ -622,7 +638,7 @@ static struct nvmap_platform_data roth_nvmap_data = {
 	.nr_carveouts	= ARRAY_SIZE(roth_carveouts),
 };
 
-static struct platform_device roth_nvmap_device __initdata = {
+static struct platform_device roth_nvmap_device = {
 	.name	= "tegra-nvmap",
 	.id	= -1,
 	.dev	= {
@@ -661,7 +677,7 @@ static struct platform_pwm_backlight_data roth_disp1_bl_data = {
 };
 
 static struct platform_device __maybe_unused
-		roth_disp1_bl_device __initdata = {
+		roth_disp1_bl_device = {
 	.name	= "pwm-backlight",
 	.id	= -1,
 	.dev	= {
@@ -763,22 +779,6 @@ int __init roth_panel_init(int board_id)
 			min(tegra_fb_size, tegra_bootloader_fb_size));
 
 	/*
-	 * If the bootloader fb2 is valid, copy it to the fb2, or else
-	 * clear fb2 to avoid garbage on dispaly2.
-	 */
-	if (tegra_bootloader_fb2_size)
-		tegra_move_framebuffer(tegra_fb2_start,
-			tegra_bootloader_fb2_start,
-			min(tegra_fb2_size, tegra_bootloader_fb2_size));
-	else
-		tegra_clear_framebuffer(tegra_fb2_start, tegra_fb2_size);
-
-	res = platform_get_resource_byname(&roth_disp2_device,
-					 IORESOURCE_MEM, "fbmem");
-	res->start = tegra_fb2_start;
-	res->end = tegra_fb2_start + tegra_fb2_size - 1;
-
-	/*
 	 * only roth supports initialized mode.
 	 */
 	if (!board_id)
@@ -791,12 +791,9 @@ int __init roth_panel_init(int board_id)
 		return err;
 	}
 
-	roth_disp2_device.dev.parent = &phost1x->dev;
-	err = platform_device_register(&roth_disp2_device);
-	if (err) {
-		pr_err("disp2 device registration failed\n");
+	err = tegra_init_hdmi(&roth_disp2_device, phost1x);
+	if (err)
 		return err;
-	}
 
 #if IS_EXTERNAL_PWM
 	err = platform_add_devices(roth_bl_device,

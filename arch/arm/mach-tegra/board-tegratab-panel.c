@@ -20,6 +20,7 @@
 #include <linux/ioport.h>
 #include <linux/fb.h>
 #include <linux/nvmap.h>
+#include <linux/of.h>
 #include <linux/nvhost.h>
 #include <linux/init.h>
 #include <linux/delay.h>
@@ -31,6 +32,8 @@
 #include <mach/irqs.h>
 #include <mach/iomap.h>
 #include <mach/dc.h>
+#include <mach/pinmux.h>
+#include <mach/pinmux-t11.h>
 
 #include "board.h"
 #include "devices.h"
@@ -228,6 +231,21 @@ static int tegratab_hdmi_hotplug_init(struct device *dev)
 	return 0;
 }
 
+static void tegratab_hdmi_hotplug_report(bool state)
+{
+	if (state) {
+		tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_DDC_SDA,
+						TEGRA_PUPD_PULL_DOWN);
+		tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_DDC_SCL,
+						TEGRA_PUPD_PULL_DOWN);
+	} else {
+		tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_DDC_SDA,
+						TEGRA_PUPD_NORMAL);
+		tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_DDC_SCL,
+						TEGRA_PUPD_NORMAL);
+	}
+}
+
 static struct tegra_dc_out tegratab_disp2_out = {
 	.type		= TEGRA_DC_OUT_HDMI,
 	.flags		= TEGRA_DC_OUT_HOTPLUG_HIGH,
@@ -245,6 +263,7 @@ static struct tegra_dc_out tegratab_disp2_out = {
 	.disable	= tegratab_hdmi_disable,
 	.postsuspend	= tegratab_hdmi_postsuspend,
 	.hotplug_init	= tegratab_hdmi_hotplug_init,
+	.hotplug_report	= tegratab_hdmi_hotplug_report,
 };
 
 static struct tegra_fb_data tegratab_disp1_fb_data = {
@@ -279,7 +298,7 @@ static struct tegra_fb_data tegratab_disp2_fb_data = {
 };
 
 static struct tegra_dc_platform_data tegratab_disp2_pdata = {
-	.flags		= TEGRA_DC_FLAG_ENABLED,
+	.flags		= 0,
 	.default_out	= &tegratab_disp2_out,
 	.fb		= &tegratab_disp2_fb_data,
 	.emc_clk_rate	= 300000000,
@@ -333,7 +352,7 @@ static struct nvmap_platform_data tegratab_nvmap_data = {
 	.carveouts	= tegratab_carveouts,
 	.nr_carveouts	= ARRAY_SIZE(tegratab_carveouts),
 };
-static struct platform_device tegratab_nvmap_device __initdata = {
+static struct platform_device tegratab_nvmap_device = {
 	.name	= "tegra-nvmap",
 	.id	= -1,
 	.dev	= {
@@ -434,7 +453,9 @@ int __init tegratab_panel_init(void)
 {
 	int err = 0;
 	struct resource __maybe_unused *res;
-	struct platform_device *phost1x;
+	struct platform_device *phost1x = NULL;
+
+	bool is_dt = of_have_populated_dt();
 
 	sd_settings = tegratab_sd_settings;
 
@@ -453,7 +474,11 @@ int __init tegratab_panel_init(void)
 	}
 #endif
 
-	phost1x = tegratab_host1x_init();
+	if (!is_dt)
+		phost1x = tegratab_host1x_init();
+	else
+		phost1x = to_platform_device(bus_find_device_by_name(
+			&platform_bus_type, NULL, "host1x"));
 	if (!phost1x) {
 		pr_err("host1x devices registration failed\n");
 		return -EINVAL;
@@ -471,11 +496,16 @@ int __init tegratab_panel_init(void)
 	__tegra_move_framebuffer(&tegratab_nvmap_device,
 		tegra_fb_start, tegra_bootloader_fb_start,
 			min(tegra_fb_size, tegra_bootloader_fb_size));
-
-	res = platform_get_resource_byname(&tegratab_disp2_device,
-		IORESOURCE_MEM, "fbmem");
-	res->start = tegra_fb2_start;
-	res->end = tegra_fb2_start + tegra_fb2_size - 1;
+	/*
+	 * If the bootloader fb2 is valid, copy it to the fb2, or else
+	 * clear fb2 to avoid garbage on dispaly2.
+	 */
+	if (tegra_bootloader_fb2_size)
+		tegra_move_framebuffer(tegra_fb2_start,
+			tegra_bootloader_fb2_start,
+			min(tegra_fb2_size, tegra_bootloader_fb2_size));
+	else
+		tegra_clear_framebuffer(tegra_fb2_start, tegra_fb2_size);
 
 	tegratab_disp1_device.dev.parent = &phost1x->dev;
 	err = platform_device_register(&tegratab_disp1_device);
@@ -484,12 +514,9 @@ int __init tegratab_panel_init(void)
 		return err;
 	}
 
-	tegratab_disp2_device.dev.parent = &phost1x->dev;
-	err = platform_device_register(&tegratab_disp2_device);
-	if (err) {
-		pr_err("disp2 device registration failed\n");
+	err = tegra_init_hdmi(&tegratab_disp2_device, phost1x);
+	if (err)
 		return err;
-	}
 
 #ifdef CONFIG_TEGRA_NVAVP
 	nvavp_device.dev.parent = &phost1x->dev;

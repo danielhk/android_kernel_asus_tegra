@@ -3,7 +3,7 @@
  *
  * Tegra Graphics 2D
  *
- * Copyright (c) 2012, NVIDIA Corporation.
+ * Copyright (c) 2012-2013, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -21,54 +21,47 @@
 #include <linux/export.h>
 #include <linux/module.h>
 #include <linux/pm_runtime.h>
+#include <linux/of.h>
+#include <linux/of_device.h>
+#include <linux/of_platform.h>
 
 #include "dev.h"
 #include "bus_client.h"
 #include "gr2d_t30.h"
 #include "gr2d_t114.h"
+#include "t20/t20.h"
+#include "t30/t30.h"
+#include "t114/t114.h"
 
-enum gr2d_ip_ver {
-	gr2d_01 = 1,
-	gr2d_02,
-};
-
-struct gr2d_desc {
-	void (*finalize_poweron)(struct platform_device *dev);
-};
-
-static const struct gr2d_desc gr2d[] = {
-	[gr2d_01] = {
-		.finalize_poweron = nvhost_gr2d_t30_finalize_poweron,
-	},
-	[gr2d_02] = {
-		.finalize_poweron = nvhost_gr2d_t114_finalize_poweron,
-	},
-};
-
-static struct platform_device_id gr2d_id[] = {
-	{ "gr2d01", gr2d_01 },
-	{ "gr2d02", gr2d_02 },
+static struct of_device_id tegra_gr2d_of_match[] __devinitdata = {
+	{ .compatible = "nvidia,tegra20-gr2d",
+		.data = (struct nvhost_device_data *)&t20_gr2d_info },
+	{ .compatible = "nvidia,tegra30-gr2d",
+		.data = (struct nvhost_device_data *)&t30_gr2d_info },
+	{ .compatible = "nvidia,tegra114-gr2d",
+		.data = (struct nvhost_device_data *)&t11_gr2d_info },
 	{ },
 };
-
-MODULE_DEVICE_TABLE(nvhost, gr2d_id);
-
 static int __devinit gr2d_probe(struct platform_device *dev)
 {
-	int index = 0;
 	int err = 0;
-	struct nvhost_device_data *pdata =
-		(struct nvhost_device_data *)dev->dev.platform_data;
+	struct nvhost_device_data *pdata = NULL;
 
-	/* HACK: reset device name */
-	dev_set_name(&dev->dev, "%s", "gr2d");
+	if (dev->dev.of_node) {
+		const struct of_device_id *match;
 
-	index = (int)(platform_get_device_id(dev)->driver_data);
-	BUG_ON(index > gr2d_02);
+		match = of_match_device(tegra_gr2d_of_match, &dev->dev);
+		if (match)
+			pdata = (struct nvhost_device_data *)match->data;
+	} else
+		pdata = (struct nvhost_device_data *)dev->dev.platform_data;
 
+	WARN_ON(!pdata);
+	if (!pdata) {
+		dev_info(&dev->dev, "no platform data\n");
+		return -ENODATA;
+	}
 	pdata->pdev = dev;
-	pdata->finalize_poweron = gr2d[index].finalize_poweron;
-
 	platform_set_drvdata(dev, pdata);
 
 	err = nvhost_client_device_init(dev);
@@ -111,8 +104,10 @@ static struct platform_driver gr2d_driver = {
 	.driver = {
 		.owner = THIS_MODULE,
 		.name = "gr2d",
+#ifdef CONFIG_OF
+		.of_match_table = tegra_gr2d_of_match,
+#endif
 	},
-	.id_table = gr2d_id,
 };
 
 static int __init gr2d_init(void)

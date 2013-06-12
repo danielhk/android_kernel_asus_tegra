@@ -55,7 +55,7 @@
 #include <mach/iomap.h>
 #include <mach/irqs.h>
 #include <mach/pinmux.h>
-#include <mach/pinmux-tegra30.h>
+#include <mach/pinmux-t11.h>
 #include <mach/iomap.h>
 #include <mach/io.h>
 #include <mach/io_dpd.h>
@@ -465,8 +465,8 @@ static struct tegra_usb_platform_data tegra_udc_pdata = {
 		.idle_wait_delay = 17,
 		.term_range_adj = 6,
 		.xcvr_setup = 8,
-		.xcvr_lsfslew = 2,
-		.xcvr_lsrslew = 2,
+		.xcvr_lsfslew = 0,
+		.xcvr_lsrslew = 3,
 		.xcvr_setup_offset = 0,
 		.xcvr_use_fuses = 1,
 	},
@@ -490,8 +490,8 @@ static struct tegra_usb_platform_data tegra_ehci1_utmi_pdata = {
 		.idle_wait_delay = 17,
 		.term_range_adj = 6,
 		.xcvr_setup = 15,
-		.xcvr_lsfslew = 2,
-		.xcvr_lsrslew = 2,
+		.xcvr_lsfslew = 0,
+		.xcvr_lsrslew = 3,
 		.xcvr_setup_offset = 0,
 		.xcvr_use_fuses = 1,
 		.vbus_oc_map = 0x4,
@@ -516,8 +516,8 @@ static struct tegra_usb_platform_data tegra_ehci3_utmi_pdata = {
 		.idle_wait_delay = 17,
 		.term_range_adj = 6,
 		.xcvr_setup = 8,
-		.xcvr_lsfslew = 2,
-		.xcvr_lsrslew = 2,
+		.xcvr_lsfslew = 0,
+		.xcvr_lsrslew = 3,
 		.xcvr_setup_offset = 0,
 		.xcvr_use_fuses = 1,
 		.vbus_oc_map = 0x5,
@@ -537,12 +537,6 @@ static void dalmore_usb_init(void)
 	tegra_set_usb_wake_source();
 
 	if (!(usb_port_owner_info & UTMI1_PORT_OWNER_XUSB)) {
-		if (tegra_get_chipid() == TEGRA_CHIPID_TEGRA11 &&
-			tegra_revision == TEGRA_REVISION_A02) {
-			tegra_ehci1_utmi_pdata \
-			.unaligned_dma_buf_supported = true;
-			tegra_udc_pdata.unaligned_dma_buf_supported = true;
-		}
 		tegra_otg_device.dev.platform_data = &tegra_otg_pdata;
 		platform_device_register(&tegra_otg_device);
 		/* Setup the udc platform data */
@@ -550,11 +544,6 @@ static void dalmore_usb_init(void)
 	}
 
 	if (!(usb_port_owner_info & UTMI2_PORT_OWNER_XUSB)) {
-		if (tegra_get_chipid() == TEGRA_CHIPID_TEGRA11 &&
-			tegra_revision == TEGRA_REVISION_A02) {
-			tegra_ehci3_utmi_pdata \
-			.unaligned_dma_buf_supported = true;
-		}
 		tegra_ehci3_device.dev.platform_data = &tegra_ehci3_utmi_pdata;
 		platform_device_register(&tegra_ehci3_device);
 	}
@@ -565,7 +554,7 @@ static struct tegra_xusb_pad_data xusb_padctl_data = {
 	.port_cap = (0x1 << 4),
 	.snps_oc_map = (0x1fc << 0),
 	.usb2_oc_map = (0x2f << 0),
-	.ss_port_map = (0x2 << 0),
+	.ss_port_map = (0x1 << 0),
 	.oc_det = (0x2c << 10),
 	.rx_wander = (0xf << 4),
 	.rx_eq = (0x3070 << 8),
@@ -575,8 +564,8 @@ static struct tegra_xusb_pad_data xusb_padctl_data = {
 	.ls_rslew = (0x3 << 14),
 	.otg_pad0_ctl0 = (0x7 << 19),
 	.otg_pad1_ctl0 = (0x0 << 19),
-	.otg_pad0_ctl1 = (0x4 << 0),
-	.otg_pad1_ctl1 = (0x3 << 0),
+	.otg_pad0_ctl1 = (0x0 << 0),
+	.otg_pad1_ctl1 = (0x0 << 0),
 	.hs_disc_lvl = (0x5 << 2),
 	.hsic_pad0_ctl0 = (0x00 << 8),
 	.hsic_pad0_ctl1 = (0x00 << 8),
@@ -679,10 +668,6 @@ static void dalmore_modem_init(void)
 	switch (modem_id) {
 	case TEGRA_BB_NEMO: /* on board i500 HSIC */
 		if (!(usb_port_owner_info & HSIC1_PORT_OWNER_XUSB)) {
-			if ((tegra_get_chipid() == TEGRA_CHIPID_TEGRA11) &&
-				(tegra_revision == TEGRA_REVISION_A02))
-				tegra_ehci2_hsic_baseband_pdata \
-				.unaligned_dma_buf_supported = true;
 			platform_device_register(&icera_nemo_device);
 		}
 		break;
@@ -813,7 +798,10 @@ static void __init tegra_dalmore_init(void)
 	tegra_get_display_board_info(&board_info);
 	tegra_clk_init_from_table(dalmore_clk_init_table);
 	tegra_clk_verify_parents();
-	tegra_soc_device_init("dalmore");
+	if (machine_is_molly())
+		tegra_soc_device_init("molly");
+	else
+		tegra_soc_device_init("dalmore");
 	tegra_enable_pinmux();
 	dalmore_pinmux_init();
 	dalmore_i2c_init();
@@ -873,15 +861,20 @@ static void __init tegra_dalmore_reserve(void)
 {
 #if defined(CONFIG_NVMAP_CONVERT_CARVEOUT_TO_IOVMM)
 	/* 1920*1200*4*2 = 18432000 bytes */
-	tegra_reserve(0, SZ_16M + SZ_2M, SZ_16M);
+	tegra_reserve(0, SZ_16M + SZ_2M, SZ_16M + SZ_2M);
 #else
-	tegra_reserve(SZ_128M, SZ_16M + SZ_2M, SZ_4M);
+	tegra_reserve(SZ_128M, SZ_16M + SZ_2M, SZ_16M + SZ_2M);
 #endif
 	dalmore_ramconsole_reserve(SZ_1M);
 }
 
 static const char * const dalmore_dt_board_compat[] = {
 	"nvidia,dalmore",
+	NULL
+};
+
+static const char * const molly_dt_board_compat[] = {
+	"nvidia,molly",
 	NULL
 };
 
@@ -897,4 +890,18 @@ MACHINE_START(DALMORE, "dalmore")
 	.init_machine	= tegra_dalmore_dt_init,
 	.restart	= tegra_assert_system_reset,
 	.dt_compat	= dalmore_dt_board_compat,
+MACHINE_END
+
+MACHINE_START(MOLLY, "molly")
+	.atag_offset	= 0x100,
+	.soc		= &tegra_soc_desc,
+	.map_io		= tegra_map_common_io,
+	.reserve	= tegra_dalmore_reserve,
+	.init_early	= tegra11x_init_early,
+	.init_irq	= tegra_init_irq,
+	.handle_irq	= gic_handle_irq,
+	.timer		= &tegra_timer,
+	.init_machine	= tegra_dalmore_dt_init,
+	.restart	= tegra_assert_system_reset,
+	.dt_compat	= molly_dt_board_compat,
 MACHINE_END

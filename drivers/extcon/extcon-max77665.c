@@ -1,7 +1,7 @@
 /*
  * extcon-max77665.c - MAX77665 extcon driver to support MAX77665 MUIC
  *
- * Copyright (C) 2012 nvidia corporation
+ * Copyright (c) 2009-2013, NVIDIA CORPORATION.  All rights reserved.
  * Syed Rafiuddin <srafiuddin@nvidia.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -96,11 +96,11 @@ static int max77660_id_cable_update(struct max77665_muic *muic)
 		return ret;
 	}
 
-	dev_info(muic->dev, "STATUS1 = 0x%02x\n", val);
+	dev_dbg(muic->dev, "STATUS1 = 0x%02x\n", val);
 
 	if (val & 0x1F) {
 		extcon_set_cable_state(&muic->edev, "USB-Host", false);
-		dev_info(muic->dev, "USB-Host is dis-connected\n");
+		dev_info(muic->dev, "USB-Host is disconnected\n");
 	} else {
 		extcon_set_cable_state(&muic->edev, "USB-Host", true);
 		dev_info(muic->dev, "USB-Host is connected\n");
@@ -120,12 +120,12 @@ static irqreturn_t max77665_muic_irq_handler(int irq, void *data)
 		dev_dbg(muic->dev, "MUIC_INT1 read failed %d\n", ret);
 		goto done;
 	}
-	dev_info(muic->dev, "INT1 is 0x%02x\n", status);
+	dev_dbg(muic->dev, "INT1 is 0x%02x\n", status);
 
 	if (status & 0x1)
 		max77660_id_cable_update(muic);
 	else
-		dev_info(muic->dev, "Unknown interrupt %d\n", irq);
+		dev_err(muic->dev, "Unknown interrupt %d\n", irq);
 done:
 	return IRQ_HANDLED;
 }
@@ -202,7 +202,7 @@ static int __devinit max77665_muic_probe(struct platform_device *pdev)
 		goto scrub;
 
 	ret = request_threaded_irq(muic->irq, NULL, max77665_muic_irq_handler,
-			0, dev_name(&pdev->dev), muic);
+			IRQF_ONESHOT | IRQF_EARLY_RESUME, dev_name(&pdev->dev), muic);
 	if (ret) {
 		dev_err(&pdev->dev, "failed: irq request error :%d)\n", ret);
 		goto scrub;
@@ -212,6 +212,7 @@ static int __devinit max77665_muic_probe(struct platform_device *pdev)
 	if (ret < 0)
 		goto scrub;
 
+	device_init_wakeup(&pdev->dev, 1);
 	return ret;
 
 scrub:
@@ -229,16 +230,25 @@ static int __devexit max77665_muic_remove(struct platform_device *pdev)
 }
 
 #ifdef CONFIG_PM_SLEEP
-static int max77665_extcon_suspend(struct device *pdev)
+static int max77665_extcon_suspend(struct device *dev)
 {
+	struct max77665_muic *muic = dev_get_drvdata(dev);
+
+	if (device_may_wakeup(dev))
+		enable_irq_wake(muic->irq);
+
 	return 0;
 }
 
-static int max77665_extcon_resume(struct device *pdev)
+static int max77665_extcon_resume(struct device *dev)
 {
-	struct max77665_muic *muic = dev_get_drvdata(pdev);
+	struct max77665_muic *muic = dev_get_drvdata(dev);
 
-	return max77660_id_cable_update(muic);
+	if (device_may_wakeup(dev))
+		disable_irq_wake(muic->irq);
+
+	max77665_muic_irq_handler(muic->irq, muic);
+	return 0;
 };
 #endif
 

@@ -36,6 +36,8 @@
 #endif
 #endif
 
+#define RESET_PROPAGATION_DELAY	5
+
 #ifndef __ASSEMBLY__
 
 #include <linux/clkdev.h>
@@ -179,6 +181,11 @@ struct clk {
 			unsigned int			clk_num;
 			u32				src_mask;
 			u32				src_shift;
+			struct clk			*pll_low;
+			struct clk			*pll_high;
+			unsigned long			threshold;
+			int				min_div_low;
+			int				min_div_high;
 		} periph;
 		struct {
 			unsigned long			input_min;

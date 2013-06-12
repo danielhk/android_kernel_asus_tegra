@@ -1,7 +1,7 @@
 /*
  * arch/arm/mach-tegra/board-dalmore-panel.c
  *
- * Copyright (c) 2011-2012, NVIDIA Corporation.
+ * Copyright (c) 2011-2013, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -31,6 +31,8 @@
 #include <mach/irqs.h>
 #include <mach/iomap.h>
 #include <mach/dc.h>
+#include <mach/pinmux.h>
+#include <mach/pinmux-t11.h>
 
 #include "board.h"
 #include "devices.h"
@@ -219,6 +221,62 @@ static int dalmore_hdmi_hotplug_init(struct device *dev)
 	return 0;
 }
 
+static void dalmore_hdmi_hotplug_report(bool state)
+{
+	if (state) {
+		tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_DDC_SDA,
+						TEGRA_PUPD_PULL_DOWN);
+		tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_DDC_SCL,
+						TEGRA_PUPD_PULL_DOWN);
+	} else {
+		tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_DDC_SDA,
+						TEGRA_PUPD_NORMAL);
+		tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_DDC_SCL,
+						TEGRA_PUPD_NORMAL);
+	}
+}
+
+/* Electrical characteristics for HDMI, all modes must be declared here */
+struct tmds_config dalmore_tmds_config[] = {
+	{ /* 480p : 27 MHz and below */
+		.pclk = 27000000,
+		.pll0 = 0x01003010,
+		.pll1 = 0x00301b00,
+		.drive_current = 0x23232323,
+		.pe_current = 0x00000000,
+		.peak_current = 0x00000000,
+	},
+	{ /* 720p : 74.25MHz modes */
+		.pclk = 74250000,
+		.pll0 = 0x01003110,
+		.pll1 = 0x00301b00,
+		.drive_current = 0x25252525,
+		.pe_current = 0x00000000,
+		.peak_current = 0x03030303,
+	},
+	{ /* 1080p : 148.5MHz modes */
+		.pclk = 148500000,
+		.pll0 = 0x01003310,
+		.pll1 = 0x00301b00,
+		.drive_current = 0x27272727,
+		.pe_current = 0x00000000,
+		.peak_current = 0x03030303,
+	},
+	{ /* 4K : 297MHz modes */
+		.pclk = INT_MAX,
+		.pll0 = 0x01003f10,
+		.pll1 = 0x00300f00,
+		.drive_current = 0x303f3f3f,
+		.pe_current = 0x00000000,
+		.peak_current = 0x040f0f0f,
+	},
+};
+
+struct tegra_hdmi_out dalmore_hdmi_out = {
+	.tmds_config = dalmore_tmds_config,
+	.n_tmds_config = ARRAY_SIZE(dalmore_tmds_config),
+};
+
 static struct tegra_dc_out dalmore_disp2_out = {
 	.type		= TEGRA_DC_OUT_HDMI,
 	.flags		= TEGRA_DC_OUT_HOTPLUG_HIGH,
@@ -226,6 +284,7 @@ static struct tegra_dc_out dalmore_disp2_out = {
 
 	.dcc_bus	= 3,
 	.hotplug_gpio	= dalmore_hdmi_hpd,
+	.hdmi_out	= &dalmore_hdmi_out,
 
 	.max_pixclock	= KHZ2PICOS(297000),
 
@@ -236,6 +295,7 @@ static struct tegra_dc_out dalmore_disp2_out = {
 	.disable	= dalmore_hdmi_disable,
 	.postsuspend	= dalmore_hdmi_postsuspend,
 	.hotplug_init	= dalmore_hdmi_hotplug_init,
+	.hotplug_report	= dalmore_hdmi_hotplug_report,
 };
 
 static struct tegra_fb_data dalmore_disp1_fb_data = {
@@ -317,7 +377,7 @@ static struct nvmap_platform_data dalmore_nvmap_data = {
 	.carveouts	= dalmore_carveouts,
 	.nr_carveouts	= ARRAY_SIZE(dalmore_carveouts),
 };
-static struct platform_device dalmore_nvmap_device __initdata = {
+static struct platform_device dalmore_nvmap_device = {
 	.name	= "tegra-nvmap",
 	.id	= -1,
 	.dev	= {
@@ -464,22 +524,6 @@ int __init dalmore_panel_init(void)
 		tegra_fb_start, tegra_bootloader_fb_start,
 			min(tegra_fb_size, tegra_bootloader_fb_size));
 
-	/*
-	 * If the bootloader fb2 is valid, copy it to the fb2, or else
-	 * clear fb2 to avoid garbage on dispaly2.
-	 */
-	if (tegra_bootloader_fb2_size)
-		tegra_move_framebuffer(tegra_fb2_start,
-			tegra_bootloader_fb2_start,
-			min(tegra_fb2_size, tegra_bootloader_fb2_size));
-	else
-		tegra_clear_framebuffer(tegra_fb2_start, tegra_fb2_size);
-
-	res = platform_get_resource_byname(&dalmore_disp2_device,
-		IORESOURCE_MEM, "fbmem");
-	res->start = tegra_fb2_start;
-	res->end = tegra_fb2_start + tegra_fb2_size - 1;
-
 	dalmore_disp1_device.dev.parent = &phost1x->dev;
 	err = platform_device_register(&dalmore_disp1_device);
 	if (err) {
@@ -487,12 +531,9 @@ int __init dalmore_panel_init(void)
 		return err;
 	}
 
-	dalmore_disp2_device.dev.parent = &phost1x->dev;
-	err = platform_device_register(&dalmore_disp2_device);
-	if (err) {
-		pr_err("disp2 device registration failed\n");
+	err = tegra_init_hdmi(&dalmore_disp2_device, phost1x);
+	if (err)
 		return err;
-	}
 
 #ifdef CONFIG_TEGRA_NVAVP
 	nvavp_device.dev.parent = &phost1x->dev;

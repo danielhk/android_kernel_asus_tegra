@@ -1,22 +1,20 @@
-/* Copyright (C) 2011-2012 NVIDIA Corporation.
+/* ad5816.c - focuser device driver for AD5816
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
+ * Copyright (c) 2012-2013, NVIDIA Corporation. All Rights Reserved.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms and conditions of the GNU General Public License,
+ * version 2, as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA
- * 02111-1307, USA
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-/* This is a NVC kernel driver for a focuser device called
- * ad5816.
- */
+
 /* Implementation
  * --------------
  * The board level details about the device need to be provided in the board
@@ -101,14 +99,20 @@
 #define AD5816_FNUMBER				(0x40333333) /* 2.8f */
 #define AD5816_SLEW_RATE		1
 #define AD5816_ACTUATOR_RANGE		1023
-#define AD5816_SETTLETIME		30
-#define AD5816_FOCUS_MACRO		620
-#define AD5816_FOCUS_INFINITY		70
+#define AD5816_SETTLETIME		20
+#define AD5816_FOCUS_MACRO		510
+#define AD5816_FOCUS_INFINITY		220
 #define AD5816_POS_LOW_DEFAULT		0
 #define AD5816_POS_HIGH_DEFAULT		1023
 #define AD5816_POS_CLAMP		0x03ff
 /* Need to decide exact value of VCM_THRESHOLD and its use */
 /* define AD5816_VCM_THRESHOLD	20 */
+
+/* Registers values */
+#define SCL_LOW_REG_VAL			0xB6
+#define CONTROL_REG_VAL			0x02
+#define MODE_REG_VAL			0x42
+#define VCM_FREQ_REG_VAL		0x54
 
 static u8 ad5816_ids[] = {
 	0x04,
@@ -131,6 +135,7 @@ struct ad5816_info {
 	struct nvc_focus_cap cap;
 	struct nv_focuser_config nv_config;
 	struct ad5816_pdata_info config;
+	unsigned long ltv_ms;
 };
 
 /**
@@ -246,25 +251,25 @@ void ad5816_set_arc_mode(struct ad5816_info *info)
 	int err;
 
 	/* disable SCL low detection */
-	err = ad5816_i2c_wr8(info, SCL_LOW_DETECTION, 0xB6);
+	err = ad5816_i2c_wr8(info, SCL_LOW_DETECTION, SCL_LOW_REG_VAL);
 	if (err)
 		dev_err(&info->i2c_client->dev, "%s: Low detect write failed\n",
 			__func__);
 
 	/* set ARC enable */
-	err = ad5816_i2c_wr8(info, CONTROL, 0x02);
+	err = ad5816_i2c_wr8(info, CONTROL, CONTROL_REG_VAL);
 	if (err)
 		dev_err(&info->i2c_client->dev,
 		"%s: CONTROL reg write failed\n", __func__);
 
 	/* set the ARC RES2 */
-	err = ad5816_i2c_wr8(info, MODE, 0x42);
+	err = ad5816_i2c_wr8(info, MODE, MODE_REG_VAL);
 	if (err)
 		dev_err(&info->i2c_client->dev,
 		"%s: MODE reg write failed\n", __func__);
 
-	/* set the VCM_FREQ to 12.8mS */
-	err = ad5816_i2c_wr8(info, VCM_FREQ, 0x4B);
+	/* set the VCM_FREQ : Tres = 10.86ms fres = 92Hz */
+	err = ad5816_i2c_wr8(info, VCM_FREQ, VCM_FREQ_REG_VAL);
 	if (err)
 		dev_err(&info->i2c_client->dev,
 		"%s: VCM_FREQ reg write failed\n", __func__);
@@ -451,14 +456,33 @@ static int ad5816_position_rd(struct ad5816_info *info, unsigned *position)
 
 static int ad5816_position_wr(struct ad5816_info *info, s32 position)
 {
-	s16 data;
+	struct timeval tv;
+	unsigned long tvl;
+	unsigned long dly;
+	int err;
 
 	if (position < info->config.pos_low || position > info->config.pos_high)
-		return -EINVAL;
+		err = -EINVAL;
+	else {
+		do_gettimeofday(&tv);
+		tvl = ((unsigned long)tv.tv_sec * USEC_PER_SEC +
+			tv.tv_usec) / USEC_PER_MSEC;
+		if (tvl - info->ltv_ms < info->cap.settle_time) {
+			dly = (tvl - info->ltv_ms) * USEC_PER_MSEC;
+			dev_dbg(&info->i2c_client->dev,
+				"%s not settled(%lu uS).\n", __func__, dly);
+			usleep_range(dly, dly + 20);
+		}
+		err = ad5816_i2c_wr16(info, VCM_CODE_MSB,
+			position & AD5816_POS_CLAMP);
+	}
 
-	data = position & AD5816_POS_CLAMP;
-	return ad5816_i2c_wr16(info, VCM_CODE_MSB, data);
-
+	if (err)
+		dev_err(&info->i2c_client->dev, "%s ERROR: %d\n",
+			__func__, err);
+	else
+		info->ltv_ms = tvl;
+	return err;
 }
 
 static void ad5816_get_focuser_capabilities(struct ad5816_info *info)
@@ -660,8 +684,7 @@ static int ad5816_param_wr(struct ad5816_info *info, unsigned long arg)
 				if (!err) {
 					info->s_mode = u8val;
 					info->s_info->s_mode = u8val;
-				}
-				else {
+				} else {
 					if (info->s_mode != NVC_SYNC_STEREO)
 						ad5816_pm_wr(info->s_info,
 						NVC_PWR_OFF);
@@ -681,8 +704,7 @@ static int ad5816_param_wr(struct ad5816_info *info, unsigned long arg)
 				if (!err) {
 					info->s_mode = u8val;
 					info->s_info->s_mode = u8val;
-				}
-				else {
+				} else {
 					if (info->s_mode != NVC_SYNC_SLAVE)
 						ad5816_pm_wr(info->s_info,
 							NVC_PWR_OFF);
@@ -1055,4 +1077,4 @@ static void __exit ad5816_exit(void)
 
 module_init(ad5816_init);
 module_exit(ad5816_exit);
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("GPL v2");

@@ -200,7 +200,6 @@ static int get_ls_adc_value(uint16_t *als_step, bool resume)
 {
 	uint8_t lsb, msb;
 	int ret = 0;
-	struct cm3217_info *lpi = lp_info;
 
 	if (als_step == NULL)
 		return -EFAULT;
@@ -227,51 +226,17 @@ static int get_ls_adc_value(uint16_t *als_step, bool resume)
 
 	D("[LS][CM3217] %s: raw adc = 0x%X\n", __func__, *als_step);
 
-	if (!lpi->ls_calibrate) {
-		*als_step = (*als_step) * lpi->als_gadc / lpi->als_kadc;
-		if (*als_step > 0xFFFF)
-			*als_step = 0xFFFF;
-	}
-
 	return ret;
 }
 
 static void report_lsensor_input_event(struct cm3217_info *lpi, bool resume)
 {
 	uint16_t adc_value = 0;
-	int level = 0, i, ret = 0;
+	int level = 0, i = 0, ret = 0;
 
 	mutex_lock(&lpi->get_adc_lock);
 
 	ret = get_ls_adc_value(&adc_value, resume);
-
-	if (lpi->ls_calibrate) {
-		for (i = 0; i < 10; i++) {
-			if (adc_value <= (*(lpi->cali_table + i))) {
-				level = i;
-				if (*(lpi->cali_table + i))
-					break;
-			}
-			/* avoid i = 10, because 'cali_table' of size is 10 */
-			if (i == 9) {
-				level = i;
-				break;
-			}
-		}
-	} else {
-		for (i = 0; i < 10; i++) {
-			if (adc_value <= (*(lpi->adc_table + i))) {
-				level = i;
-				if (*(lpi->adc_table + i))
-					break;
-			}
-			/* avoid i = 10, because 'cali_table' of size is 10 */
-			if (i == 9) {
-				level = i;
-				break;
-			}
-		}
-	}
 
 	if ((i == 0) || (adc_value == 0))
 		D("[LS][CM3217] %s: ADC=0x%03X, Level=%d, l_thd equal 0, "
@@ -297,7 +262,7 @@ static void report_lsensor_input_event(struct cm3217_info *lpi, bool resume)
 		level = fLevel;
 	}
 
-	input_report_abs(lpi->ls_input_dev, ABS_MISC, level);
+	input_report_abs(lpi->ls_input_dev, ABS_MISC, adc_value);
 	input_sync(lpi->ls_input_dev);
 
 	mutex_unlock(&lpi->get_adc_lock);
@@ -390,7 +355,7 @@ static int lightsensor_enable(struct cm3217_info *lpi)
 		pr_err("[LS][CM3217 error]%s: set auto light sensor fail\n",
 		       __func__);
 
-	queue_work(lpi->lp_wq, &report_work);
+	queue_work(lpi->lp_wq, &report_work.work);
 	lpi->als_enable = 1;
 
 	mutex_unlock(&lpi->enable_lock);

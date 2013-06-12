@@ -201,11 +201,6 @@ struct max17042_config_data {
 	u16	cell_char_tbl[MAX17042_CHARACTERIZATION_DATA_SIZE];
 } __packed;
 
-struct max17042_rbat_map {
-	unsigned int capacity;
-	unsigned int rbat;
-};
-
 struct max17042_platform_data {
 	struct max17042_reg_data *init_data;
 	struct max17042_config_data *config_data;
@@ -219,16 +214,19 @@ struct max17042_platform_data {
 	 * the datasheet although it can be changed by board designers.
 	 */
 	unsigned int r_sns;
-
-	struct max17042_rbat_map *rbat_map;
-	struct edp_client *edp_client;
+	bool is_battery_present;
 };
 
 #ifdef CONFIG_BATTERY_MAX17042
-extern int maxim_get_temp(void);
+extern int maxim_get_temp(int *deci_celsius);
 extern void max17042_update_status(int status);
 #else
-static inline int maxim_get_temp(void) { return -ENODEV; }
+static inline int maxim_get_temp(int *deci_celsius)
+{
+	/* 0 Kelvin */
+	*deci_celsius = -2732;
+	return -ENODEV;
+}
 static inline void max17042_update_status(int status) {}
 #endif
 #endif /* __MAX17042_BATTERY_H_ */

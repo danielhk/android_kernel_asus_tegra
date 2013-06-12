@@ -254,7 +254,7 @@ static __initdata struct tegra_pingroup_config tegratab_pinmux_common[] = {
 	GPIO_PINMUX(GPIO_PU5, PULL_UP, NORMAL, INPUT, DISABLE),
 	GPIO_PINMUX(GPIO_PU6, NORMAL, NORMAL, INPUT, DISABLE),
 	GPIO_PINMUX(HDMI_INT, PULL_DOWN, NORMAL, INPUT, DEFAULT),
-	GPIO_PINMUX(SPDIF_IN, NORMAL, NORMAL, OUTPUT, DISABLE),
+	GPIO_PINMUX(SPDIF_IN, PULL_UP, NORMAL, OUTPUT, DISABLE),
 };
 
 static __initdata struct tegra_pingroup_config unused_pins_lowpower[] = {
@@ -299,7 +299,7 @@ static struct gpio_init_pin_info init_gpio_mode_tegratab_common[] = {
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PCC2, true, 0),
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PG0, false, 0),
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PG1, false, 0),
-	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PH2, false, 0),
+	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PH2, false, 1),
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PH3, false, 0),
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PH4, true, 0),
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PH5, false, 0),

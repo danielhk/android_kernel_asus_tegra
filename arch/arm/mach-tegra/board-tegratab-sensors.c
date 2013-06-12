@@ -41,8 +41,12 @@
 #include <mach/gpio-tegra.h>
 #include <mach/pinmux-t11.h>
 #include <mach/pinmux.h>
+#ifndef CONFIG_USE_OF
 #include <media/ov5693.h>
 #include <media/ad5823.h>
+#endif
+#include <media/mt9m114.h>
+#include <media/ov7695.h>
 #include <generated/mach-types.h>
 #include <linux/power/sbs-battery.h>
 
@@ -130,18 +134,21 @@ static struct i2c_board_info tegratab_i2c4_nct1008_board_info[] = {
 		.ioreset	= TEGRA_PIN_IO_RESET_##_ioreset	\
 }
 
+#ifndef CONFIG_USE_OF
 static struct tegra_pingroup_config mclk_disable =
 	VI_PINMUX(CAM_MCLK, VI, NORMAL, NORMAL, OUTPUT, DEFAULT, DEFAULT);
 
 static struct tegra_pingroup_config mclk_enable =
 	VI_PINMUX(CAM_MCLK, VI_ALT3, NORMAL, NORMAL, OUTPUT, DEFAULT, DEFAULT);
+#endif
 
 static struct tegra_pingroup_config pbb0_disable =
 	VI_PINMUX(GPIO_PBB0, VI, NORMAL, NORMAL, OUTPUT, DEFAULT, DEFAULT);
-/*
+
 static struct tegra_pingroup_config pbb0_enable =
 	VI_PINMUX(GPIO_PBB0, VI_ALT3, NORMAL, NORMAL, OUTPUT, DEFAULT, DEFAULT);
-*/
+
+#ifndef CONFIG_USE_OF
 /*
  * As a workaround, tegratab_vcmvdd need to be allocated to activate the
  * sensor devices. This is due to the focuser device(AD5823) will hook up
@@ -262,8 +269,130 @@ static struct ad5823_platform_data tegratab_ad5823_pdata = {
 	.power_on	= tegratab_ad5823_power_on,
 	.power_off	= tegratab_ad5823_power_off,
 };
+#endif
+
+static int tegratab_mt9m114_power_on(struct mt9m114_power_rail *pw)
+{
+	int err;
+
+	if (unlikely(!pw || !pw->avdd || !pw->iovdd))
+		return -EFAULT;
+
+	gpio_set_value(CAM_RSTN, 0);
+	usleep_range(1000, 1020);
+
+	err = regulator_enable(pw->iovdd);
+	if (unlikely(err))
+		goto mt9m114_iovdd_fail;
+	usleep_range(300, 320);
+
+	err = regulator_enable(pw->avdd);
+	if (unlikely(err))
+		goto mt9m114_avdd_fail;
+
+	usleep_range(1000, 1020);
+	gpio_set_value(CAM_RSTN, 1);
+
+	usleep_range(1000, 1020);
+	tegra_pinmux_config_table(&pbb0_enable, 1);
+	usleep_range(200, 220);
+
+	/* return 1 to skip the in-driver power_on swquence */
+	return 1;
+
+mt9m114_avdd_fail:
+	regulator_disable(pw->iovdd);
+
+mt9m114_iovdd_fail:
+	gpio_set_value(CAM_RSTN, 0);
+	return -ENODEV;
+}
+
+static int tegratab_mt9m114_power_off(struct mt9m114_power_rail *pw)
+{
+	if (unlikely(!pw || !pw->avdd || !pw->iovdd))
+		return -EFAULT;
+
+	usleep_range(100, 120);
+	tegra_pinmux_config_table(&pbb0_disable, 1);
+	usleep_range(100, 120);
+	gpio_set_value(CAM_RSTN, 0);
+	usleep_range(100, 120);
+	regulator_disable(pw->avdd);
+	usleep_range(100, 120);
+	regulator_disable(pw->iovdd);
+
+	return 1;
+}
+
+struct mt9m114_platform_data tegratab_mt9m114_pdata = {
+	.power_on = tegratab_mt9m114_power_on,
+	.power_off = tegratab_mt9m114_power_off,
+};
+
+static int tegratab_ov7695_power_on(struct ov7695_power_rail *pw)
+{
+	int err;
+
+	if (unlikely(!pw || !pw->avdd || !pw->iovdd))
+		return -EFAULT;
+
+	gpio_set_value(CAM2_POWER_DWN_GPIO, 0);
+	usleep_range(1000, 1020);
+
+	err = regulator_enable(pw->iovdd);
+	if (unlikely(err))
+		goto ov7695_iovdd_fail;
+	usleep_range(300, 320);
+
+	err = regulator_enable(pw->avdd);
+	if (unlikely(err))
+		goto ov7695_avdd_fail;
+	usleep_range(1000, 1020);
+
+	gpio_set_value(CAM2_POWER_DWN_GPIO, 1);
+	usleep_range(1000, 1020);
+
+	tegra_pinmux_config_table(&pbb0_enable, 1);
+	usleep_range(200, 220);
+
+	return 0;
+
+ov7695_avdd_fail:
+	regulator_disable(pw->iovdd);
+
+ov7695_iovdd_fail:
+	gpio_set_value(CAM_RSTN, 0);
+	return -ENODEV;
+}
+
+static int tegratab_ov7695_power_off(struct ov7695_power_rail *pw)
+{
+	if (unlikely(!pw || !pw->avdd || !pw->iovdd))
+		return -EFAULT;
+	usleep_range(100, 120);
+
+	tegra_pinmux_config_table(&pbb0_disable, 1);
+	usleep_range(100, 120);
+
+	gpio_set_value(CAM2_POWER_DWN_GPIO, 0);
+	usleep_range(100, 120);
+
+	regulator_disable(pw->avdd);
+	usleep_range(100, 120);
+
+	regulator_disable(pw->iovdd);
+
+	return 0;
+}
+
+struct ov7695_platform_data tegratab_ov7695_pdata = {
+	.power_on = tegratab_ov7695_power_on,
+	.power_off = tegratab_ov7695_power_off,
+};
 
 static struct i2c_board_info tegratab_i2c_board_info_e1599[] = {
+#ifndef CONFIG_USE_OF
 	{
 		I2C_BOARD_INFO("ov5693", 0x10),
 		.platform_data = &tegratab_ov5693_pdata,
@@ -272,11 +401,22 @@ static struct i2c_board_info tegratab_i2c_board_info_e1599[] = {
 		I2C_BOARD_INFO("ad5823", 0x0c),
 		.platform_data = &tegratab_ad5823_pdata,
 	},
+#endif
+	{
+		I2C_BOARD_INFO("mt9m114", 0x48),
+		.platform_data = &tegratab_mt9m114_pdata,
+	},
+	{
+		I2C_BOARD_INFO("ov7695", 0x21),
+		.platform_data = &tegratab_ov7695_pdata,
+	},
 };
 
 static int tegratab_camera_init(void)
 {
+#ifndef CONFIG_USE_OF
 	tegra_pinmux_config_table(&mclk_disable, 1);
+#endif
 	tegra_pinmux_config_table(&pbb0_disable, 1);
 
 	i2c_register_board_info(2, tegratab_i2c_board_info_e1599,
@@ -285,6 +425,15 @@ static int tegratab_camera_init(void)
 }
 
 /* MPU board file definition	*/
+static struct mpu_platform_data mpu6050_gyro_data_e1569 = {
+	.int_config	= 0x10,
+	.level_shifter	= 0,
+	/* Located in board_[platformname].h */
+	.orientation	= MPU_GYRO_ORIENTATION_E1569,
+	.key		= {0x4E, 0xCC, 0x7E, 0xEB, 0xF6, 0x1E, 0x35, 0x22,
+			   0x00, 0x34, 0x0D, 0x65, 0x32, 0xE9, 0x94, 0x89},
+};
+
 static struct mpu_platform_data mpu6050_gyro_data = {
 	.int_config	= 0x10,
 	.level_shifter	= 0,
@@ -314,6 +463,7 @@ static void mpuirq_init(void)
 	unsigned gyro_irq_gpio = MPU_GYRO_IRQ_GPIO;
 	unsigned gyro_bus_num = MPU_GYRO_BUS_NUM;
 	char *gyro_name = MPU_GYRO_NAME;
+	struct board_info board_info;
 
 	pr_info("*** MPU START *** mpuirq_init...\n");
 
@@ -333,6 +483,11 @@ static void mpuirq_init(void)
 	pr_info("*** MPU END *** mpuirq_init...\n");
 
 	inv_mpu6050_i2c2_board_info[0].irq = gpio_to_irq(MPU_GYRO_IRQ_GPIO);
+
+	tegra_get_board_info(&board_info);
+	if (board_info.board_id == BOARD_E1569)
+		inv_mpu6050_i2c2_board_info[0].platform_data =
+			&mpu6050_gyro_data_e1569;
 	i2c_register_board_info(gyro_bus_num, inv_mpu6050_i2c2_board_info,
 		ARRAY_SIZE(inv_mpu6050_i2c2_board_info));
 }
@@ -382,7 +537,7 @@ static struct thermal_trip_info skin_trips[] = {
 
 static struct therm_est_subdevice skin_devs[] = {
 	{
-		.dev_data = "nct_ext",
+		.dev_data = "Tdiode",
 		.coeffs = {
 			2, 1, 1, 1,
 			1, 1, 1, 1,
@@ -392,7 +547,7 @@ static struct therm_est_subdevice skin_devs[] = {
 		},
 	},
 	{
-		.dev_data = "nct_int",
+		.dev_data = "Tboard",
 		.coeffs = {
 			-11, -7, -5, -3,
 			-3, -2, -1, 0,
@@ -522,8 +677,8 @@ int __init tegratab_sensors_init(void)
 
 	tegra_get_board_info(&board_info);
 
-	/* E1545+E1604 has no temp sensor. */
-	if (board_info.board_id != BOARD_E1545) {
+	/* E1569 only has temp sensor. */
+	if (board_info.board_id == BOARD_E1569) {
 		err = tegratab_nct1008_init();
 		if (err) {
 			pr_err("%s: nct1008 register failed.\n", __func__);
