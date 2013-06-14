@@ -62,7 +62,9 @@
 #include <mach/tegra_fiq_debugger.h>
 #include <linux/aah_io.h>
 #include <linux/athome_radio.h>
+#include <linux/nct1008.h>
 #include <mach/hardware.h>
+#include <mach/thermal.h>
 
 #include "board.h"
 #include "board-common.h"
@@ -74,6 +76,8 @@
 #include "pm.h"
 #include "pm-irq.h"
 #include "common.h"
+
+#define MOLLY_ON_DALMORE 1
 
 #if defined(CONFIG_BT_BLUESLEEP) || defined(CONFIG_BT_BLUESLEEP_MODULE)
 static struct rfkill_gpio_platform_data molly_bt_rfkill_pdata = {
@@ -261,7 +265,7 @@ static struct tegra_i2c_platform_data molly_i2c5_platform_data = {
  *                                                                            *
  ******************************************************************************/
 static struct aah_io_platform_data aah_io_data = {
-#if 0
+#if MOLLY_ON_DALMORE == 0
 	.key_gpio          = TEGRA_GPIO_PQ5, /* molly's UI_SWITCH, KB_COL5/GPIO_PQ5 */
 #else
 	.key_gpio          = TEGRA_GPIO_PR2, /* dalmore's volume+ button for now */
@@ -269,14 +273,184 @@ static struct aah_io_platform_data aah_io_data = {
 	.key_code          = KEY_MUTE,/* TBD, easiest to test as mute for now */
 };
 
-static struct i2c_board_info __initdata i2c_bus2[] = {
+static struct i2c_board_info __initdata aah_io_i2c_board_info[] = {
 	{
 		I2C_BOARD_INFO("aah-io", 0x32),
 		.platform_data = &aah_io_data,
 	},
 };
 
-static void molly_i2c_init(void)
+/******************************************************************************
+ *                                                                            *
+ *           temp sensor                                                      *
+ *                                                                            *
+ ******************************************************************************/
+
+static struct throttle_table tj_throttle_table[] = {
+	/* CPU_THROT_LOW cannot be used by other than CPU */
+	/*      CPU,  C2BUS,  C3BUS,   SCLK,    EMC   */
+	{ { 1810500, NO_CAP, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1785000, NO_CAP, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1759500, NO_CAP, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1734000, NO_CAP, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1708500, NO_CAP, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1683000, NO_CAP, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1657500, NO_CAP, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1632000, NO_CAP, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1606500, NO_CAP, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1581000, NO_CAP, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1555500, NO_CAP, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1530000, NO_CAP, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1504500, NO_CAP, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1479000, NO_CAP, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1453500, NO_CAP, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1428000, NO_CAP, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1402500, NO_CAP, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1377000, NO_CAP, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1351500, NO_CAP, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1326000, NO_CAP, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1300500, NO_CAP, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1275000, NO_CAP, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1249500, NO_CAP, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1224000, NO_CAP, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1198500, NO_CAP, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1173000, 636000, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1147500, 636000, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1122000, 636000, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1096500, 636000, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1071000, 636000, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1045500, 636000, NO_CAP, NO_CAP, NO_CAP } },
+	{ { 1020000, 636000, NO_CAP, NO_CAP, NO_CAP } },
+	{ {  994500, 636000, NO_CAP, NO_CAP, NO_CAP } },
+	{ {  969000, 600000, NO_CAP, NO_CAP, NO_CAP } },
+	{ {  943500, 600000, NO_CAP, NO_CAP, NO_CAP } },
+	{ {  918000, 600000, NO_CAP, NO_CAP, NO_CAP } },
+	{ {  892500, 600000, NO_CAP, NO_CAP, NO_CAP } },
+	{ {  867000, 600000, NO_CAP, NO_CAP, NO_CAP } },
+	{ {  841500, 564000, NO_CAP, NO_CAP, NO_CAP } },
+	{ {  816000, 564000, NO_CAP, NO_CAP, 792000 } },
+	{ {  790500, 564000, NO_CAP, 372000, 792000 } },
+	{ {  765000, 564000, 468000, 372000, 792000 } },
+	{ {  739500, 528000, 468000, 372000, 792000 } },
+	{ {  714000, 528000, 468000, 336000, 792000 } },
+	{ {  688500, 528000, 420000, 336000, 792000 } },
+	{ {  663000, 492000, 420000, 336000, 792000 } },
+	{ {  637500, 492000, 420000, 336000, 408000 } },
+	{ {  612000, 492000, 420000, 300000, 408000 } },
+	{ {  586500, 492000, 360000, 336000, 408000 } },
+	{ {  561000, 420000, 420000, 300000, 408000 } },
+	{ {  535500, 420000, 360000, 228000, 408000 } },
+	{ {  510000, 420000, 288000, 228000, 408000 } },
+	{ {  484500, 324000, 288000, 228000, 408000 } },
+	{ {  459000, 324000, 288000, 228000, 408000 } },
+	{ {  433500, 324000, 288000, 228000, 408000 } },
+	{ {  408000, 324000, 288000, 228000, 408000 } },
+};
+
+static struct balanced_throttle tj_throttle = {
+	.throt_tab_size = ARRAY_SIZE(tj_throttle_table),
+	.throt_tab = tj_throttle_table,
+};
+
+static int __init molly_throttle_init(void)
+{
+	pr_info("%s:\n", __func__);
+	balanced_throttle_register(&tj_throttle, "tegra-balanced");
+	return 0;
+}
+module_init(molly_throttle_init);
+
+static struct nct1008_platform_data nct1008_pdata = {
+	.supported_hwrev = true,
+	.ext_range = true,
+	.conv_rate = 0x06, /* 4Hz conversion rate */
+	.shutdown_ext_limit = 105, /* C */
+	.shutdown_local_limit = 120, /* C */
+
+	.num_trips = 1,
+	.trips = {
+		{
+			.cdev_type = "suspend_soctherm",
+			.trip_temp = 50000,
+			.trip_type = THERMAL_TRIP_ACTIVE,
+			.upper = 1,
+			.lower = 1,
+			.hysteresis = 5000,
+		},
+	},
+};
+
+/* Our real part is TI tmp451, which is a derivative
+ * and software compatible with nct1008
+ */
+static struct i2c_board_info __initdata nct1008_i2c_board_info[] = {
+	{
+		I2C_BOARD_INFO("nct1008", 0x4C),
+		.platform_data = &nct1008_pdata,
+		.irq  = -1,
+	},
+};
+
+#if MOLLY_ON_DALMORE == 1
+#include "tegra-board-id.h"
+#else
+#define TEMP_ALERT_GPIO TEGRA_GPIO_PJ0
+#endif
+
+static void __init temp_sensor_init(void)
+{
+	int nct1008_port;
+	int ret = 0;
+
+#if MOLLY_ON_DALMORE == 1
+	struct board_info board_info;
+
+	tegra_get_board_info(&board_info);
+
+	if (board_info.board_id == BOARD_E1611) {
+		if (board_info.fab == 0x04)
+			nct1008_port = TEGRA_GPIO_PO4;
+		else
+			nct1008_port = TEGRA_GPIO_PX6;
+	} else {
+		nct1008_port = TEGRA_GPIO_PX6;
+		pr_err("Warning: nct alert_port assumed TEGRA_GPIO_PX6"
+			" for unknown dalmore board id E%d\n",
+			board_info.board_id);
+	}
+#else
+	nct1008_port = TEGRA_GPIO_PJ0;
+#endif
+
+	tegra_add_cdev_trips(nct1008_pdata.trips, &nct1008_pdata.num_trips);
+
+	nct1008_i2c_board_info[0].irq = gpio_to_irq(nct1008_port);
+	pr_info("%s: nct1008 irq %d", __func__, nct1008_i2c_board_info[0].irq);
+
+	ret = gpio_request(nct1008_port, "temp_alert");
+	if (ret < 0) {
+		pr_err("%s: gpio_request() for nct1008_port %d failed\n",
+		       __func__, nct1008_port);
+		return;
+	}
+
+	ret = gpio_direction_input(nct1008_port);
+	if (ret < 0) {
+		pr_info("%s: calling gpio_free(nct1008_port)", __func__);
+		gpio_free(nct1008_port);
+		return;
+	}
+
+#if MOLLY_ON_DALMORE == 1
+	/* dalmore has thermal sensor on GEN1-I2C, i.e. instance 0 */
+	i2c_register_board_info(0, nct1008_i2c_board_info, ARRAY_SIZE(nct1008_i2c_board_info));
+#else
+	/* molly thermal sensor on I2C3/CAM_I2C, i.e. instance 2 */
+	i2c_register_board_info(2, i2c_bus2, ARRAY_SIZE(i2c_bus2));
+#endif
+}
+
+static void __init molly_i2c_init(void)
 {
 	/* Tegra4 has five i2c controllers:
 	 * I2C_1 is called GEN1_I2C in pinmux/schematics
@@ -287,7 +461,9 @@ static void molly_i2c_init(void)
 	 *
 	 * I2C1/GEN1 is for INA3221 current and bus voltage monitor
 	 * I2C2/GEN2 is for LED
-	 * I2C3/CAM is for TMP451
+	 * I2C3/CAM is for TMP451 (nct1008 temp sensor for
+	 *  dalmore is on I2C1)
+	 * I2C4 is for HDMI/DDC
 	 * I2C5/PWR is for PMIC TPS65913B2B5
 	 */
 
@@ -303,7 +479,10 @@ static void molly_i2c_init(void)
 	platform_device_register(&tegra11_i2c_device2);
 	platform_device_register(&tegra11_i2c_device1);
 
-	i2c_register_board_info(2, i2c_bus2, ARRAY_SIZE(i2c_bus2));
+	i2c_register_board_info(1, aah_io_i2c_board_info,
+				ARRAY_SIZE(aah_io_i2c_board_info));
+
+	temp_sensor_init();
 }
 
 static struct platform_device *molly_uart_devices[] __initdata = {
@@ -475,7 +654,7 @@ static struct tegra_usb_otg_data tegra_otg_pdata = {
 	.ehci_pdata = &tegra_ehci1_utmi_pdata,
 };
 
-static void molly_usb_init(void)
+static void __init molly_usb_init(void)
 {
 	/* Set USB wake sources for molly */
 	tegra_set_usb_wake_source();
@@ -507,7 +686,7 @@ static struct tegra_xusb_pad_data xusb_padctl_data = {
 	.hsic_pad0_ctl1 = (0x00 << 8),
 };
 
-static void molly_xusb_init(void)
+static void __init molly_xusb_init(void)
 {
 	u32 usb_calib0 = tegra_fuse_readl(FUSE_SKU_USB_CALIB_0);
 

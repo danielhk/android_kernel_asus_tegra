@@ -330,7 +330,13 @@ static struct regulator_consumer_supply palmas_ldo4_config2_supply[] = {
 };
 
 static struct regulator_consumer_supply palmas_ldo6_supply[] = {
-	REGULATOR_SUPPLY("vdd", "0-004c"),
+#if MOLLY_ON_DALMORE == 1
+	/* needed for temp sensor nct1008.
+	 * In molly, this is the always on 1v8 smps8 rail so
+	 * we won't bother registering a regulator for it.
+	 */
+	REGULATOR_SUPPLY("vdd", "0-004c"), /* NCT1008, i2c slave 0x4c */
+#endif
 	REGULATOR_SUPPLY("vdd", "0-0069"),
 	REGULATOR_SUPPLY("vdd", "0-000d"),
 	REGULATOR_SUPPLY("vdd", "0-0078"),
