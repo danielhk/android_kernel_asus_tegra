@@ -55,11 +55,13 @@
 #include "tegra11_soctherm.h"
 #include "tegra3_tsensor.h"
 
+#define MOLLY_ON_DALMORE 1
+
 #define PMC_CTRL		0x0
 #define PMC_CTRL_INTR_LOW	(1 << 17)
-#define TPS65090_CHARGER_INT	TEGRA_GPIO_PJ0
 
-#define MOLLY_ON_DALMORE 1
+#if MOLLY_ON_DALMORE == 1
+#define TPS65090_CHARGER_INT	TEGRA_GPIO_PJ0
 
 /*TPS65090 consumer rails */
 static struct regulator_consumer_supply tps65090_dcdc1_supply[] = {
@@ -271,23 +273,6 @@ static struct regulator_consumer_supply palmas_smps8_supply[] = {
 	REGULATOR_SUPPLY("avdd_csi_dsi_pll", "tegradc.0"),
 	REGULATOR_SUPPLY("avdd_csi_dsi_pll", "tegradc.1"),
 	REGULATOR_SUPPLY("avdd_csi_dsi_pll", "vi"),
-	REGULATOR_SUPPLY("avdd_hdmi_pll", "tegradc.1"),
-	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-ehci.2"),
-	REGULATOR_SUPPLY("avddio_usb", "tegra-ehci.2"),
-	REGULATOR_SUPPLY("avddio_usb", "tegra-xhci"),
-	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-xhci"),
-};
-
-static struct regulator_consumer_supply palmas_smps8_config2_supply[] = {
-	REGULATOR_SUPPLY("avdd_plla_p_c", NULL),
-	REGULATOR_SUPPLY("avdd_pllm", NULL),
-	REGULATOR_SUPPLY("avdd_pllu", NULL),
-	REGULATOR_SUPPLY("avdd_pllx", NULL),
-	REGULATOR_SUPPLY("vdd_ddr_hs", NULL),
-	REGULATOR_SUPPLY("avdd_plle", NULL),
-	REGULATOR_SUPPLY("avdd_csi_dsi_pll", "tegradc.0"),
-	REGULATOR_SUPPLY("avdd_csi_dsi_pll", "tegradc.1"),
-	REGULATOR_SUPPLY("avdd_csi_dsi_pll", "vi"),
 };
 
 static struct regulator_consumer_supply palmas_smps9_supply[] = {
@@ -295,20 +280,11 @@ static struct regulator_consumer_supply palmas_smps9_supply[] = {
 };
 
 static struct regulator_consumer_supply palmas_ldo1_supply[] = {
-	REGULATOR_SUPPLY("vana", "2-0036"),
-};
-
-static struct regulator_consumer_supply palmas_ldo1_config2_supply[] = {
 	REGULATOR_SUPPLY("avddio_usb", "tegra-ehci.2"),
 	REGULATOR_SUPPLY("avddio_usb", "tegra-xhci"),
 };
 
 static struct regulator_consumer_supply palmas_ldo2_supply[] = {
-	REGULATOR_SUPPLY("avdd", "2-0010"),
-};
-
-/* FIXME!! Put the device address of camera */
-static struct regulator_consumer_supply palmas_ldo2_config2_supply[] = {
 	REGULATOR_SUPPLY("vana", "2-0036"),
 	REGULATOR_SUPPLY("avdd", "2-0010"),
 };
@@ -321,22 +297,16 @@ static struct regulator_consumer_supply palmas_ldo3_supply[] = {
 
 static struct regulator_consumer_supply palmas_ldo4_supply[] = {
 	REGULATOR_SUPPLY("vpp_fuse", NULL),
-};
-
-static struct regulator_consumer_supply palmas_ldo4_config2_supply[] = {
-	REGULATOR_SUPPLY("vpp_fuse", NULL),
 	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-ehci.2"),
 	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-xhci"),
 };
 
 static struct regulator_consumer_supply palmas_ldo6_supply[] = {
-#if MOLLY_ON_DALMORE == 1
 	/* needed for temp sensor nct1008.
 	 * In molly, this is the always on 1v8 smps8 rail so
 	 * we won't bother registering a regulator for it.
 	 */
 	REGULATOR_SUPPLY("vdd", "0-004c"), /* NCT1008, i2c slave 0x4c */
-#endif
 	REGULATOR_SUPPLY("vdd", "0-0069"),
 	REGULATOR_SUPPLY("vdd", "0-000d"),
 	REGULATOR_SUPPLY("vdd", "0-0078"),
@@ -368,7 +338,6 @@ static struct regulator_consumer_supply palmas_ldousb_supply[] = {
 	REGULATOR_SUPPLY("avdd_hdmi", "tegradc.1"),
 };
 
-#if MOLLY_ON_DALMORE == 1
 #include "tegra-board-id.h"
 static struct regulator_consumer_supply palmas_ldoln_fab05_supply[] = {
 	REGULATOR_SUPPLY("avdd_hdmi", "tegradc.1"),
@@ -382,7 +351,6 @@ static struct regulator_consumer_supply palmas_ldousb_fab05_supply[] = {
 	REGULATOR_SUPPLY("avdd_usb", "tegra-ehci.1"),
 	REGULATOR_SUPPLY("avdd_usb", "tegra-ehci.2"),
 };
-#endif
 
 PALMAS_REGS_PDATA(smps12, 1350,  1350, tps65090_rails(DCDC3), 0, 0, 0, NORMAL,
 	0, 0, 0, 0, 0);
@@ -394,23 +362,15 @@ PALMAS_REGS_PDATA(smps457, 900,  1400, tps65090_rails(DCDC2), 1, 1, 0, NORMAL,
 	0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
 PALMAS_REGS_PDATA(smps8, 1050,  1050, tps65090_rails(DCDC2), 0, 1, 1, NORMAL,
 	0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-PALMAS_REGS_PDATA(smps8_config2, 1050,  1050, tps65090_rails(DCDC2), 0, 1, 1,
-	NORMAL, 0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
 PALMAS_REGS_PDATA(smps9, 2800,  2800, tps65090_rails(DCDC2), 1, 0, 0, NORMAL,
 	0, 0, 0, 0, 0);
-PALMAS_REGS_PDATA(ldo1, 2800,  2800, tps65090_rails(DCDC2), 0, 0, 1, 0,
-	0, 0, 0, 0, 0);
-PALMAS_REGS_PDATA(ldo1_config2, 1200,  1200, tps65090_rails(DCDC2), 0, 0, 1, 0,
+PALMAS_REGS_PDATA(ldo1, 1200,  1200, tps65090_rails(DCDC2), 0, 0, 1, 0,
 	1, 0, 0, 0, 0);
 PALMAS_REGS_PDATA(ldo2, 2800,  2800, tps65090_rails(DCDC2), 0, 0, 1, 0,
 	0, 0, 0, 0, 0);
-PALMAS_REGS_PDATA(ldo2_config2, 2800,  2800, tps65090_rails(DCDC2), 0, 0, 1, 0,
-	0, 0, 0, 0, 0);
 PALMAS_REGS_PDATA(ldo3, 1200,  1200, palmas_rails(smps3), 0, 0, 1, 0,
 	0, 0, 0, 0, 0);
-PALMAS_REGS_PDATA(ldo4_config2, 1200,  1200, tps65090_rails(DCDC2), 0, 0, 1, 0,
-	0, 0, 0, 0, 0);
-PALMAS_REGS_PDATA(ldo4, 1800,  1800, tps65090_rails(DCDC2), 0, 0, 0, 0,
+PALMAS_REGS_PDATA(ldo4, 1200,  1200, tps65090_rails(DCDC2), 0, 0, 1, 0,
 	0, 0, 0, 0, 0);
 PALMAS_REGS_PDATA(ldo6, 2850,  2850, tps65090_rails(DCDC2), 0, 0, 1, 0,
 	0, 0, 0, 0, 0);
@@ -426,16 +386,14 @@ PALMAS_REGS_PDATA(ldoln, 3300, 3300, tps65090_rails(DCDC1), 0, 0, 1, 0,
 PALMAS_REGS_PDATA(ldousb, 3300,  3300, tps65090_rails(DCDC1), 0, 0, 1, 0,
 	0, 0, 0, 0, 0);
 
-#if MOLLY_ON_DALMORE == 1
 PALMAS_REGS_PDATA(ldoln_fab05, 3300, 3300, tps65090_rails(DCDC1), 0, 0, 1, 0,
 	0, 0, 0, 0, 0);
 PALMAS_REGS_PDATA(ldousb_fab05, 3300,  3300, tps65090_rails(DCDC1), 0, 0, 1, 0,
 	0, 0, 0, 0, 0);
-#endif
 
 #define PALMAS_REG_PDATA(_sname) (&reg_idata_##_sname)
 
-static struct regulator_init_data *molly_e1611_reg_data[PALMAS_NUM_REGS] = {
+static struct regulator_init_data *molly_reg_data[PALMAS_NUM_REGS] = {
 	PALMAS_REG_PDATA(smps12),
 	NULL,
 	PALMAS_REG_PDATA(smps3),
@@ -465,7 +423,7 @@ static struct regulator_init_data *molly_e1611_reg_data[PALMAS_NUM_REGS] = {
 };
 
 #define PALMAS_REG_INIT_DATA(_sname) (&reg_init_data_##_sname)
-static struct palmas_reg_init *molly_e1611_reg_init[PALMAS_NUM_REGS] = {
+static struct palmas_reg_init *molly_reg_init[PALMAS_NUM_REGS] = {
 	PALMAS_REG_INIT_DATA(smps12),
 	NULL,
 	PALMAS_REG_INIT_DATA(smps3),
@@ -494,6 +452,43 @@ static struct palmas_reg_init *molly_e1611_reg_init[PALMAS_NUM_REGS] = {
 	NULL,
 };
 
+static void set_dalmore_power_fab05(void)
+{
+	molly_reg_data[PALMAS_REG_LDOLN] =
+				PALMAS_REG_PDATA(ldoln_fab05);
+	molly_reg_init[PALMAS_REG_LDOLN] =
+				PALMAS_REG_INIT_DATA(ldoln_fab05);
+	molly_reg_data[PALMAS_REG_LDOUSB] =
+				PALMAS_REG_PDATA(ldousb_fab05);
+	molly_reg_init[PALMAS_REG_LDOUSB] =
+				PALMAS_REG_INIT_DATA(ldousb_fab05);
+	return;
+}
+
+static void molly_tps65090_init(void)
+{
+	int err;
+
+	err = gpio_request(TPS65090_CHARGER_INT, "CHARGER_INT");
+	if (err < 0) {
+		pr_err("%s: gpio_request failed %d\n", __func__, err);
+		goto fail_init_irq;
+	}
+
+	err = gpio_direction_input(TPS65090_CHARGER_INT);
+	if (err < 0) {
+		pr_err("%s: gpio_direction_input failed %d\n", __func__, err);
+		goto fail_init_irq;
+	}
+
+	tps65090_regulators[0].irq = gpio_to_irq(TPS65090_CHARGER_INT);
+fail_init_irq:
+	i2c_register_board_info(4, tps65090_regulators,
+			ARRAY_SIZE(tps65090_regulators));
+	return;
+}
+#endif
+
 static struct palmas_pmic_platform_data pmic_platform = {
 	.enable_ldo8_tracking = true,
 	.disabe_ldo8_tracking_suspend = true,
@@ -501,8 +496,7 @@ static struct palmas_pmic_platform_data pmic_platform = {
 };
 
 static struct palmas_rtc_platform_data rtc_platform = {
-	.enable_charging = 1,
-	.charging_current_ua = 100,
+	.enable_charging = 0,
 };
 
 static struct palmas_pinctrl_config palmas_pincfg[] = {
@@ -638,40 +632,6 @@ static struct platform_device *fixed_reg_devs_molly[] = {
 	ADD_FIXED_REG(avdd_hdmi_pll),
 };
 
-static void set_dalmore_power_fab05(void)
-{
-	molly_e1611_reg_data[PALMAS_REG_LDOLN] =
-				PALMAS_REG_PDATA(ldoln_fab05);
-	molly_e1611_reg_init[PALMAS_REG_LDOLN] =
-				PALMAS_REG_INIT_DATA(ldoln_fab05);
-	molly_e1611_reg_data[PALMAS_REG_LDOUSB] =
-				PALMAS_REG_PDATA(ldousb_fab05);
-	molly_e1611_reg_init[PALMAS_REG_LDOUSB] =
-				PALMAS_REG_INIT_DATA(ldousb_fab05);
-	return;
-}
-
-static void set_molly_power_config2(void)
-{
-	molly_e1611_reg_data[PALMAS_REG_SMPS8] =
-				PALMAS_REG_PDATA(smps8_config2);
-	molly_e1611_reg_init[PALMAS_REG_SMPS8] =
-				PALMAS_REG_INIT_DATA(smps8_config2);
-	molly_e1611_reg_data[PALMAS_REG_LDO1] =
-				PALMAS_REG_PDATA(ldo1_config2);
-	molly_e1611_reg_init[PALMAS_REG_LDO1] =
-				PALMAS_REG_INIT_DATA(ldo1_config2);
-	molly_e1611_reg_data[PALMAS_REG_LDO2] =
-				PALMAS_REG_PDATA(ldo2_config2);
-	molly_e1611_reg_init[PALMAS_REG_LDO2] =
-				PALMAS_REG_INIT_DATA(ldo2_config2);
-	molly_e1611_reg_data[PALMAS_REG_LDO4] =
-				PALMAS_REG_PDATA(ldo4_config2);
-	molly_e1611_reg_init[PALMAS_REG_LDO4] =
-				PALMAS_REG_INIT_DATA(ldo4_config2);
-	return;
-}
-
 int __init molly_palmas_regulator_init(void)
 {
 	void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
@@ -691,15 +651,14 @@ int __init molly_palmas_regulator_init(void)
 	pmc_ctrl = readl(pmc + PMC_CTRL);
 	writel(pmc_ctrl | PMC_CTRL_INTR_LOW, pmc + PMC_CTRL);
 
-	set_molly_power_config2();
 #if MOLLY_ON_DALMORE == 1
 	if (board_info.fab == BOARD_FAB_A05)
 		set_dalmore_power_fab05();
 #endif
 
 	for (i = 0; i < PALMAS_NUM_REGS ; i++) {
-		pmic_platform.reg_data[i] = molly_e1611_reg_data[i];
-		pmic_platform.reg_init[i] = molly_e1611_reg_init[i];
+		pmic_platform.reg_data[i] = molly_reg_data[i];
+		pmic_platform.reg_init[i] = molly_reg_init[i];
 	}
 
 	i2c_register_board_info(4, palma_device,
@@ -817,38 +776,19 @@ static int __init molly_fixed_regulator_init(void)
 }
 subsys_initcall_sync(molly_fixed_regulator_init);
 
-static void molly_tps65090_init(void)
-{
-	int err;
-
-	err = gpio_request(TPS65090_CHARGER_INT, "CHARGER_INT");
-	if (err < 0) {
-		pr_err("%s: gpio_request failed %d\n", __func__, err);
-		goto fail_init_irq;
-	}
-
-	err = gpio_direction_input(TPS65090_CHARGER_INT);
-	if (err < 0) {
-		pr_err("%s: gpio_direction_input failed %d\n", __func__, err);
-		goto fail_init_irq;
-	}
-
-	tps65090_regulators[0].irq = gpio_to_irq(TPS65090_CHARGER_INT);
-fail_init_irq:
-	i2c_register_board_info(4, tps65090_regulators,
-			ARRAY_SIZE(tps65090_regulators));
-	return;
-}
-
 int __init molly_regulator_init(void)
 {
+#if MOLLY_ON_DALMORE == 1
 	molly_tps65090_init();
+#endif
 #ifdef CONFIG_ARCH_TEGRA_HAS_CL_DVFS
 	molly_cl_dvfs_init();
 #endif
 	molly_palmas_regulator_init();
 
+#if MOLLY_ON_DALMORE == 1
 	i2c_register_board_info(4, tps51632_boardinfo, 1);
+#endif
 	platform_device_register(&molly_pda_power_device);
 	return 0;
 }
