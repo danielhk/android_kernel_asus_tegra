@@ -20,10 +20,15 @@
  */
 
 #include <linux/i2c.h>
-#include <linux/ina219.h>
+#include <linux/ina3221.h>
 
 #include "board.h"
 #include "board-molly.h"
+
+#define MOLLY_ON_DALMORE 1
+
+#if MOLLY_ON_DALMORE == 1
+#include <linux/ina219.h>
 
 #define PRECISION_MULTIPLIER_MOLLY 1000
 
@@ -46,7 +51,7 @@ enum {
 	VDD_1V8_DSM,
 };
 
-static struct ina219_platform_data power_mon_info[] = {
+static struct ina219_platform_data ina219_power_mon_info[] = {
 	[VDD_12V_DCIN_RS] = {
 		.calibration_data  = 0xaec0,
 		.power_lsb = 1.8311874106 * PRECISION_MULTIPLIER_MOLLY,
@@ -246,105 +251,132 @@ enum {
 static struct i2c_board_info molly_i2c0_ina219_board_info[] = {
 	[INA_I2C_ADDR_40] = {
 		I2C_BOARD_INFO("ina219", 0x40),
-		.platform_data = &power_mon_info[VDD_12V_DCIN_RS],
+		.platform_data = &ina219_power_mon_info[VDD_12V_DCIN_RS],
 		.irq = -1,
 	},
 
 	[INA_I2C_ADDR_41] = {
 		I2C_BOARD_INFO("ina219", 0x41),
-		.platform_data = &power_mon_info[VDD_AC_BAT_VIN1],
+		.platform_data = &ina219_power_mon_info[VDD_AC_BAT_VIN1],
 		.irq = -1,
 	},
 
 	[INA_I2C_ADDR_42] = {
 		I2C_BOARD_INFO("ina219", 0x42),
-		.platform_data = &power_mon_info[VDD_5V0_SYS],
+		.platform_data = &ina219_power_mon_info[VDD_5V0_SYS],
 		.irq = -1,
 	},
 
 	[INA_I2C_ADDR_43] = {
 		I2C_BOARD_INFO("ina219", 0x43),
-		.platform_data = &power_mon_info[VDD_3V3_SYS],
+		.platform_data = &ina219_power_mon_info[VDD_3V3_SYS],
 		.irq = -1,
 	},
 
 	[INA_I2C_ADDR_44] = {
 		I2C_BOARD_INFO("ina219", 0x44),
-		.platform_data = &power_mon_info[VDD_3V3_SYS_VIN4_5_7],
+		.platform_data = &ina219_power_mon_info[VDD_3V3_SYS_VIN4_5_7],
 		.irq = -1,
 	},
 
 	[INA_I2C_ADDR_45] = {
 		I2C_BOARD_INFO("ina219", 0x45),
-		.platform_data = &power_mon_info[AVDD_USB_HDMI],
+		.platform_data = &ina219_power_mon_info[AVDD_USB_HDMI],
 		.irq = -1,
 	},
 
 	[INA_I2C_ADDR_46] = {
 		I2C_BOARD_INFO("ina219", 0x46),
-		.platform_data = &power_mon_info[VDD_AC_BAT_D1],
+		.platform_data = &ina219_power_mon_info[VDD_AC_BAT_D1],
 		.irq = -1,
 	},
 
 	[INA_I2C_ADDR_47] = {
 		I2C_BOARD_INFO("ina219", 0x47),
-		.platform_data = &power_mon_info[VDD_AO_SMPS12_IN],
+		.platform_data = &ina219_power_mon_info[VDD_AO_SMPS12_IN],
 		.irq = -1,
 	},
 
 	[INA_I2C_ADDR_48] = {
 		I2C_BOARD_INFO("ina219", 0x48),
-		.platform_data = &power_mon_info[VDD_3V3_SYS_SMPS45_IN],
+		.platform_data = &ina219_power_mon_info[VDD_3V3_SYS_SMPS45_IN],
 		.irq = -1,
 	},
 
 	[INA_I2C_ADDR_49] = {
 		I2C_BOARD_INFO("ina219", 0x49),
-		.platform_data = &power_mon_info[VDD_AO_SMPS2_IN],
+		.platform_data = &ina219_power_mon_info[VDD_AO_SMPS2_IN],
 		.irq = -1,
 	},
 
 	[INA_I2C_ADDR_4A] = {
 		I2C_BOARD_INFO("ina219", 0x4A),
-		.platform_data = &power_mon_info[VDDIO_HV_AP],
+		.platform_data = &ina219_power_mon_info[VDDIO_HV_AP],
 		.irq = -1,
 	},
 
 	[INA_I2C_ADDR_4B] = {
 		I2C_BOARD_INFO("ina219", 0x4B),
-		.platform_data = &power_mon_info[VDD_1V8_LDO3_IN],
+		.platform_data = &ina219_power_mon_info[VDD_1V8_LDO3_IN],
 		.irq = -1,
 	},
 
 	[INA_I2C_ADDR_4C] = {
 		I2C_BOARD_INFO("ina219", 0x4C),
-		.platform_data = &power_mon_info[VDD_3V3_SYS_LDO4_IN],
+		.platform_data = &ina219_power_mon_info[VDD_3V3_SYS_LDO4_IN],
 		.irq = -1,
 	},
 
 	[INA_I2C_ADDR_4D] = {
 		I2C_BOARD_INFO("ina219", 0x4D),
-		.platform_data = &power_mon_info[VDD_AO_LDO8_IN],
+		.platform_data = &ina219_power_mon_info[VDD_AO_LDO8_IN],
 		.irq = -1,
 	},
 
 	[INA_I2C_ADDR_4E] = {
 		I2C_BOARD_INFO("ina219", 0x4E),
-		.platform_data = &power_mon_info[VDD_1V8_AP],
+		.platform_data = &ina219_power_mon_info[VDD_1V8_AP],
 		.irq = -1,
 	},
 
 	[INA_I2C_ADDR_4F] = {
 		I2C_BOARD_INFO("ina219", 0x4F),
-		.platform_data = &power_mon_info[VDD_1V8_DSM],
+		.platform_data = &ina219_power_mon_info[VDD_1V8_DSM],
+		.irq = -1,
+	},
+};
+#endif
+
+static struct ina3221_platform_data power_mon_info = {
+	.rail_name = {
+		"VIN_5V0",     /* everything except CPU/Core/DDR */
+		"VIN_5V0_CCD", /* CPU/Core/DDR */
+	},
+	.shunt_resistor = {5, 5}, /* 5 mOhm */
+	.cont_conf_data = ((6 << 12) | /* enable ch1 and ch2, no ch3 */
+			   INA3221_AVG | INA3221_VBUS_CT |
+			   INA3221_VSHUNT_CT | INA3221_CONT_MODE),
+	.trig_conf_data = ((6 << 12) | /* enable ch1 and ch2, no ch3 */
+			   INA3221_TRIG_MODE),
+};
+
+static struct i2c_board_info molly_i2c0_ina3221_board_info[] = {
+	{
+		I2C_BOARD_INFO("ina3221", 0x40),
+		.platform_data = &power_mon_info,
 		.irq = -1,
 	},
 };
 
 int __init molly_pmon_init(void)
 {
+#if MOLLY_ON_DALMORE == 1
 	i2c_register_board_info(1, molly_i2c0_ina219_board_info,
 		ARRAY_SIZE(molly_i2c0_ina219_board_info));
+#endif
+
+	i2c_register_board_info(0, molly_i2c0_ina3221_board_info,
+		ARRAY_SIZE(molly_i2c0_ina3221_board_info));
 
 	return 0;
 }
