@@ -433,7 +433,7 @@ PALMAS_REGS_PDATA(ldousb_fab05, 3300,  3300, tps65090_rails(DCDC1), 0, 0, 1, 0,
 	0, 0, 0, 0, 0);
 #endif
 
-#define PALMAS_REG_PDATA(_sname) &reg_idata_##_sname
+#define PALMAS_REG_PDATA(_sname) (&reg_idata_##_sname)
 
 static struct regulator_init_data *molly_e1611_reg_data[PALMAS_NUM_REGS] = {
 	PALMAS_REG_PDATA(smps12),
@@ -464,7 +464,7 @@ static struct regulator_init_data *molly_e1611_reg_data[PALMAS_NUM_REGS] = {
 	NULL,
 };
 
-#define PALMAS_REG_INIT_DATA(_sname) &reg_init_data_##_sname
+#define PALMAS_REG_INIT_DATA(_sname) (&reg_init_data_##_sname)
 static struct palmas_reg_init *molly_e1611_reg_init[PALMAS_NUM_REGS] = {
 	PALMAS_REG_INIT_DATA(smps12),
 	NULL,
@@ -693,9 +693,8 @@ int __init molly_palmas_regulator_init(void)
 
 	set_molly_power_config2();
 #if MOLLY_ON_DALMORE == 1
-	if (board_info.fab == BOARD_FAB_A05) {
+	if (board_info.fab == BOARD_FAB_A05)
 		set_dalmore_power_fab05();
-	}
 #endif
 
 	for (i = 0; i < PALMAS_NUM_REGS ; i++) {

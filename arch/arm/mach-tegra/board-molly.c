@@ -266,11 +266,11 @@ static struct tegra_i2c_platform_data molly_i2c5_platform_data = {
  ******************************************************************************/
 static struct aah_io_platform_data aah_io_data = {
 #if MOLLY_ON_DALMORE == 0
-	.key_gpio          = TEGRA_GPIO_PQ5, /* molly's UI_SWITCH, KB_COL5/GPIO_PQ5 */
+	.key_gpio = TEGRA_GPIO_PQ5, /* molly's UI_SWITCH, KB_COL5/GPIO_PQ5 */
 #else
-	.key_gpio          = TEGRA_GPIO_PR2, /* dalmore's volume+ button for now */
+	.key_gpio = TEGRA_GPIO_PR2, /* dalmore's volume+ button for now */
 #endif
-	.key_code          = KEY_MUTE,/* TBD, easiest to test as mute for now */
+	.key_code = KEY_MUTE,/* TBD, easiest to test as mute for now */
 };
 
 static struct i2c_board_info __initdata aah_io_i2c_board_info[] = {
@@ -414,7 +414,7 @@ static void __init temp_sensor_init(void)
 			nct1008_port = TEGRA_GPIO_PX6;
 	} else {
 		nct1008_port = TEGRA_GPIO_PX6;
-		pr_err("Warning: nct alert_port assumed TEGRA_GPIO_PX6"
+		pr_err("Warning: nct alert_port assumed TEGRA_GPIO_PX6" \
 			" for unknown dalmore board id E%d\n",
 			board_info.board_id);
 	}
@@ -443,7 +443,8 @@ static void __init temp_sensor_init(void)
 
 #if MOLLY_ON_DALMORE == 1
 	/* dalmore has thermal sensor on GEN1-I2C, i.e. instance 0 */
-	i2c_register_board_info(0, nct1008_i2c_board_info, ARRAY_SIZE(nct1008_i2c_board_info));
+	i2c_register_board_info(0, nct1008_i2c_board_info,
+				ARRAY_SIZE(nct1008_i2c_board_info));
 #else
 	/* molly thermal sensor on I2C3/CAM_I2C, i.e. instance 2 */
 	i2c_register_board_info(2, i2c_bus2, ARRAY_SIZE(i2c_bus2));
@@ -777,49 +778,49 @@ static void __init molly_radio_init(void)
 }
 
 static struct platform_device *molly_spi_devices[] __initdata = {
-        &tegra11_spi_device3,
+	&tegra11_spi_device3,
 };
 
 struct spi_clk_parent spi_parent_clk_molly[] = {
-        [0] = {.name = "pll_p"},
+	[0] = {.name = "pll_p"},
 #ifndef CONFIG_TEGRA_PLLM_RESTRICTED
-        [1] = {.name = "pll_m"},
-        [2] = {.name = "clk_m"},
+	[1] = {.name = "pll_m"},
+	[2] = {.name = "clk_m"},
 #else
-        [1] = {.name = "clk_m"},
+	[1] = {.name = "clk_m"},
 #endif
 };
 
 static struct tegra_spi_platform_data molly_spi_pdata = {
 	.max_dma_buffer         = 16 * 1024,
-        .is_clkon_always        = false,
-        .max_rate               = 25000000,
+	.is_clkon_always        = false,
+	.max_rate               = 25000000,
 	.is_dma_based           = true,
 };
 
 static void __init molly_spi_init(void)
 {
-        int i;
-        struct clk *c;
+	int i;
+	struct clk *c;
 
-        for (i = 0; i < ARRAY_SIZE(spi_parent_clk_molly); ++i) {
-                c = tegra_get_clock_by_name(spi_parent_clk_molly[i].name);
-                if (IS_ERR_OR_NULL(c)) {
-                        pr_err("Not able to get the clock for %s\n",
-                                                spi_parent_clk_molly[i].name);
-                        continue;
-                }
-                spi_parent_clk_molly[i].parent_clk = c;
-                spi_parent_clk_molly[i].fixed_clk_rate = clk_get_rate(c);
+	for (i = 0; i < ARRAY_SIZE(spi_parent_clk_molly); ++i) {
+		c = tegra_get_clock_by_name(spi_parent_clk_molly[i].name);
+		if (IS_ERR_OR_NULL(c)) {
+			pr_err("Not able to get the clock for %s\n",
+			       spi_parent_clk_molly[i].name);
+			continue;
+		}
+		spi_parent_clk_molly[i].parent_clk = c;
+		spi_parent_clk_molly[i].fixed_clk_rate = clk_get_rate(c);
 		pr_info("%s: clock %s, rate %lu\n",
 			__func__, spi_parent_clk_molly[i].name,
 			spi_parent_clk_molly[i].fixed_clk_rate);
-        }
-        molly_spi_pdata.parent_clk_list = spi_parent_clk_molly;
-        molly_spi_pdata.parent_clk_count = ARRAY_SIZE(spi_parent_clk_molly);
+	}
+	molly_spi_pdata.parent_clk_list = spi_parent_clk_molly;
+	molly_spi_pdata.parent_clk_count = ARRAY_SIZE(spi_parent_clk_molly);
 	tegra11_spi_device3.dev.platform_data = &molly_spi_pdata;
-        platform_add_devices(molly_spi_devices,
-                                ARRAY_SIZE(molly_spi_devices));
+	platform_add_devices(molly_spi_devices,
+			     ARRAY_SIZE(molly_spi_devices));
 }
 
 static void __init tegra_molly_init(void)
@@ -887,7 +888,10 @@ static void __init tegra_molly_reserve(void)
 }
 
 static const char * const molly_dt_board_compat[] = {
-	"nvidia,dalmore", /* allows us to work with dalmore bootloader for now */
+	"nvidia,dalmore", /*
+			   * allows us to work with dalmore
+			   * bootloader for now
+			   */
 	"google,molly",
 	NULL
 };
