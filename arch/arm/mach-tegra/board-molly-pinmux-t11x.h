@@ -37,9 +37,19 @@ static __initdata struct tegra_pingroup_config molly_pinmux_common[] = {
 	DEFAULT_PINMUX(GMI_A19,       UARTD,       NORMAL,    NORMAL,   OUTPUT),
 
 	/* SOC pinmux */
-	DEFAULT_PINMUX(GMI_CS1_N, SOC, PULL_UP, TRISTATE, INPUT),/* OC_CRIT_N */
+
+	/* From POWERGOOD from TPS65913 -> PSD_CPU_OC/SOC_THERM_OC2.
+	 * Not really used yet because we use external temp
+	 * sensor TMP451.  In future, we might want to cost
+	 * reduce and remove TMP451 and use the ADC in the TMP56913.
+	 * Has external pull-up resistor so no internal one needed.
+	 */
 	DEFAULT_PINMUX(CLK_32K_OUT,   SOC,         NORMAL,    TRISTATE, INPUT),
-	GPIO_PINMUX(GMI_IORDY, PULL_UP, NORMAL, INPUT, DISABLE), /* OC_WARN_N */
+
+	/* From CRITICAL of INA3221 -> OC_CRIT_N/SOC_THERM_OC4 */
+	DEFAULT_PINMUX(GMI_CS1_N,     SOC,         PULL_UP,   TRISTATE, INPUT),
+	/* From WARNING of INA3221 -> OC_WARN_N/GPIO */
+	GPIO_PINMUX(GMI_IORDY,        PULL_UP,     NORMAL,    INPUT,    DISABLE),
 
 	/* SDMMC1 pinmux */
 	DEFAULT_PINMUX(SDMMC1_CLK,    SDMMC1,      NORMAL,    NORMAL,   INPUT),
