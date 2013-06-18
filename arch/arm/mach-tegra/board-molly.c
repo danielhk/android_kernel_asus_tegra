@@ -578,17 +578,6 @@ static struct platform_device *molly_devices[] __initdata = {
 #if defined(CONFIG_CRYPTO_DEV_TEGRA_SE)
 	&tegra11_se_device,
 #endif
-	&tegra_ahub_device,
-	&tegra_dam_device0,
-	&tegra_dam_device1,
-	&tegra_dam_device2,
-	&tegra_i2s_device1,
-	&tegra_i2s_device3,
-	&tegra_i2s_device4,
-	&tegra_spdif_device,
-	&spdif_dit_device,
-	&bluetooth_dit_device,
-	&tegra_pcm_device,
 	&tegra_hda_device,
 #if defined(CONFIG_TEGRA_CEC_SUPPORT)
 	&tegra_cec_device,
