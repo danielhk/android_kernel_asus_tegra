@@ -18,8 +18,6 @@
  * 51 Franklin Street, Fifth floor, Boston, MA  02110-1301, USA
  */
 
-#define MOLLY_ON_DALMORE 1
-
 static __initdata struct tegra_pingroup_config molly_pinmux_common[] = {
 
 	/* I2C3 pinmux */

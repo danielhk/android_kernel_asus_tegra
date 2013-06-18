@@ -38,11 +38,10 @@
 #include "board.h"
 #include "devices.h"
 #include "gpio-names.h"
+#include "board-molly.h"
 #include "board-panel.h"
 #include "common.h"
 #include "tegra11_host1x_devices.h"
-
-#define MOLLY_ON_DALMORE 1
 
 struct platform_device * __init molly_host1x_init(void)
 {

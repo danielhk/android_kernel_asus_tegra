@@ -77,8 +77,6 @@
 #include "pm-irq.h"
 #include "common.h"
 
-#define MOLLY_ON_DALMORE 1
-
 #if defined(CONFIG_BT_BLUESLEEP) || defined(CONFIG_BT_BLUESLEEP_MODULE)
 static struct rfkill_gpio_platform_data molly_bt_rfkill_pdata = {
 		.name           = "bt_rfkill",
@@ -447,7 +445,8 @@ static void __init temp_sensor_init(void)
 				ARRAY_SIZE(nct1008_i2c_board_info));
 #else
 	/* molly thermal sensor on I2C3/CAM_I2C, i.e. instance 2 */
-	i2c_register_board_info(2, i2c_bus2, ARRAY_SIZE(i2c_bus2));
+	i2c_register_board_info(2, nct1008_i2c_board_info,
+				ARRAY_SIZE(nct1008_i2c_board_info));
 #endif
 }
 

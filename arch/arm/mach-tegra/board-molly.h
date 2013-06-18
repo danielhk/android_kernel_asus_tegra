@@ -128,4 +128,6 @@ enum tegra_bb_type {
 #define UTMI2_PORT_OWNER_XUSB	0x2
 #define HSIC1_PORT_OWNER_XUSB	0x4
 
+#define MOLLY_ON_DALMORE 1
+
 #endif

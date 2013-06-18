@@ -25,8 +25,6 @@
 #include "board.h"
 #include "board-molly.h"
 
-#define MOLLY_ON_DALMORE 1
-
 #if MOLLY_ON_DALMORE == 1
 #include <linux/ina219.h>
 
