@@ -203,7 +203,7 @@ void tegra_assert_system_reset(char mode, const char *cmd)
 static int modem_id;
 static int commchip_id;
 static int sku_override;
-static int debug_uart_port_id;
+static int debug_uart_port_id = -1;
 static enum audio_codec_type audio_codec_name;
 static enum image_type board_image_type = system_image;
 static int max_cpu_current;
