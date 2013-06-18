@@ -580,7 +580,7 @@ static struct regulator_consumer_supply palmas_ldo2_supply[] = {
 
 /* ldo4 - avdd_hsic_1v2 */
 static struct regulator_consumer_supply palmas_ldo4_supply[] = {
-	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-ehci.2"),
+	REGULATOR_SUPPLY("vddio_hsic", "tegra-ehci.1"),
 };
 
 /* ldo5 - vdd_fuse.  move to fixed? */
@@ -785,7 +785,6 @@ static struct regulator_consumer_supply fixed_reg_usb1_vbus_supply[] = {
 
 /* EN_USB3_VBUS From TEGRA GPIO PM5 */
 static struct regulator_consumer_supply fixed_reg_usb3_vbus_supply[] = {
-	REGULATOR_SUPPLY("usb_vbus", "tegra-ehci.2"),
 	REGULATOR_SUPPLY("usb_vbus", "tegra-xhci"),
 };
 

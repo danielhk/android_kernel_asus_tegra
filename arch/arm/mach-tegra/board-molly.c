@@ -699,6 +699,53 @@ static void __init molly_xusb_init(void)
 	platform_device_register(&tegra_xhci_device);
 }
 
+/* SMSC LAN9730 ethernet controller.
+ * Initially reset is asserted.
+ * TODO: How to use the phy_int_n signal?  SMSC driver doesn't take
+ * platform data.  Maybe just hook up here as a irq for wake?
+ */
+#define GPIO_ETHERNET_PHY_INT_N  TEGRA_GPIO_PEE4 /* SDMMC3_CLK_LB_OUT/GPIO_PEE4 */
+#define GPIO_ETHERNET_RESET_N    TEGRA_GPIO_PEE5 /* SDMMC3_CLK_LB_IN/GPIO_PEE5 */
+
+static struct gpio ethernet_gpios[] __initdata = {
+	{GPIO_ETHERNET_PHY_INT_N, GPIOF_IN,           "ethernet_phy_int_n" },
+	{GPIO_ETHERNET_RESET_N,   GPIOF_OUT_INIT_LOW, "ethernet_reset_n" },
+};
+
+static struct tegra_usb_platform_data tegra_ehci2_hsic_pdata = {
+	.port_otg = false,
+	.has_hostpc = true,
+	.unaligned_dma_buf_supported = false,
+	.phy_intf = TEGRA_USB_PHY_INTF_HSIC,
+	.op_mode = TEGRA_USB_OPMODE_HOST,
+	.u_data.host = {
+		.vbus_gpio = -1,
+		.hot_plug = false,
+		.remote_wakeup_supported = true,
+		.power_off_on_suspend = true,
+	},
+};
+
+static void __init molly_hsic_init(void)
+{
+	int ret;
+
+	ret = gpio_request_array(ethernet_gpios, ARRAY_SIZE(ethernet_gpios));
+	if (ret) {
+		pr_warn("%s:gpio request failed\n", __func__);
+		return;
+	}
+
+	/* delay after reset asserted by gpio_request_array() */
+	udelay(100);
+
+	/* take out of reset */
+	gpio_set_value(GPIO_ETHERNET_RESET_N, 1);
+
+	tegra_ehci2_device.dev.platform_data = &tegra_ehci2_hsic_pdata;
+	platform_device_register(&tegra_ehci2_device);
+}
+
 #define ATHOME_RADIO_INT_GPIO     TEGRA_GPIO_PB4 /* SDMMC3_DAT3/GPIO_PB4 */
 #define ATHOME_RADIO_RESET_N_GPIO TEGRA_GPIO_PB5 /* SDMMC3_DAT2/GPIO_PB5 */
 #define ATHOME_RADIO_SPI_CS_GPIO  TEGRA_GPIO_PA7 /* SDMMC3_CMD/GPIO_PA7 */
@@ -823,6 +870,7 @@ static void __init tegra_molly_init(void)
 	molly_radio_init();
 	molly_usb_init();
 	molly_xusb_init();
+	molly_hsic_init();
 	molly_uart_init();
 	platform_add_devices(molly_devices, ARRAY_SIZE(molly_devices));
 	tegra_ram_console_debug_init();
