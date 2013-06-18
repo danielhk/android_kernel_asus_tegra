@@ -42,6 +42,8 @@
 #include "common.h"
 #include "tegra11_host1x_devices.h"
 
+#define MOLLY_ON_DALMORE 1
+
 struct platform_device * __init molly_host1x_init(void)
 {
 	struct platform_device *pdev = NULL;
@@ -59,7 +61,9 @@ struct platform_device * __init molly_host1x_init(void)
 #ifdef CONFIG_TEGRA_DC
 
 /* HDMI Hotplug detection pin */
-#define molly_hdmi_hpd	TEGRA_GPIO_PN7
+#define molly_hdmi_hpd	 TEGRA_GPIO_PN7
+/* HDMI level shifter enable on SPDIF_IN - GPIO_PK6 */
+#define molly_hdmi_ls_en TEGRA_GPIO_PK6
 
 static struct regulator *molly_hdmi_reg;
 static struct regulator *molly_hdmi_pll;
@@ -148,6 +152,9 @@ static struct tegra_dc_out molly_disp1_out = {
 static int molly_hdmi_enable(struct device *dev)
 {
 	int ret;
+#if MOLLY_ON_DALMORE == 0
+	gpio_set_value(molly_hdmi_ls_en, 1);
+#endif
 	if (!molly_hdmi_reg) {
 		molly_hdmi_reg = regulator_get(dev, "avdd_hdmi");
 		if (IS_ERR_OR_NULL(molly_hdmi_reg)) {
@@ -192,7 +199,9 @@ static int molly_hdmi_disable(void)
 		regulator_put(molly_hdmi_pll);
 		molly_hdmi_pll = NULL;
 	}
-
+#if MOLLY_ON_DALMORE == 0
+	gpio_set_value(molly_hdmi_ls_en, 0);
+#endif
 	return 0;
 }
 
@@ -208,6 +217,7 @@ static int molly_hdmi_postsuspend(void)
 
 static int molly_hdmi_hotplug_init(struct device *dev)
 {
+#if MOLLY_ON_DALMORE == 1
 	if (!molly_hdmi_vddio) {
 		molly_hdmi_vddio = regulator_get(dev, "vdd_hdmi_5v0");
 		if (WARN_ON(IS_ERR(molly_hdmi_vddio))) {
@@ -218,6 +228,12 @@ static int molly_hdmi_hotplug_init(struct device *dev)
 			regulator_enable(molly_hdmi_vddio);
 		}
 	}
+#else
+	/* no regulator needed to power the level shifter for
+	 * HDMI on molly.  there is a HDMI_EN control GPIO
+	 * we need to set to enable the level shifter though.
+	 */
+#endif
 
 	return 0;
 }
@@ -500,6 +516,11 @@ int __init molly_panel_init(void)
 
 	gpio_request(molly_hdmi_hpd, "hdmi_hpd");
 	gpio_direction_input(molly_hdmi_hpd);
+
+#if MOLLY_ON_DALMORE == 0
+	gpio_request(molly_hdmi_ls_en, "hdmi_ls_en");
+	gpio_direction_output(molly_hdmi_hpd, 0);
+#endif
 
 	res = platform_get_resource_byname(&molly_disp1_device,
 					 IORESOURCE_MEM, "fbmem");
