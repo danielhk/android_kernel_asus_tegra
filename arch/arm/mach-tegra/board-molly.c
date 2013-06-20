@@ -487,8 +487,6 @@ static void __init molly_i2c_init(void)
 
 static struct platform_device *molly_uart_devices[] __initdata = {
 	&tegra_uarta_device,
-	&tegra_uartb_device,
-	&tegra_uartc_device,
 	&tegra_uartd_device,
 };
 static struct uart_clk_parent uart_parent_clk[] = {
@@ -500,7 +498,6 @@ static struct uart_clk_parent uart_parent_clk[] = {
 };
 
 static struct tegra_uart_platform_data molly_uart_pdata;
-static struct tegra_uart_platform_data molly_loopback_uart_pdata;
 
 static void __init uart_debug_init(void)
 {
@@ -510,7 +507,7 @@ static void __init uart_debug_init(void)
 	if (debug_port_id < 0)
 		return;
 
-	molly_uart_devices[debug_port_id] = uart_console_debug_device;
+	molly_uart_devices[1] = uart_console_debug_device;
 }
 
 static void __init molly_uart_init(void)
@@ -530,13 +527,7 @@ static void __init molly_uart_init(void)
 	}
 	molly_uart_pdata.parent_clk_list = uart_parent_clk;
 	molly_uart_pdata.parent_clk_count = ARRAY_SIZE(uart_parent_clk);
-	molly_loopback_uart_pdata.parent_clk_list = uart_parent_clk;
-	molly_loopback_uart_pdata.parent_clk_count =
-						ARRAY_SIZE(uart_parent_clk);
-	molly_loopback_uart_pdata.is_loopback = true;
 	tegra_uarta_device.dev.platform_data = &molly_uart_pdata;
-	tegra_uartb_device.dev.platform_data = &molly_uart_pdata;
-	tegra_uartc_device.dev.platform_data = &molly_uart_pdata;
 	tegra_uartd_device.dev.platform_data = &molly_uart_pdata;
 
 	uart_debug_init();

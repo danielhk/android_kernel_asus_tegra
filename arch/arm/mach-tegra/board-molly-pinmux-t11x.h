@@ -28,7 +28,7 @@ static __initdata struct tegra_pingroup_config molly_pinmux_common[] = {
 	I2C_PINMUX(GEN2_I2C_SCL, I2C2, NORMAL, NORMAL, INPUT, DISABLE, DISABLE),
 	I2C_PINMUX(GEN2_I2C_SDA, I2C2, NORMAL, NORMAL, INPUT, DISABLE, DISABLE),
 
-	/* UARTD pinmux */
+	/* UARTD pinmux - debug uart */
 	DEFAULT_PINMUX(GMI_A16,       UARTD,       NORMAL,    NORMAL,   OUTPUT),
 	DEFAULT_PINMUX(GMI_A17,       UARTD,       NORMAL,    TRISTATE, INPUT),
 	DEFAULT_PINMUX(GMI_A18,       UARTD,       NORMAL,    TRISTATE, INPUT),
@@ -65,6 +65,9 @@ static __initdata struct tegra_pingroup_config molly_pinmux_common[] = {
 	GPIO_PINMUX(SDMMC3_CMD, NORMAL, NORMAL, OUTPUT, DISABLE), /* CS */
 	GPIO_PINMUX(SDMMC3_DAT2, NORMAL, NORMAL, OUTPUT, DISABLE), /* RESET_N */
 	GPIO_PINMUX(SDMMC3_DAT3, PULL_UP, NORMAL, INPUT, DISABLE), /* INT_N */
+	/* UARTA pinmux, for ubik */
+	DEFAULT_PINMUX(GPIO_PU0,      UARTA,       NORMAL,    NORMAL,   OUTPUT),
+	DEFAULT_PINMUX(GPIO_PU1,      UARTA,       NORMAL,    TRISTATE, INPUT),
 
 	/* SDMMC4 pinmux */
 	DEFAULT_PINMUX(SDMMC4_CLK,    SDMMC4,      NORMAL,    NORMAL,   INPUT),
@@ -107,12 +110,6 @@ static __initdata struct tegra_pingroup_config molly_pinmux_common[] = {
 	/* I2C1 pinmux */
 	I2C_PINMUX(GEN1_I2C_SCL, I2C1, NORMAL, NORMAL, INPUT, DISABLE, DISABLE),
 	I2C_PINMUX(GEN1_I2C_SDA, I2C1, NORMAL, NORMAL, INPUT, DISABLE, DISABLE),
-
-	/* UARTC pinmux */
-	DEFAULT_PINMUX(UART3_CTS_N,   UARTC,       NORMAL,    TRISTATE, INPUT),
-	DEFAULT_PINMUX(UART3_RTS_N,   UARTC,       NORMAL,    NORMAL,   OUTPUT),
-	DEFAULT_PINMUX(UART3_RXD,     UARTC,       NORMAL,    TRISTATE, INPUT),
-	DEFAULT_PINMUX(UART3_TXD,     UARTC,       NORMAL,    NORMAL,   OUTPUT),
 
 	/* CEC pinmux */
 	CEC_PINMUX(HDMI_CEC, CEC, NORMAL, NORMAL, INPUT, DISABLE, DISABLE),
@@ -281,6 +278,13 @@ static __initdata struct tegra_pingroup_config unused_pins_lowpower[] = {
 	UNUSED_PINMUX(GPIO_PU4),
 	UNUSED_PINMUX(UART2_RXD),
 	UNUSED_PINMUX(UART2_TXD),
+	/* UART3 is connected to WLAN as an optional interconnet
+	 * but we use SD for now so this is unused.
+	 */
+	UNUSED_PINMUX(UART3_CTS_N),
+	UNUSED_PINMUX(UART3_RTS_N),
+	UNUSED_PINMUX(UART3_RXD),
+	UNUSED_PINMUX(UART3_TXD),
 	UNUSED_PINMUX(OWR),
 	UNUSED_PINMUX(SPDIF_OUT),
 	UNUSED_PINMUX(USB_VBUS_EN1),
@@ -347,8 +351,6 @@ static struct gpio_init_pin_info init_gpio_mode_molly_common[] = {
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PR7, true, 0),
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PS0, true, 0),
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PEE1, false, 0),
-	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PU0, false, 0),
-	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PU1, true, 0),
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PU2, true, 0),
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PU3, false, 0),
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PU4, false, 0),
