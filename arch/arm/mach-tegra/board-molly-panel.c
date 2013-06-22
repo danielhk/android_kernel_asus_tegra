@@ -68,7 +68,7 @@ static struct regulator *molly_hdmi_reg;
 static struct regulator *molly_hdmi_pll;
 static struct regulator *molly_hdmi_vddio;
 
-static struct resource molly_disp1_resources[] = {
+static struct resource molly_disp_resources[] = {
 	{
 		.name	= "irq",
 		.start	= INT_DISPLAY_GENERAL,
@@ -88,64 +88,11 @@ static struct resource molly_disp1_resources[] = {
 		.flags	= IORESOURCE_MEM,
 	},
 	{
-		.name	= "ganged_dsia_regs",
-		.start	= 0, /* Filled in the panel file by init_resources() */
-		.end	= 0, /* Filled in the panel file by init_resources() */
-		.flags	= IORESOURCE_MEM,
-	},
-	{
-		.name	= "ganged_dsib_regs",
-		.start	= 0, /* Filled in the panel file by init_resources() */
-		.end	= 0, /* Filled in the panel file by init_resources() */
-		.flags	= IORESOURCE_MEM,
-	},
-	{
-		.name	= "dsi_regs",
-		.start	= 0, /* Filled in the panel file by init_resources() */
-		.end	= 0, /* Filled in the panel file by init_resources() */
-		.flags	= IORESOURCE_MEM,
-	},
-	{
-		.name	= "mipi_cal",
-		.start	= TEGRA_MIPI_CAL_BASE,
-		.end	= TEGRA_MIPI_CAL_BASE + TEGRA_MIPI_CAL_SIZE - 1,
-		.flags	= IORESOURCE_MEM,
-	},
-};
-
-static struct resource molly_disp2_resources[] = {
-	{
-		.name	= "irq",
-		.start	= INT_DISPLAY_B_GENERAL,
-		.end	= INT_DISPLAY_B_GENERAL,
-		.flags	= IORESOURCE_IRQ,
-	},
-	{
-		.name	= "regs",
-		.start	= TEGRA_DISPLAY2_BASE,
-		.end	= TEGRA_DISPLAY2_BASE + TEGRA_DISPLAY2_SIZE - 1,
-		.flags	= IORESOURCE_MEM,
-	},
-	{
-		.name	= "fbmem",
-		.start	= 0, /* Filled in by molly_panel_init() */
-		.end	= 0, /* Filled in by molly_panel_init() */
-		.flags	= IORESOURCE_MEM,
-	},
-	{
 		.name	= "hdmi_regs",
 		.start	= TEGRA_HDMI_BASE,
 		.end	= TEGRA_HDMI_BASE + TEGRA_HDMI_SIZE - 1,
 		.flags	= IORESOURCE_MEM,
 	},
-};
-
-
-static struct tegra_dc_sd_settings sd_settings;
-
-static struct tegra_dc_out molly_disp1_out = {
-	.type		= TEGRA_DC_OUT_DSI,
-	.sd_settings	= &sd_settings,
 };
 
 static int molly_hdmi_enable(struct device *dev)
@@ -237,6 +184,22 @@ static int molly_hdmi_hotplug_init(struct device *dev)
 	return 0;
 }
 
+static struct tegra_dc_mode hdmi_panel_modes[] = {
+	{
+		.pclk = 148500000,
+		.h_ref_to_sync = 1,
+		.v_ref_to_sync = 1,
+		.h_sync_width = 44,
+		.v_sync_width = 5,
+		.h_back_porch = 148,
+		.v_back_porch = 36,
+		.h_active = 1920,
+		.v_active = 1080,
+		.h_front_porch = 88,
+		.v_front_porch = 4,
+	},
+};
+
 static void molly_hdmi_hotplug_report(bool state)
 {
 	if (state) {
@@ -293,7 +256,7 @@ struct tegra_hdmi_out molly_hdmi_out = {
 	.n_tmds_config = ARRAY_SIZE(molly_tmds_config),
 };
 
-static struct tegra_dc_out molly_disp2_out = {
+static struct tegra_dc_out molly_disp_out = {
 	.type		= TEGRA_DC_OUT_HDMI,
 	.flags		= TEGRA_DC_OUT_HOTPLUG_HIGH,
 	.parent_clk	= "pll_d2_out0",
@@ -303,6 +266,10 @@ static struct tegra_dc_out molly_disp2_out = {
 	.hdmi_out	= &molly_hdmi_out,
 
 	.max_pixclock	= KHZ2PICOS(297000),
+
+	/* defaults until hotplug occurs */
+	.modes          = hdmi_panel_modes,
+	.n_modes        = ARRAY_SIZE(hdmi_panel_modes),
 
 	.align		= TEGRA_DC_ALIGN_MSB,
 	.order		= TEGRA_DC_ORDER_RED_BLUE,
@@ -314,54 +281,28 @@ static struct tegra_dc_out molly_disp2_out = {
 	.hotplug_report	= molly_hdmi_hotplug_report,
 };
 
-static struct tegra_fb_data molly_disp1_fb_data = {
+static struct tegra_fb_data molly_disp_fb_data = {
 	.win		= 0,
+	.xres		= 1920,
+	.yres		= 1080,
 	.bits_per_pixel = 32,
 	.flags		= TEGRA_FB_FLIP_ON_PROBE,
 };
 
-static struct tegra_dc_platform_data molly_disp1_pdata = {
+static struct tegra_dc_platform_data molly_disp_pdata = {
 	.flags		= TEGRA_DC_FLAG_ENABLED,
-	.default_out	= &molly_disp1_out,
-	.fb		= &molly_disp1_fb_data,
-	.emc_clk_rate	= 204000000,
-#ifdef CONFIG_TEGRA_DC_CMU
-	.cmu_enable	= 1,
-#endif
-};
-
-static struct tegra_fb_data molly_disp2_fb_data = {
-	.win		= 0,
-	.xres		= 1024,
-	.yres		= 600,
-	.bits_per_pixel = 32,
-	.flags		= TEGRA_FB_FLIP_ON_PROBE,
-};
-
-static struct tegra_dc_platform_data molly_disp2_pdata = {
-	.flags		= TEGRA_DC_FLAG_ENABLED,
-	.default_out	= &molly_disp2_out,
-	.fb		= &molly_disp2_fb_data,
+	.default_out	= &molly_disp_out,
+	.fb		= &molly_disp_fb_data,
 	.emc_clk_rate	= 300000000,
 };
 
-static struct platform_device molly_disp2_device = {
-	.name		= "tegradc",
-	.id		= 1,
-	.resource	= molly_disp2_resources,
-	.num_resources	= ARRAY_SIZE(molly_disp2_resources),
-	.dev = {
-		.platform_data = &molly_disp2_pdata,
-	},
-};
-
-static struct platform_device molly_disp1_device = {
+static struct platform_device molly_disp_device = {
 	.name		= "tegradc",
 	.id		= 0,
-	.resource	= molly_disp1_resources,
-	.num_resources	= ARRAY_SIZE(molly_disp1_resources),
+	.resource	= molly_disp_resources,
+	.num_resources	= ARRAY_SIZE(molly_disp_resources),
 	.dev = {
-		.platform_data = &molly_disp1_pdata,
+		.platform_data = &molly_disp_pdata,
 	},
 };
 
@@ -401,98 +342,11 @@ static struct platform_device molly_nvmap_device = {
 	},
 };
 
-static struct tegra_dc_sd_settings molly_sd_settings = {
-	.enable = 1, /* enabled by default. */
-	.use_auto_pwm = false,
-	.hw_update_delay = 0,
-	.bin_width = -1,
-	.aggressiveness = 5,
-	.use_vid_luma = false,
-	.phase_in_adjustments = 0,
-	.k_limit_enable = true,
-	.k_limit = 200,
-	.sd_window_enable = false,
-	.soft_clipping_enable = true,
-	/* Low soft clipping threshold to compensate for aggressive k_limit */
-	.soft_clipping_threshold = 128,
-	.smooth_k_enable = true,
-	.smooth_k_incr = 4,
-	/* Default video coefficients */
-	.coeff = {5, 9, 2},
-	.fc = {0, 0},
-	/* Immediate backlight changes */
-	.blp = {1024, 255},
-	/* Gammas: R: 2.2 G: 2.2 B: 2.2 */
-	/* Default BL TF */
-	.bltf = {
-			{
-				{57, 65, 73, 82},
-				{92, 103, 114, 125},
-				{138, 150, 164, 178},
-				{193, 208, 224, 241},
-			},
-		},
-	/* Default LUT */
-	.lut = {
-			{
-				{255, 255, 255},
-				{199, 199, 199},
-				{153, 153, 153},
-				{116, 116, 116},
-				{85, 85, 85},
-				{59, 59, 59},
-				{36, 36, 36},
-				{17, 17, 17},
-				{0, 0, 0},
-			},
-		},
-	.sd_brightness = &sd_brightness,
-	.use_vpulse2 = true,
-};
-
-#if 1
-static void molly_panel_select(void)
-{
-	struct tegra_panel *panel = &dsi_p_wuxga_10_1;
-
-	if (panel->init_sd_settings)
-		panel->init_sd_settings(&sd_settings);
-
-	if (panel->init_dc_out)
-		panel->init_dc_out(&molly_disp1_out);
-
-	if (panel->init_fb_data)
-		panel->init_fb_data(&molly_disp1_fb_data);
-
-	if (panel->init_cmu_data)
-		panel->init_cmu_data(&molly_disp1_pdata);
-
-	if (panel->set_disp_device)
-		panel->set_disp_device(&molly_disp1_device);
-
-	if (panel->init_resources)
-		panel->init_resources(molly_disp1_resources,
-				      ARRAY_SIZE(molly_disp1_resources));
-
-	if (panel->register_bl_dev)
-		panel->register_bl_dev();
-
-	if (panel->register_i2c_bridge)
-		panel->register_i2c_bridge();
-}
-#endif
-
 int __init molly_panel_init(void)
 {
 	int err = 0;
 	struct resource __maybe_unused *res;
 	struct platform_device *phost1x;
-
-	sd_settings = molly_sd_settings;
-
-#if 1 /* TBD: can we remove this since we have no LCD? */
-	molly_panel_select();
-#endif
 
 #ifdef CONFIG_TEGRA_NVMAP
 	molly_carveouts[1].base = tegra_carveout_start;
@@ -521,24 +375,18 @@ int __init molly_panel_init(void)
 	gpio_direction_output(molly_hdmi_hpd, 0);
 #endif
 
-	res = platform_get_resource_byname(&molly_disp1_device,
-					 IORESOURCE_MEM, "fbmem");
-	res->start = tegra_fb_start;
-	res->end = tegra_fb_start + tegra_fb_size - 1;
-
 	/* Copy the bootloader fb to the fb. */
 	__tegra_move_framebuffer(&molly_nvmap_device,
 		tegra_fb_start, tegra_bootloader_fb_start,
 			min(tegra_fb_size, tegra_bootloader_fb_size));
 
-	molly_disp1_device.dev.parent = &phost1x->dev;
-	err = platform_device_register(&molly_disp1_device);
-	if (err) {
-		pr_err("disp1 device registration failed\n");
-		return err;
-	}
-
-	err = tegra_init_hdmi(&molly_disp2_device, phost1x);
+	/* can't use tegra_init_hdmi() because it assumes
+	 * fb2 is for hdmi, but we're using fb1
+	 */
+	molly_disp_resources[2].start = tegra_fb_start;
+	molly_disp_resources[2].end = tegra_fb_start + tegra_fb_size - 1;
+	molly_disp_device.dev.parent = &phost1x->dev;
+	err = platform_device_register(&molly_disp_device);
 	if (err)
 		return err;
 

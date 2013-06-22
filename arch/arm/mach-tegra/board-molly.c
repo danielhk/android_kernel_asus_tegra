@@ -908,10 +908,16 @@ static void __init tegra_molly_dt_init(void)
 static void __init tegra_molly_reserve(void)
 {
 #if defined(CONFIG_NVMAP_CONVERT_CARVEOUT_TO_IOVMM)
-	/* 1920*1200*4*2 = 18432000 bytes */
-	tegra_reserve(0, SZ_16M + SZ_2M, SZ_16M);
+	/* 1920*1080*4*2 = 16588800 bytes, or 15.8203125MB
+	 * 3840*2160*4*2 = 66355200 bytes, or 63.28125MB
+	 * We don't run fb at 4K mode.  Movie playback
+	 * doesn't use it.
+	 */
+	tegra_reserve(0, /* carveout */
+		      SZ_16M, /* fb_size */
+		      0); /* fb2_size: 0, not used */
 #else
-	tegra_reserve(SZ_128M, SZ_16M + SZ_2M, SZ_4M);
+	tegra_reserve(SZ_128M, SZ_16M, 0);
 #endif
 	molly_ramconsole_reserve(SZ_1M);
 }
