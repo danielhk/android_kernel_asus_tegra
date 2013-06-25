@@ -556,6 +556,7 @@ static struct regulator_consumer_supply palmas_smps8_supply[] = {
 /* vdd_sys_2v9 */
 static struct regulator_consumer_supply palmas_smps9_supply[] = {
 	REGULATOR_SUPPLY("vddio_sd_slot", "sdhci-tegra.3"),
+	REGULATOR_SUPPLY("vddio_hv", "tegradc.1"),
 };
 
 /* smps10 is unused */
@@ -574,6 +575,9 @@ static struct regulator_consumer_supply palmas_ldo1_supply[] = {
 static struct regulator_consumer_supply palmas_ldo2_supply[] = {
 	REGULATOR_SUPPLY("avddio_usb", "tegra-xhci"),
 	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-xhci"),
+};
+
+static struct regulator_consumer_supply palmas_ldo3_supply[] = {
 };
 
 /* ldo4 - avdd_hsic_1v2 */
@@ -614,22 +618,22 @@ static struct regulator_consumer_supply palmas_ldousb_supply[] = {
  * ENABLE1 is hooked up to CPU_PWR_REQ
  */
 /* vdd_cpu - 1.0V nominal */
-PALMAS_REGS_PDATA(smps123, 900, 1300, NULL, 0, 0, 0, NORMAL,
+PALMAS_REGS_PDATA(smps123, 500, 1520, NULL, 1, 1, 0, NORMAL,
 		  0, PALMAS_EXT_CONTROL_ENABLE1, 0, 0, 0);
 /* vdd_core - 1.1V nominal */
 PALMAS_REGS_PDATA(smps45, 900,  1400, NULL, 0, 0, 0, NORMAL,
 		  0, PALMAS_EXT_CONTROL_NSLEEP, 0, 3, 0);
 /* vdd_3v3 - 3.3V */
-PALMAS_REGS_PDATA(smps6, 3300,  3300, NULL, 0, 0, 1, NORMAL,
+PALMAS_REGS_PDATA(smps6, 3300,  3300, NULL, 1, 0, 1, NORMAL,
 		  0, 0, 0, 0, 0);
 /* vdd_ddr - 1.35V */
 PALMAS_REGS_PDATA(smps7, 1350,  1350, NULL, 0, 0, 0, NORMAL,
 		  0, 0, 0, 0, 0);
 /* vdd_1v8 - 1.8V */
-PALMAS_REGS_PDATA(smps8, 1800,  1800, NULL, 0, 1, 1, NORMAL,
+PALMAS_REGS_PDATA(smps8, 1800,  1800, NULL, 1, 0, 1, NORMAL,
 		  0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
 /* vdd_sys_2v9 - always on, emmc power */
-PALMAS_REGS_PDATA(smps9, 2900,  2900, NULL, 1, 0, 0, NORMAL,
+PALMAS_REGS_PDATA(smps9, 2900,  2900, NULL, 1, 0, 1, NORMAL,
 		  0, 0, 0, 0, 0);
 
 /* va_pllx - boot on? - 1.05V */
@@ -638,11 +642,14 @@ PALMAS_REGS_PDATA(ldo1, 1050,  1050, palmas_rails(smps7), 0, 0, 1, 0,
 /* va_usb3_1v2 - 1.2V */
 PALMAS_REGS_PDATA(ldo2, 1200,  1200, palmas_rails(smps7), 0, 0, 1, 0,
 		  0, 0, 0, 0, 0);
-/* avdd_hsic_1v2 */
+/* avdd_hdmi_pll - 1.2V */
+PALMAS_REGS_PDATA(ldo3, 1200,  1200, palmas_rails(smps8), 0, 0, 1, 0,
+		  0, 0, 0, 0, 0);
+/* avdd_hsic_1v2 - 1.2V */
 PALMAS_REGS_PDATA(ldo4, 1200,  1200, palmas_rails(smps8), 0, 0, 1, 0,
 		  0, 0, 0, 0, 0);
 /* vd_fuse - should we move this to a fixed regulator? */
-PALMAS_REGS_PDATA(ldo5, 1800,  1800, palmas_rails(smps8), 0, 0, 1, 0,
+PALMAS_REGS_PDATA(ldo5, 1800,  1800, NULL, 0, 0, 1, 0,
 		  0, 0, 0, 0, 0);
 /* always on at 3.3V for Ubik -
    should we move this to a fixed regulator? */
@@ -664,11 +671,11 @@ PALMAS_REGS_PDATA(ldousb, 3300,  3300, NULL, 0, 0, 1, 0,
 #define PALMAS_REG_PDATA(_sname) (&reg_idata_##_sname)
 
 static struct regulator_init_data *molly_reg_data[PALMAS_NUM_REGS] = {
+	NULL,
 	PALMAS_REG_PDATA(smps123),
 	NULL,
+	PALMAS_REG_PDATA(smps45),
 	NULL,
-	PALMAS_REG_PDATA(smps45),
-	PALMAS_REG_PDATA(smps45),
 	PALMAS_REG_PDATA(smps6),
 	PALMAS_REG_PDATA(smps7),
 	PALMAS_REG_PDATA(smps8),
@@ -676,7 +683,7 @@ static struct regulator_init_data *molly_reg_data[PALMAS_NUM_REGS] = {
 	NULL,
 	PALMAS_REG_PDATA(ldo1),
 	PALMAS_REG_PDATA(ldo2),
-	NULL,
+	PALMAS_REG_PDATA(ldo3),
 	PALMAS_REG_PDATA(ldo4),
 	PALMAS_REG_PDATA(ldo5),
 	PALMAS_REG_PDATA(ldo6),
@@ -694,19 +701,19 @@ static struct regulator_init_data *molly_reg_data[PALMAS_NUM_REGS] = {
 
 #define PALMAS_REG_INIT_DATA(_sname) (&reg_init_data_##_sname)
 static struct palmas_reg_init *molly_reg_init[PALMAS_NUM_REGS] = {
-	PALMAS_REG_INIT_DATA(smps123),
-	NULL,
-	NULL,
-	PALMAS_REG_INIT_DATA(smps45),
-	PALMAS_REG_INIT_DATA(smps45),
-	PALMAS_REG_INIT_DATA(smps6),
-	PALMAS_REG_INIT_DATA(smps7),
-	PALMAS_REG_INIT_DATA(smps8),
-	PALMAS_REG_INIT_DATA(smps9),
-	NULL,
+	NULL, /* SMPS12 */
+	PALMAS_REG_INIT_DATA(smps123), /* SMPS123 */
+	NULL, /* SMPS3 */
+	PALMAS_REG_INIT_DATA(smps45), /* SMPS45 */
+	NULL, /* SMPS457 */
+	PALMAS_REG_INIT_DATA(smps6), /* SMPS6 */
+	PALMAS_REG_INIT_DATA(smps7), /* SMPS7 */
+	PALMAS_REG_INIT_DATA(smps8), /* SMPS8 */
+	PALMAS_REG_INIT_DATA(smps9), /* SMPS9 */
+	NULL, /* SMPS10 */
 	PALMAS_REG_INIT_DATA(ldo1),
 	PALMAS_REG_INIT_DATA(ldo2),
-	NULL,
+	PALMAS_REG_INIT_DATA(ldo3),
 	PALMAS_REG_INIT_DATA(ldo4),
 	PALMAS_REG_INIT_DATA(ldo5),
 	PALMAS_REG_INIT_DATA(ldo6),
