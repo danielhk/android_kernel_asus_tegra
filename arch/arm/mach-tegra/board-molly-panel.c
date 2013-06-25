@@ -98,9 +98,6 @@ static struct resource molly_disp_resources[] = {
 static int molly_hdmi_enable(struct device *dev)
 {
 	int ret;
-#if MOLLY_ON_DALMORE == 0
-	gpio_set_value(molly_hdmi_ls_en, 1);
-#endif
 	if (!molly_hdmi_reg) {
 		molly_hdmi_reg = regulator_get(dev, "avdd_hdmi");
 		if (IS_ERR_OR_NULL(molly_hdmi_reg)) {
@@ -145,9 +142,6 @@ static int molly_hdmi_disable(void)
 		regulator_put(molly_hdmi_pll);
 		molly_hdmi_pll = NULL;
 	}
-#if MOLLY_ON_DALMORE == 0
-	gpio_set_value(molly_hdmi_ls_en, 0);
-#endif
 	return 0;
 }
 
@@ -371,8 +365,16 @@ int __init molly_panel_init(void)
 	gpio_direction_input(molly_hdmi_hpd);
 
 #if MOLLY_ON_DALMORE == 0
-	gpio_request(molly_hdmi_ls_en, "hdmi_ls_en");
-	gpio_direction_output(molly_hdmi_hpd, 0);
+	err = gpio_request(molly_hdmi_ls_en, "hdmi_ls_en");
+	pr_info("%s: gpio_request(hdmi_ls_en) returned %d\n",
+		__func__, err);
+	/* keep level shifter always enabled, otherwise
+	 * HPD hotplug detection fails because it's also
+	 * coming through the level shifter.
+	 */
+	err = gpio_direction_output(molly_hdmi_ls_en, 1);
+	pr_info("%s: gpio_direction_output(hdmi_ls_en, 1) returned %d\n",
+		__func__, err);
 #endif
 
 	/* Copy the bootloader fb to the fb. */
