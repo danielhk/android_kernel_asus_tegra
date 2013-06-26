@@ -123,7 +123,7 @@ static __initdata struct tegra_pingroup_config molly_pinmux_common[] = {
 
 	/* GPIO pinmux */
 	/* LED_EN */
-	GPIO_PINMUX(GMI_AD10, PULL_DOWN, NORMAL, OUTPUT, DISABLE),
+	GPIO_PINMUX(GMI_AD10, NORMAL, NORMAL, OUTPUT, DISABLE),
 	/* LED_TRIG_N */
 	GPIO_PINMUX(GMI_AD11, PULL_UP, NORMAL, OUTPUT, DISABLE),
 	/* STD_TEMP_ALERT */
@@ -317,7 +317,8 @@ static struct gpio_init_pin_info init_gpio_mode_molly_common[] = {
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PCC2, true, 0),
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PG0, false, 0),
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PG1, false, 0),
-	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PH2, false, 0),
+	/* GMI_AD10 - LED_EN - always enable for now */
+	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PH2, false, 1),
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PH3, false, 0),
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PH4, true, 0),
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PH5, false, 0),
