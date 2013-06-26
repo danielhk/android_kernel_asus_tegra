@@ -355,7 +355,6 @@ int tegra_edid_get_monspecs_test(struct tegra_edid *edid,
 	data = new_data->dc_edid.buf;
 	memcpy(data, edid_ptr, 128);
 
-	memset(specs, 0x0, sizeof(struct fb_monspecs));
 	memset(&new_data->eld, 0x0, sizeof(new_data->eld));
 	fb_edid_to_monspecs(data, specs);
 	if (specs->modedb == NULL) {
@@ -437,7 +436,6 @@ int tegra_edid_get_monspecs(struct tegra_edid *edid, struct fb_monspecs *specs)
 	if (ret)
 		goto fail;
 
-	memset(specs, 0x0, sizeof(struct fb_monspecs));
 	memset(&new_data->eld, 0x0, sizeof(new_data->eld));
 	fb_edid_to_monspecs(data, specs);
 	if (specs->modedb == NULL) {
