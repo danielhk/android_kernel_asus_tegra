@@ -40,9 +40,12 @@
 #include "dvfs.h"
 
 #define MOLLY_WLAN_PWR	TEGRA_GPIO_PCC5
+#if MOLLY_ON_DALMORE == 1
 #define MOLLY_WLAN_RST	TEGRA_GPIO_PX7
+#else
+#define MOLLY_WLAN_RST	TEGRA_GPIO_PW5
+#endif
 #define MOLLY_WLAN_WOW	TEGRA_GPIO_PU5
-#define MOLLY_SD_CD		TEGRA_GPIO_PV2
 static void (*wifi_status_cb)(int card_present, void *dev_id);
 static void *wifi_status_cb_devid;
 static int molly_wifi_status_register(void (*callback)(int , void *), void *);
@@ -124,7 +127,7 @@ static struct tegra_sdhci_platform_data tegra_sdhci_platform_data0 = {
 #ifdef CONFIG_MMC_EMBEDDED_SDIO
 		.embedded_sdio = &embedded_sdio_data0,
 #endif
-		.built_in = 0,
+		.built_in = 1,
 		.ocr_mask = MMC_OCR_1V8_MASK,
 	},
 #ifndef CONFIG_MMC_EMBEDDED_SDIO
@@ -199,15 +202,18 @@ static int molly_wifi_set_carddetect(int val)
 	return 0;
 }
 
+#if MOLLY_ON_DALMORE == 1
 static struct regulator *molly_vdd_com_3v3;
 static struct regulator *molly_vddio_com_1v8;
 #define MOLLY_VDD_WIFI_3V3 "vdd_wifi_3v3"
 #define MOLLY_VDD_WIFI_1V8 "vddio_wifi_1v8"
+#endif
 
 static int molly_wifi_regulator_enable(void)
 {
 	int ret = 0;
 
+#if MOLLY_ON_DALMORE == 1
 	/* Enable COM's vdd_com_3v3 regulator*/
 	if (IS_ERR_OR_NULL(molly_vdd_com_3v3)) {
 		molly_vdd_com_3v3 = regulator_get(&molly_wifi_device.dev,
@@ -255,12 +261,14 @@ static int molly_wifi_regulator_enable(void)
 			return ret;
 		}
 	}
+#endif
 
 	return ret;
 }
 
 static void molly_wifi_regulator_disable(void)
 {
+#if MOLLY_ON_DALMORE == 1
 	/* Disable COM's vdd_com_3v3 regulator*/
 	if (!IS_ERR_OR_NULL(molly_vdd_com_3v3)) {
 		regulator_disable(molly_vdd_com_3v3);
@@ -274,6 +282,7 @@ static void molly_wifi_regulator_disable(void)
 		regulator_put(molly_vddio_com_1v8);
 		molly_vddio_com_1v8 = NULL;
 	}
+#endif
 }
 
 static int molly_wifi_power(int on)
