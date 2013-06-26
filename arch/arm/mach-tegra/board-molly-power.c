@@ -730,17 +730,16 @@ static struct palmas_reg_init *molly_reg_init[PALMAS_NUM_REGS] = {
 };
 #endif
 
+/* Note: this can't be __initdata because palmas driver
+ * keeps a reference to it after init.
+ */
 static struct palmas_pmic_platform_data pmic_platform = {
 	.enable_ldo8_tracking = true,
 	.disabe_ldo8_tracking_suspend = true,
 	.disable_smps10_boost_suspend = false,
 };
 
-static struct palmas_rtc_platform_data rtc_platform = {
-	.enable_charging = 0,
-};
-
-static struct palmas_pinctrl_config palmas_pincfg[] = {
+static struct palmas_pinctrl_config __initdata palmas_pincfg[] = {
 	PALMAS_PINMUX(POWERGOOD, POWERGOOD, DEFAULT, DEFAULT),
 	PALMAS_PINMUX(VAC, VAC, DEFAULT, DEFAULT),
 	PALMAS_PINMUX(GPIO0, GPIO, DEFAULT, DEFAULT),
@@ -753,35 +752,35 @@ static struct palmas_pinctrl_config palmas_pincfg[] = {
 	PALMAS_PINMUX(GPIO7, GPIO, DEFAULT, DEFAULT),
 };
 
-static struct palmas_pinctrl_platform_data palmas_pinctrl_pdata = {
+static struct palmas_pinctrl_platform_data __initdata palmas_pinctrl_pdata = {
 	.pincfg = palmas_pincfg,
 	.num_pinctrl = ARRAY_SIZE(palmas_pincfg),
 	.dvfs1_enable = true,
 	.dvfs2_enable = false,
 };
 
-struct palmas_clk32k_init_data palmas_clk32k_pdata[] = {
+struct palmas_clk32k_init_data __initdata palmas_clk32k_pdata[] = {
 	{
 		.clk32k_id = PALMAS_CLOCK32KG,
 		.enable = true,
-	}, {
+	},
+	{
 		.clk32k_id = PALMAS_CLOCK32KG_AUDIO,
 		.enable = true,
 	},
 };
 
-static struct palmas_platform_data palmas_pdata = {
+static struct palmas_platform_data __initdata palmas_pdata = {
 	.gpio_base = PALMAS_TEGRA_GPIO_BASE,
 	.irq_base = PALMAS_TEGRA_IRQ_BASE,
 	.pmic_pdata = &pmic_platform,
-	.clk32k_init_data =  palmas_clk32k_pdata,
+	.clk32k_init_data = palmas_clk32k_pdata,
 	.clk32k_init_data_size = ARRAY_SIZE(palmas_clk32k_pdata),
-	.rtc_pdata = &rtc_platform,
 	.use_power_off = true,
 	.pinctrl_pdata = &palmas_pinctrl_pdata,
 };
 
-static struct i2c_board_info palma_device[] = {
+static struct i2c_board_info __initdata palma_device[] = {
 	{
 		I2C_BOARD_INFO("tps65913", 0x58),
 		.irq		= INT_EXTERNAL_PMU,
