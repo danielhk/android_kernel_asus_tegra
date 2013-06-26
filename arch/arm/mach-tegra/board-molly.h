@@ -21,7 +21,7 @@
 #ifndef _MACH_TEGRA_BOARD_MOLLY_H
 #define _MACH_TEGRA_BOARD_MOLLY_H
 
-#define MOLLY_ON_DALMORE 1
+#define MOLLY_ON_DALMORE 0
 
 #include <mach/gpio.h>
 #include <mach/irqs.h>
