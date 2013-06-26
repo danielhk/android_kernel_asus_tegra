@@ -220,8 +220,29 @@ static unsigned int palmas_smps_ramp_delay[4] = {0, 10000, 5000, 2500};
  * max/min values where there are no change are ommitted.
  *
  * So they are basically (maxV-minV)/stepV
+ *
+ * The datasheet says for SMPS rails:
+ *   0 = off
+ *   1-6 = 0.5V * mult (where mult is 1 or 2)
+ *   7 = 0.51V * mult
+ *   8 = 0.52V * mult
+ *   ...
+ *   120 (0x78) = 1.64V * mult
+ *   121 (0x79) - 127 (0x7f) = 1.65V * mult
+ *
+ * Since selector is a range from 0 to n_voltages - 1,
+ * the formula used above is
+ *   selector    voltage                               sel
+ *     0          0                                    0
+ *     1          (.49V + .1V) * mult                  6
+ *     2          (.49V + .2V) * mult                  7
+ *     n          (.49V + .1V * selector) * mult       selector+5, or 0
+ *     115                                             120
+ *     116                                             121
+ *
+ * So n_voltages has to be 117
  */
-#define PALMAS_SMPS_NUM_VOLTAGES	116
+#define PALMAS_SMPS_NUM_VOLTAGES	117
 #define PALMAS_SMPS10_NUM_VOLTAGES	2
 #define PALMAS_LDO_NUM_VOLTAGES		50
 
