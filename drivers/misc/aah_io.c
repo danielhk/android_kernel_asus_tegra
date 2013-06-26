@@ -168,9 +168,6 @@ static int aah_io_led_set_mode(struct aah_io_driver_state *state,
 	int rc = 0;
 	struct i2c_client *client = state->i2c_client;
 
-	if (!client)
-		return rc;
-
 	if (mode != state->led_mode) {
 		switch (mode) {
 		case AAH_LED_MODE_POWER_UP_ANIMATION:
@@ -344,11 +341,6 @@ static long aah_io_leddev_ioctl(struct file *file, unsigned int cmd,
 		}
 	}
 	pr_debug("%s: cmd = 0x%x\n", __func__, cmd);
-
-	if (!state->i2c_client) {
-		mutex_unlock(&state->lock);
-		return 0;
-	}
 
 	switch (cmd) {
 	case AAH_IO_LED_GET_MODE: {
@@ -524,12 +516,7 @@ static int aah_io_probe(struct i2c_client *client,
 	if (!lp5521_is_enabled(client, &state->led_mode)) {
 		dev_err(&client->dev, "not enabled\n");
 		rc = -EINVAL;
-#if 0
 		goto error;
-#else
-		dev_err(&client->dev, "ignoring error for now\n");
-		state->i2c_client = NULL;
-#endif
 	}
 
 	dev_info(&client->dev, "lp5521 programmable led running");
