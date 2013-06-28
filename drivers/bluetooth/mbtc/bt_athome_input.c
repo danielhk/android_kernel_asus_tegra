@@ -14,6 +14,7 @@
 
 #include <linux/input.h>
 #include <linux/input/mt.h>
+#include <linux/ktime.h>
 #include "bt_athome_input.h"
 #include "bt_athome_logging.h"
 #include "bt_athome_proto.h"
@@ -23,6 +24,7 @@ static struct {
 	struct input_dev *idev;
 	uint8_t fingers_down;
 	char uniq[16];
+	struct timespec last_evt;
 } inputs[ATHOME_RMT_MAX_CONNS];
 
 
@@ -51,9 +53,10 @@ static int athome_bt_input_init_device(struct input_dev **idevP)
 
 	idev->name = "athome_remote";
 
-	/* we support touch buttons */
+	/* we support touch, buttons, misc */
 	set_bit(EV_SYN, idev->evbit);
 	set_bit(EV_ABS, idev->evbit);
+	set_bit(EV_MSC, idev->evbit);
 
 	/* we support the following buttons */
 	set_bit(EV_KEY, idev->evbit);
@@ -74,8 +77,13 @@ static int athome_bt_input_init_device(struct input_dev **idevP)
 	input_abs_set_res(idev, ABS_MT_POSITION_Y,
 					RAW_Y_MAX / AAH_BT_TOUCHPAD_HEIGHT);
 
-	/* without misc key capability, volume keys will do nothing */
+	/* without misc scan capability, volume keys will do nothing */
 	input_set_capability(idev, EV_MSC, MSC_SCAN);
+
+	/* hacky way to give android timestamps for the events */
+	input_set_capability(idev, EV_MSC, MSC_ANDROID_TIME_SEC);
+	input_set_capability(idev, EV_MSC, MSC_ANDROID_TIME_USEC);
+
 	err = input_register_device(idev);
 	if (err) {
 		aahlog("Failed to register input device\n");
@@ -94,6 +102,11 @@ static void athome_bt_input_del_device(struct input_dev *idev)
 	input_free_device(idev);
 }
 
+void athome_bt_input_reset_time(unsigned which)
+{
+	ktime_get_ts(&inputs[which].last_evt);
+}
+
 int athome_bt_input_init(void)
 {
 	int err;
@@ -110,6 +123,7 @@ int athome_bt_input_init(void)
 			break;
 		inputs[i].idev->uniq = inputs[i].uniq;
 		inputs[i].fingers_down = 0;
+		athome_bt_input_reset_time(i);
 	}
 	if (i == ATHOME_RMT_MAX_CONNS)
 		return 0;
@@ -180,10 +194,20 @@ void athome_bt_input_send_buttons(unsigned which, uint32_t mask)
 	}
 }
 
-void athome_bt_input_frame(unsigned which)
+void athome_bt_input_frame(unsigned which, long msec_since_last)
 {
 	BUG_ON(which >= ARRAY_SIZE(inputs));
 
+	if (msec_since_last == AAH_BT_UNKNOWN_MSEC)
+		athome_bt_input_reset_time(which);
+	else
+		timespec_add_ns(&inputs[which].last_evt,
+				(uint64_t)msec_since_last * NSEC_PER_MSEC);
+
+	input_event(inputs[which].idev, EV_MSC, MSC_ANDROID_TIME_SEC,
+					inputs[which].last_evt.tv_sec);
+	input_event(inputs[which].idev, EV_MSC, MSC_ANDROID_TIME_USEC,
+			inputs[which].last_evt.tv_nsec / NSEC_PER_USEC);
 	input_sync(inputs[which].idev);
 }
 

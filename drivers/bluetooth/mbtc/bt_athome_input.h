@@ -24,13 +24,14 @@
 
 #define ATHOME_MAX_FINGERS			3
 
+#define AAH_BT_UNKNOWN_MSEC			-1
 
 int athome_bt_input_init(void);
 void athome_bt_input_deinit(void);
 void athome_bt_input_send_touch(unsigned which, int pointer_idx,
 					uint16_t x, uint16_t y);
 void athome_bt_input_send_buttons(unsigned which, uint32_t mask);
-void athome_bt_input_frame(unsigned which);
+void athome_bt_input_frame(unsigned which, long msec_since_last);
 
 
 #endif

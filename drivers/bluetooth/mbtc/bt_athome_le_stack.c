@@ -825,7 +825,10 @@ static int athome_bt_data_rx(int which, uint8_t *in_data, uint32_t len)
 		}
 		if (LOG_INPUT_EVENTS)
 			aahlog_continue("}\n");
-		athome_bt_input_frame(which);
+		i = inp->info & ATHOME_INPUT_INFO_MASK_TIMESTAMP;
+		athome_bt_input_frame(which,
+				i == ATHOME_INPUT_INFO_MASK_TIMESTAMP ?
+					AAH_BT_UNKNOWN_MSEC : ((long)i * 10));
 		break;
 
 	case ATHOME_PKT_RX_AUDIO_0:
