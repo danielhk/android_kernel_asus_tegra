@@ -42,6 +42,14 @@
 #include <linux/delay.h>
 #include <linux/reboot.h>
 
+#ifndef HACK_DEBUG_USING_LED
+// Set to 1 if you want to change the LED color based on the last BTLE event.
+// This is a hack that was added for debugging. It will help us know
+// whether Bemote or Wolfie is hung.
+// See corresponding change in "drivers/bluetooth/mbt/bt_athome_le_stack.c".
+#define HACK_DEBUG_USING_LED  1
+#endif
+
 MODULE_LICENSE("GPL v2");
 
 #define LP5521_PROGRAM_LENGTH		32	/* in bytes */
@@ -200,6 +208,27 @@ static int aah_io_led_set_rgb(struct aah_io_driver_state *state,
 					      LP5521_REG_LED_PWM_BASE,
 					      3, &rgb_val->rgb[0]);
 }
+
+#ifdef HACK_DEBUG_USING_LED
+static bool hack_disable_ioctl;
+int aah_io_led_hack( uint rgb_color )
+{
+	/* no clean way to get the state so have to use a global */
+	struct aah_io_driver_state *state = g_state;
+	struct led_rgb_vals rgb_val;
+	static uint last_color = (uint) -1;
+	int rc = 0;
+	if ((rgb_color != last_color) && (state != NULL)) {
+		rgb_val.rgb[0] = (rgb_color >> 16) & 0xFF;
+		rgb_val.rgb[1] = (rgb_color >> 8) & 0xFF;
+		rgb_val.rgb[2] = (rgb_color >> 0) & 0xFF;
+		hack_disable_ioctl = true;
+		rc = aah_io_led_set_rgb(state, &rgb_val);
+		last_color = rgb_color;
+	}
+	return rc;
+}
+#endif
 
 static int gpio_input_event(struct gpio_event_input_devs *input_devs,
 			    struct gpio_event_info *info,
@@ -371,6 +400,10 @@ static long aah_io_leddev_ioctl(struct file *file, unsigned int cmd,
 			rc = -EFAULT;
 			break;
 		}
+
+#ifdef HACK_DEBUG_USING_LED
+		if (!hack_disable_ioctl)
+#endif
 		rc = aah_io_led_set_rgb(state, &req);
 	} break;
 

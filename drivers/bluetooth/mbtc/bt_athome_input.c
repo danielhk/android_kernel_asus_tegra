@@ -20,6 +20,50 @@
 #include "bt_athome_proto.h"
 
 
+#if HACK_DEBUG_USING_LED
+#define HACK_LED_BLACK    0
+#define HACK_LED_BLUE     0x0000FF
+#define HACK_LED_GREEN    0x00FF00
+#define HACK_LED_RED      0xFF0000
+#define HACK_LED_GRAY     0x404040
+#define HACK_LED_YELLOW   0x808000
+
+int aah_io_led_hack( uint rgb_color );
+
+void athome_bt_led_show_event(int event_type)
+{
+	static bool toggle;
+	switch(event_type) {
+		case HACK_LED_EVENT_CONNECT:
+		case HACK_LED_EVENT_AWAKE:
+			aah_io_led_hack(HACK_LED_YELLOW);
+			toggle = false;
+			break;
+
+		case HACK_LED_EVENT_TOUCH_DOWN:
+			aah_io_led_hack(HACK_LED_GREEN);
+			break;
+
+		case HACK_LED_EVENT_BUTTON_DOWN:
+			aah_io_led_hack(HACK_LED_RED);
+			break;
+
+		case HACK_LED_EVENT_INPUT_UP:
+			aah_io_led_hack(HACK_LED_GRAY);
+			break;
+
+		case HACK_LED_EVENT_ASLEEP:
+			aah_io_led_hack(HACK_LED_BLUE);
+			break;
+
+		case HACK_LED_EVENT_DISCONNECT:
+			aah_io_led_hack(HACK_LED_BLACK);
+			break;
+	}
+}
+#endif /* HACK_DEBUG_USING_LED */
+
+
 static struct {
 	struct input_dev *idev;
 	uint8_t fingers_down;
@@ -156,6 +200,10 @@ void athome_bt_input_send_touch(unsigned which, int pointer_idx,
 	idev = inputs[which].idev;
 	wasdown = !!(inputs[which].fingers_down & mask);
 
+	if (isdown && !wasdown)
+		athome_bt_led_show_event(HACK_LED_EVENT_TOUCH_DOWN);
+	else if (!isdown && wasdown)
+		athome_bt_led_show_event(HACK_LED_EVENT_INPUT_UP);
 
 	if (!isdown && !wasdown)
 		return;

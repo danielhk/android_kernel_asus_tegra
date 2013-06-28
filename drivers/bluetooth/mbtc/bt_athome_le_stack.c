@@ -839,6 +839,8 @@ static int athome_bt_data_rx(int which, uint8_t *in_data, uint32_t len)
 					aahlog(" ->  now: 0x%08X\n", buttons);
 			}
 
+			athome_bt_led_show_event(buttons
+				? HACK_LED_EVENT_BUTTON_DOWN : HACK_LED_EVENT_INPUT_UP);
 			athome_bt_input_send_buttons(which,
 						buttons & ~SECURE_BTN_MASK);
 
@@ -886,6 +888,8 @@ static int athome_bt_data_rx(int which, uint8_t *in_data, uint32_t len)
 				msw->mode != ATHOME_MODE_SEMIIDLE)
 			msw->mode = ATHOME_MODE_IDLE;
 		conns[which].next_pwr = msw->mode;
+		athome_bt_led_show_event((msw->mode == ATHOME_MODE_ACTIVE)
+			? HACK_LED_EVENT_AWAKE : HACK_LED_EVENT_ASLEEP);
 		if (LOG_MODESWITCH)
 			aahlog("Requested modeswitch to %d for conn %d\n",
 							msw->mode, which);
@@ -1210,6 +1214,8 @@ static int athome_bt_process_evt(struct sk_buff *skb, bool *is_scanning,
 			clockA[ci->clk_accurancy],
 			*proto_ver);
 
+		athome_bt_led_show_event(HACK_LED_EVENT_CONNECT);
+
 		spin_lock_irqsave(&stack_state_lock, flags);
 		for (i = 0; i < ATHOME_RMT_MAX_CONNS &&
 				conns[i].state != CONN_STATE_INVALID; i++)
@@ -1496,6 +1502,7 @@ static int athome_bt_thread(void *unusedData)
 
 		struct sk_buff *skb = NULL;
 		bool did_something = false;
+		bool is_disconnecting = false;
 
 		/* always scanning, if possible */
 		if (!is_scanning && !is_connecting) {
@@ -1612,6 +1619,7 @@ static int athome_bt_thread(void *unusedData)
 			} else if (conns[i].gone) {
 				conns[i].state = CONN_STATE_INVALID;
 				conns[i].gone = false;
+				is_disconnecting = true;
 				nconns--;
 				did_something = 1;
 			} else if (conns[i].pwr != conns[i].next_pwr &&
@@ -1629,6 +1637,10 @@ static int athome_bt_thread(void *unusedData)
 		}
 		if (i == ATHOME_RMT_MAX_CONNS)
 			spin_unlock_irqrestore(&stack_state_lock, flags);
+
+		if (is_disconnecting)
+			athome_bt_led_show_event(HACK_LED_EVENT_DISCONNECT);
+
 		if (ret)
 			goto exit_return;
 
