@@ -53,7 +53,8 @@ static void athome_bt_log_uuids(const uint8_t **data, uint8_t* L, unsigned len)
  * produce a simple final decision to or not to connect, and whom to.
  */
 static bool athome_bt_discovered_device(const uint8_t **bufP,
-			bool try_connect, uint8_t *macP, int* remain_bytes)
+			bool try_connect, uint8_t *macP,
+			int* remain_bytes, uint32_t *proto_ver)
 {
 	static const char *advTypes[] = {"ADV_IND", "ADV_DIRECT_IND",
 					"ADV_SCAN_IND", "ADV_NONCONN_IND",
@@ -71,6 +72,7 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 			(struct hci_ev_le_advertising_info*)buf;
 	struct athome_bt_adv_manuf_data *manuf;
 	uint8_t ver[4] = {0,};
+	uint32_t ver_val = 0;
 	int8_t rssi;
 
 
@@ -229,7 +231,6 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 		case ADV_DATA_MANUF_SPECIFIC: //custom
 			if (needmanuf && L >= sizeof(*manuf)) do {
 
-				uint32_t ver_val;
 				manuf = (struct athome_bt_adv_manuf_data*)data;
 
 				if (memcmp(manuf->ident, ATHOME_BT_IDENT,
@@ -370,6 +371,7 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 		else {
 			try_connect = true;
 			memcpy(macP, mac, sizeof(mac));
+			*proto_ver = ver_val;
 		}
 	}
 
@@ -378,7 +380,8 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 }
 
 /* process adv response, see if anything of use is in it, if so, what */
-bool athome_bt_discovered(const uint8_t *buf, uint8_t *macP, int len)
+bool athome_bt_discovered(const uint8_t *buf, uint8_t *macP, int len,
+							uint32_t *proto_ver)
 {
 	bool try_connect = false;
 	uint8_t num;
@@ -395,7 +398,7 @@ bool athome_bt_discovered(const uint8_t *buf, uint8_t *macP, int len)
 
 	while (num--)
 		try_connect = athome_bt_discovered_device(&buf,
-						try_connect, macP, &len);
+					try_connect, macP, &len, proto_ver);
 
 	return try_connect;
 }

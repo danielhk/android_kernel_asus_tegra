@@ -25,6 +25,7 @@
 #define ENCR_RND_NUM			0x474A204143204744ULL
 #define ENCR_DIV			0x6F67
 #define MIN_PROTO_VERSION		0x00010000
+#define PROTO_VERSION_AUDIO_V2		0x00010001
 #define CONNECT_TIMEOUT			5000 /* try for 5 seconds to connect */
 #define ENCRYPT_DAT_TIMEOUT		1000 /* 1 sec for encrypt data echo */
 #define ENCRYPT_TIMEOUT			1000 /* 1 sec for encryption */

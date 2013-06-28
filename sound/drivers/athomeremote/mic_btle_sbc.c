@@ -83,7 +83,7 @@ MODULE_SUPPORTED_DEVICE("{{ALSA,RemoteMic soundcard}}");
 
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;  /* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;   /* ID for this card */
-static int enable[SNDRV_CARDS] = {1, 0};
+static bool enable[SNDRV_CARDS] = {true, false};
 /* Linux does not like NULL initialization. */
 static char *model[SNDRV_CARDS]; /* = {[0 ... (SNDRV_CARDS - 1)] = NULL}; */
 static int pcm_devs[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};
@@ -93,7 +93,7 @@ module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for btlesbc soundcard.");
 module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string for btlesbc soundcard.");
-module_param_array(enable, int, NULL, 0444);
+module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable this btlesbc soundcard.");
 module_param_array(model, charp, NULL, 0444);
 MODULE_PARM_DESC(model, "Soundcard model.");
@@ -179,14 +179,19 @@ static void btlesbc_handle_frame_advance(
  * SBC format parameters arranged from low to high quality.
  * TODO Move to sbc decoder as inline functions.
  */
-const uint8_t s_blocks_per_packet[SBC_NUM_FORMATS] = { 16, 12,  8,  5 };
-const uint8_t s_num_bits[SBC_NUM_FORMATS]          = { 10, 14, 21, 33 };
+const uint8_t s_blocks_per_packet_old[SBC_NUM_FORMATS] = { 16, 12,  8,  5 };
+const uint8_t s_num_bits_old[SBC_NUM_FORMATS]          = { 10, 14, 21, 33 };
+
+const uint8_t s_blocks_per_packet_new[SBC_NUM_FORMATS] = { 16, 12,  8,  6 };
+const uint8_t s_num_bits_new[SBC_NUM_FORMATS]          = { 10, 14, 21, 28 };
+
 
 static int btlesbc_decode_sbc_packet(
 			struct snd_pcm_substream *substream,
 			uint packet_type, /* describes SBC format, 0-3 */
 			const uint8_t *sbc_input,
-			size_t num_bytes
+			size_t num_bytes,
+			bool new_timings
 			)
 {
 	uint num_samples;
@@ -195,6 +200,12 @@ static int btlesbc_decode_sbc_packet(
 	uint32_t pos;
 	uint read_index = 0;
 	struct snd_btlesbc *btlesbc = snd_pcm_substream_chip(substream);
+
+	/* Get decoder params */
+	const uint8_t *s_blocks_per_packet = new_timings ?
+			s_blocks_per_packet_new : s_blocks_per_packet_old;
+	const uint8_t *s_num_bits = new_timings ?
+			s_num_bits_new : s_num_bits_old;
 
 	/* Decode SBC data to PCM. */
 	uint blocks_per_packet = s_blocks_per_packet[packet_type];
@@ -241,13 +252,16 @@ static int btlesbc_decode_sbc_packet(
  * @param which index of Bemote TODO
  * @param format AAH SBC format, 0-3
  * @param sbc_input pointer to SBC data to be decoded
+ * @param num_bytes how mnay bytes in sbc_input
+ * @param new_timings - set for new packet format in proto 0.1.0.1
  * @return number of samples decoded or negative error.
  */
 void athome_bt_audio_dec(
 			int which,
 			int format,
 			const uint8_t *sbc_input,
-			size_t num_bytes
+			size_t num_bytes,
+			bool new_timings
 			)
 {
 #if DEBUG_COUNT_PACKETS
@@ -263,7 +277,7 @@ void athome_bt_audio_dec(
 	if (s_current_substream != NULL) {
 		/* TODO use array of substream pointers for 4 cards. */
 		btlesbc_decode_sbc_packet(s_current_substream,
-			format, sbc_input, num_bytes);
+			format, sbc_input, num_bytes, new_timings);
 	}
 	smp_wmb(); /* so other thread will see updated position */
 }

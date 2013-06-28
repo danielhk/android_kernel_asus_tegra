@@ -97,7 +97,7 @@ void athome_bt_stack_shutdown(void);
  *	This must exist elsewhere in the kernel. Used for audio packets
  */
 void athome_bt_audio_dec(int which, int format,
-				const uint8_t *data, unsigned len);
+			const uint8_t *data, unsigned len, bool new_timings);
 
 
 

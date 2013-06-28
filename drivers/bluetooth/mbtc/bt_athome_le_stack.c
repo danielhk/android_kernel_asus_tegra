@@ -51,6 +51,7 @@ struct athome_bt_conn {
 	bool gone, timeout, outstanding, in_modeswitch;
 	uint8_t MAC[AAH_BT_MAC_SZ];
 	uint8_t LTK[AAH_BT_LTK_SZ];
+	uint32_t proto_ver;
 	struct timer_list timer;
 
 	uint8_t entropy[AAH_BT_ENTROPY_SZ];
@@ -837,7 +838,8 @@ static int athome_bt_data_rx(int which, uint8_t *in_data, uint32_t len)
 	case ATHOME_PKT_RX_AUDIO_3:
 #ifdef CONFIG_SND_MIC_BTLE_SBC
 		athome_bt_audio_dec(which, type - ATHOME_PKT_RX_AUDIO_0,
-								data, len);
+			data, len,
+			conns[which].proto_ver >= PROTO_VERSION_AUDIO_V2);
 #endif
 		break;
 
@@ -1118,8 +1120,8 @@ static int athome_bt_host_setup(void)
 }
 
 static int athome_bt_process_evt(struct sk_buff *skb, bool *is_scanning,
-			bool *is_connecting, bool *did_something,
-			struct timer_list *timeout)
+			bool *is_connecting, uint32_t *proto_ver,
+			bool *did_something, struct timer_list *timeout)
 {
 	/* clock accuracy velues indexed as per BT 4.0 spec */
 	static const unsigned clockA[] = {500,250,150,100,75,50,30,20};
@@ -1167,12 +1169,13 @@ static int athome_bt_process_evt(struct sk_buff *skb, bool *is_scanning,
 		handle = r16LE(&ci->handle) & ACL_CONN_MASK;
 		aahlog("CONNECTED with handle %d as %c with "
 			"interval  %uuS, latency %u, sv_to "
-			"%umS & MCA %uppm\n", handle,
+			"%umS & MCA %uppm (v%08X)\n", handle,
 			ci->role ? 'S' : 'M',
 			1250 * r16LE(&ci->interval),
 			r16LE(&ci->latency),
 			10 * r16LE(&ci->supervision_timeout),
-			clockA[ci->clk_accurancy]);
+			clockA[ci->clk_accurancy],
+			*proto_ver);
 
 		spin_lock_irqsave(&stack_state_lock, flags);
 		for (i = 0; i < ATHOME_RMT_MAX_CONNS &&
@@ -1201,6 +1204,7 @@ static int athome_bt_process_evt(struct sk_buff *skb, bool *is_scanning,
 			conns[i].pwr = ATHOME_MODE_ACTIVE;
 			conns[i].next_pwr = ATHOME_MODE_ACTIVE;
 			conns[i].in_modeswitch = false;
+			conns[i].proto_ver = *proto_ver;
 			memcpy(conns[i].MAC, ci->bdaddr.b, AAH_BT_MAC_SZ);
 			memset(&conns[i].stats, 0, sizeof(conns[i].stats));
 			conns[i].last_time = get_time();
@@ -1228,18 +1232,21 @@ device_handled:
 			HCI_EV_LE_ADVERTISING_REPORT) {
 
 		uint8_t mac[AAH_BT_MAC_SZ];
+		uint32_t new_proto_ver = 0;
 
 		*did_something = true;
 		if (athome_bt_discovered(data, mac,
-			skb->len - sizeof(*evt)) &&
+			skb->len - sizeof(*evt), &new_proto_ver) &&
 				!*is_connecting &&
 				nconns != ATHOME_RMT_MAX_CONNS) {
 
+			BUG_ON(!new_proto_ver);
+
 			*is_scanning = false;
 			aahlog("Trying to connect to %02X:%02X"
-				":%02X:%02X:%02X:%02X\n",
+				":%02X:%02X:%02X:%02X (v%08X)\n",
 				mac[5], mac[4], mac[3], mac[2],
-				mac[1], mac[0]);
+				mac[1], mac[0], new_proto_ver);
 
 			/* try to connect */
 			parP = buf;
@@ -1269,6 +1276,7 @@ device_handled:
 			if (stat->status)
 				aahlog("failed conn. try.\n");
 			else {
+				*proto_ver = new_proto_ver;
 				*is_connecting = true;
 				mod_timer(timeout, jiffies +
 					msecs_to_jiffies(
@@ -1413,6 +1421,7 @@ static int athome_bt_thread(void *unusedData)
 	uint8_t *evt_data = buf + HCI_EVENT_HDR_SIZE;
 	uint8_t *cmd_cmpl_data = evt_data + sizeof(struct hci_ev_cmd_complete);
 	bool is_scanning = false, is_connecting = false;
+	uint32_t proto_ver;
 	uint8_t *parP, sta;
 	uint16_t handle;
 	unsigned long flags;
@@ -1481,7 +1490,8 @@ static int athome_bt_thread(void *unusedData)
 
 		if (skb) {
 			athome_bt_process_evt(skb, &is_scanning,
-				&is_connecting, &did_something, &timeout);
+					&is_connecting, &proto_ver,
+					&did_something, &timeout);
 			kfree_skb(skb);
 			skb = NULL;
 		}
