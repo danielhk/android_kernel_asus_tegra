@@ -69,6 +69,10 @@ static int athome_bt_input_init_device(struct input_dev **idevP)
 	input_mt_init_slots(idev, ATHOME_MAX_FINGERS);
 	input_set_abs_params(idev, ABS_MT_POSITION_X, 0, RAW_X_MAX, 0, 0);
 	input_set_abs_params(idev, ABS_MT_POSITION_Y, 0, RAW_Y_MAX, 0, 0);
+	input_abs_set_res(idev, ABS_MT_POSITION_X,
+					RAW_X_MAX / AAH_BT_TOUCHPAD_WIDTH);
+	input_abs_set_res(idev, ABS_MT_POSITION_Y,
+					RAW_Y_MAX / AAH_BT_TOUCHPAD_HEIGHT);
 
 	/* without misc key capability, volume keys will do nothing */
 	input_set_capability(idev, EV_MSC, MSC_SCAN);

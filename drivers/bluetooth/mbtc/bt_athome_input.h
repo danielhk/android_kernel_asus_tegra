@@ -19,6 +19,8 @@
 #define AAH_BT_KEY_POWER			177
 #define AAH_BT_KEY_INPUT			178
 
+#define AAH_BT_TOUCHPAD_WIDTH			50	/* in mm */
+#define AAH_BT_TOUCHPAD_HEIGHT			50	/* in mm */
 
 #define ATHOME_MAX_FINGERS			3
 
