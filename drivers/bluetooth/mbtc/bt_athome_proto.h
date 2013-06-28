@@ -222,6 +222,8 @@ struct athome_bt_stats {
 		uint8_t mode;
 	} __packed;
 #define ATHOME_PKT_RX_NFC		8
+#define ATHOME_PKT_RX_NFC_RF_DETECT	9
+#define ATHOME_PKT_RX_PAIRING		119
 
 #define ATHOME_PKT_TX_ACK		0
 	/* see athome_pkt_ack */
@@ -240,6 +242,13 @@ struct athome_bt_stats {
 		uint8_t entropy[AAH_BT_ENTROPY_SZ];
 	} __packed;
 #define ATHOME_PKT_TX_NFC		5
+#define ATHOME_PKT_TX_IR 		6
+#define ATHOME_PKT_TX_PAIRING		119
+	struct athome_tx_pkt_pairing {
+		uint8_t offset;
+		uint8_t total_len;
+		uint8_t data[]; /* up to 25 bytes */
+	} __packed;
 
 
 

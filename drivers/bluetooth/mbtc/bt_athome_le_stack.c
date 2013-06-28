@@ -534,7 +534,8 @@ bool athome_bt_send_data(const uint8_t *MAC, uint8_t typ,
 	else if (conns[which].state == CONN_STATE_BINDING &&
 					typ != ATHOME_PKT_TX_ACK &&
 					typ != ATHOME_PKT_TX_SET_PARAM &&
-					typ != ATHOME_PKT_TX_ENC)
+					typ != ATHOME_PKT_TX_ENC &&
+					typ != ATHOME_PKT_TX_PAIRING)
 		/* only some packet types allowed in binding mode */
 		/*
 			XXX: TODO: once binding is proper, stop allowing
@@ -774,7 +775,9 @@ static int athome_bt_data_rx(int which, uint8_t *in_data, uint32_t len)
 
 	case CONN_STATE_BINDING:
 		/* only some packets allowed in bind mode */
-		ok = type == ATHOME_PKT_RX_ACK || type == ATHOME_PKT_RX_INPUT;
+		ok = type == ATHOME_PKT_RX_ACK ||
+		     type == ATHOME_PKT_RX_INPUT ||
+		     type == ATHOME_PKT_RX_PAIRING;
 		secure = false;
 		break;
 	}
