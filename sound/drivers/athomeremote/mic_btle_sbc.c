@@ -103,10 +103,10 @@ module_param_array(pcm_substreams, int, NULL, 0444);
 MODULE_PARM_DESC(pcm_substreams,
 	"PCM substreams # (1-128) for btlesbc driver?");
 
-
 static struct platform_device *devices[SNDRV_CARDS];
 
-/* TODO Hack so Bluetooth can pass SBC to a running stream.
+/*
+ * Static substream is needed so Bluetooth can pass SBC to a running stream.
  * This also serves to enable or disable the decoding of audio in the callback.
  */
 struct snd_pcm_substream *s_current_substream;
@@ -236,7 +236,7 @@ static int btlesbc_decode_sbc_packet(
 	/* Advance write position. */
 	pos += num_samples;
 	/* Wrap around at end of the circular buffer. */
-	if (pos > btlesbc->frames_per_buffer)
+	if (pos >= btlesbc->frames_per_buffer)
 		pos -= btlesbc->frames_per_buffer;
 
 	btlesbc->write_index = pos;
@@ -246,13 +246,17 @@ static int btlesbc_decode_sbc_packet(
 	return num_samples;
 }
 
+#if DEBUG_COUNT_PACKETS
+static int debug_decoder_callback_counter;
+#endif
+
 /**
  * This is called by the Android@Home Bluetooth driver when it gets an
  * SBC packet from Bemote.
  * @param which index of Bemote TODO
  * @param format AAH SBC format, 0-3
  * @param sbc_input pointer to SBC data to be decoded
- * @param num_bytes how mnay bytes in sbc_input
+ * @param num_bytes how many bytes in sbc_input
  * @param new_timings - set for new packet format in proto 0.1.0.1
  * @return number of samples decoded or negative error.
  */
@@ -264,22 +268,22 @@ void athome_bt_audio_dec(
 			bool new_timings
 			)
 {
-#if DEBUG_COUNT_PACKETS
-	static int counter;
-#endif
 	smp_rmb(); /* for s_current_substream and the write_index */
+
 #if DEBUG_COUNT_PACKETS
-	if ((counter++ & 0x3FF) == 0) {
-		pr_info("%s called %d times, %s\n", __func__, counter,
+	if ((debug_decoder_callback_counter++ & 0x3FF) == 0) {
+		pr_info("%s called %d times, %s\n", __func__,
+			debug_decoder_callback_counter,
 			((s_current_substream == NULL) ? "ignored" : "on"));
 	}
 #endif
+
 	if (s_current_substream != NULL) {
 		/* TODO use array of substream pointers for 4 cards. */
 		btlesbc_decode_sbc_packet(s_current_substream,
 			format, sbc_input, num_bytes, new_timings);
 	}
-	smp_wmb(); /* so other thread will see updated position */
+	smp_wmb(); /* so other thread will see updated write_index */
 }
 
 /* ===================================================================== */
@@ -377,6 +381,9 @@ static int btlesbc_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
+#if DEBUG_COUNT_PACKETS
+		debug_decoder_callback_counter = 0;
+#endif
 		/* TODO use other device ids besides zero */
 		pr_info("%s starting audio\n", __func__);
 		sbc_decoder_reset();
@@ -405,22 +412,15 @@ static int btlesbc_pcm_prepare(struct snd_pcm_substream *substream)
 {
 	struct snd_btlesbc *btlesbc = snd_pcm_substream_chip(substream);
 	struct snd_pcm_runtime *runtime = substream->runtime;
-#define PRINT_RUNTIME(member) pr_info("%s, " #member " = %d\n", \
-		__func__, (int) runtime->member);
-	PRINT_RUNTIME(access);
-	PRINT_RUNTIME(format);
-	PRINT_RUNTIME(subformat);
-	PRINT_RUNTIME(rate);
-	PRINT_RUNTIME(channels);
-	PRINT_RUNTIME(period_size);
-	PRINT_RUNTIME(buffer_size);
-	PRINT_RUNTIME(min_align);
+	pr_info("%s, rate = %d, period_size = %d, buffer_size = %d\n",
+		__func__, (int) runtime->rate,
+		(int) runtime->period_size,
+		(int) runtime->buffer_size);
+
 	if (runtime->buffer_size > MAX_FRAMES_PER_BUFFER)
 		return -EINVAL;
 
 	btlesbc->frames_per_buffer = runtime->buffer_size;
-	pr_info("%s, frames_per_buffer = %u\n", __func__,
-		btlesbc->frames_per_buffer);
 
 	return 0; /* TODO - review */
 }
