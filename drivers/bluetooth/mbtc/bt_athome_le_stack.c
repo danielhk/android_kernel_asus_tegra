@@ -61,11 +61,12 @@ struct athome_bt_conn {
 	struct athome_bt_stats stats;
 };
 
-/* connection params indexed by ATHOME_MODE_* */
-static const uint16_t mode_conn_intervals[] = {80, 40, 6};
-static const uint16_t mode_slave_latencies[] = {50, 10, 2};
-static const uint16_t mode_svc_timeouts[] = {3000, 200, 20};
-
+struct athome_bt_mode_settings
+{
+	uint16_t conn_interval;
+	uint16_t slave_latency;
+	uint16_t svc_timeout;
+};
 
 /* stack state */
 #define INVALID			0xFFFF
@@ -89,6 +90,43 @@ static struct athome_bt_conn conns[ATHOME_RMT_MAX_CONNS] = {{0,},};
 static uint8_t nconns = 0;
 static uint8_t *cmd_rsp_buf;
 static bool devices_exist = false;
+
+/*
+ * These settings are tuned to work with the Bemote Power manager.
+ * The connections intervals are kept low so that audio can send packets quickly enough,
+ * even in idle mode.
+ * The latency is high in idle mode to reduce power consumption when hibernating.
+ * The index into these arrays is the sleep_level.
+ *
+ * WARNING the settings for different modes must differ in some way or we cannot
+ * detect which mode we are in.
+ *
+ * interval and latency units are 1.25ms
+ * timeout min value: ci * 1.25 * (lat + 1) * 2 / 10
+ *
+ * These settings are buried in the function to limit their scope.
+ */
+static const struct athome_bt_mode_settings *athome_bt_get_mode_settings(uint32_t proto_ver,
+			int mode)
+{
+	static const struct athome_bt_mode_settings old_mode_settings[ATHOME_MODE_MAX] =
+	{
+		{.conn_interval = 80, .slave_latency = 50, .svc_timeout = 3000}, /* IDLE */
+		{.conn_interval = 40, .slave_latency = 10, .svc_timeout =  200}, /* SEMI_IDLE */
+		{.conn_interval =  6, .slave_latency =  2, .svc_timeout =   20}, /* ACTIVE */
+	};
+
+	static const struct athome_bt_mode_settings new_mode_settings[ATHOME_MODE_MAX] =
+	{
+		{.conn_interval = 17, .slave_latency =  60, .svc_timeout = 600}, /* IDLE */
+		{.conn_interval =  7, .slave_latency = 101, .svc_timeout = 500}, /* SEMI_IDLE */
+		{.conn_interval =  6, .slave_latency = 100, .svc_timeout = 400}, /* ACTIVE */
+	};
+
+	return (proto_ver < PROTO_VERSION_POWER_V2)
+		? &old_mode_settings[mode]
+		: &new_mode_settings[mode];
+}
 
 /*
  * About "disconnH": We have a finite number of connection slots (n), but due
@@ -870,11 +908,15 @@ static int athome_bt_modeswitch(int which, unsigned mode)
 	 * Re-enable this functionality once we have figured out why it takes so
 	 * long to change from a long slave-latency to a short one while waking
 	 * up.
+	 * OR maybe not. We have seen intermittent problems with the TI chip and PSoC5 getting
+	 * out of sync when enabled. https://b.corp.google.com/issue?id=9206731
+	 *
+	 * And Doug has tested WiFi and is not seeing any impact on WiFi from BTLE.
 	 */
-#if 0
-	const uint16_t intr = mode_conn_intervals[mode];
-	const uint16_t slat = mode_slave_latencies[mode];
-	const uint16_t svto = mode_svc_timeouts[mode];
+#define CHANGE_SETTINGS_ON_MODESWITCH  0
+#if CHANGE_SETTINGS_ON_MODESWITCH
+	const struct athome_bt_mode_settings *mode_settings =
+		athome_bt_get_mode_settings(conns[which].proto_ver, mode);
 	uint8_t buf[EVT_PACKET_LEN];
 	uint8_t *parP = buf;
 	int ret;
@@ -882,10 +924,10 @@ static int athome_bt_modeswitch(int which, unsigned mode)
 			(struct hci_ev_cmd_status*)(buf + HCI_EVENT_HDR_SIZE);
 
 	put16LE(&parP, conns[which].handle);
-	put16LE(&parP, intr); /* min conn intr */
-	put16LE(&parP, intr); /* max conn intr */
-	put16LE(&parP, slat);
-	put16LE(&parP, svto);
+	put16LE(&parP, mode_settings->conn_interval); /* min conn intr */
+	put16LE(&parP, mode_settings->conn_interval); /* max conn intr */
+	put16LE(&parP, mode_settings->slave_latency);
+	put16LE(&parP, mode_settings->svc_timeout);
 	put16LE(&parP, 20);   /* min durX.62ms */
 	put16LE(&parP, 20);   /* max durX.62ms */
 
@@ -904,8 +946,6 @@ static int athome_bt_modeswitch(int which, unsigned mode)
 	if (LOG_MODESWITCH) {
 		aahlog("Skipping conn parameter update for modeswitch to %d for"
 				" conn %d\n", mode, which);
-		aahlog("TODO: re-enable connection parameter update once it has"
-				"been debugged.\n");
 	}
 	conns[which].pwr = conns[which].next_pwr;
 #endif
@@ -1134,13 +1174,6 @@ static int athome_bt_process_evt(struct sk_buff *skb, bool *is_scanning,
 	unsigned i;
 	int err;
 
-	const uint16_t intr =
-		mode_conn_intervals[ATHOME_MODE_ACTIVE];
-	const uint16_t slat =
-		mode_slave_latencies[ATHOME_MODE_ACTIVE];
-	const uint16_t svto =
-		mode_svc_timeouts[ATHOME_MODE_ACTIVE];
-
 	struct hci_event_hdr *evt =
 			(struct hci_event_hdr*)skb->data;
 	uint8_t *data = (uint8_t*)(evt + 1);
@@ -1240,8 +1273,10 @@ device_handled:
 				!*is_connecting &&
 				nconns != ATHOME_RMT_MAX_CONNS) {
 
+			const struct athome_bt_mode_settings *mode_settings;
 			BUG_ON(!new_proto_ver);
 
+			mode_settings = athome_bt_get_mode_settings(new_proto_ver, ATHOME_MODE_ACTIVE);
 			*is_scanning = false;
 			aahlog("Trying to connect to %02X:%02X"
 				":%02X:%02X:%02X:%02X (v%08X)\n",
@@ -1261,10 +1296,10 @@ device_handled:
 			put8LE(&parP, mac[4]);/* mac addr[1] */
 			put8LE(&parP, mac[5]);/* mac addr[0] */
 			put8LE(&parP, 0);     /* send pub. adr */
-			put16LE(&parP, intr);
-			put16LE(&parP, intr);
-			put16LE(&parP, slat);
-			put16LE(&parP, svto);
+			put16LE(&parP, mode_settings->conn_interval);
+			put16LE(&parP, mode_settings->conn_interval);
+			put16LE(&parP, mode_settings->slave_latency);
+			put16LE(&parP, mode_settings->svc_timeout);
 			put16LE(&parP, 20);   /* min durX.62ms */
 			put16LE(&parP, 20);   /* max durX.62ms */
 			err = athome_bt_simple_cmd(HCI_OGF_LE,
@@ -1290,8 +1325,11 @@ device_handled:
 			(struct hci_ev_le_conn_update*)
 						(meta + 1);
 		int which;
-		unsigned interval = r16LE(&cu->interval);
-
+		/* Use {0,} to be sure entire structure is zero for later comparison. */
+		struct athome_bt_mode_settings mode_settings = {0,};
+		mode_settings.conn_interval = r16LE(&cu->interval);
+		mode_settings.slave_latency = r16LE(&cu->latency);
+		mode_settings.svc_timeout = r16LE(&cu->supervision_timeout);
 
 		*did_something = true;
 
@@ -1306,10 +1344,9 @@ device_handled:
 		if (LOG_MODESWITCH)
 			aahlog("UPDATED handle %d with interval"
 				" %uuS, latency %u, sv_to %umS"
-				"\n", handle, 1250 * interval,
-				r16LE(&cu->latency),
-				10 * r16LE(&cu->
-					supervision_timeout));
+				"\n", handle, 1250 * mode_settings.conn_interval,
+				mode_settings.slave_latency,
+				10 * mode_settings.svc_timeout);
 
 		spin_lock_irqsave(&stack_state_lock, flags);
 		which = athome_bt_find_connection_l(handle);
@@ -1323,16 +1360,15 @@ device_handled:
 				handle);
 		} else {
 			struct bt_athome_mode_switched mse;
-			for (i = 0; i < ARRAY_SIZE(
-				mode_conn_intervals) &&
-				mode_conn_intervals[i] !=
-					interval; i++)
-				/* No loop body intended - just find the val */
-				;
+			for (i = 0; i < ATHOME_MODE_MAX; i++) {
+				const struct athome_bt_mode_settings *candidate
+					= athome_bt_get_mode_settings(conns[which].proto_ver, i);
+				if (memcmp(&mode_settings, candidate, sizeof(mode_settings)) == 0)
+					break;
+			}
 
 			/* if unknown mode, pretend idle */
-			if (i == ARRAY_SIZE(
-					mode_conn_intervals))
+			if (i == ATHOME_MODE_MAX)
 				i = ATHOME_MODE_IDLE;
 
 			athome_bt_update_time_stats_l(which);
