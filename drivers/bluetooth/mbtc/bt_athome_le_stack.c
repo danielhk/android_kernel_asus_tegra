@@ -30,6 +30,75 @@
 #define L2CAP_CHAN_ATHOME_BIT		0x0080
 #define EVT_PACKET_LEN			270
 
+/* Calculate the timeout value for (num) missed replies.
+ * The +9 is to round up when dividing by 10.
+ * The 1+ is so that the timeout will occur slightly after the missed reply, for safety.
+ */
+#define AAH_BT_CALC_SVC_TIMEOUT(conint, latency, num) \
+		((uint16_t)(1 + ((num) * ((((conint) * 1.25 * ((latency) + 1)) + 9) / 10))))
+
+/*
+ * Increasing AAH_BT_ACTIVE_CONN_INTERVAL will reduce the quality of recorded audio and touch
+ * but may improve WiFi bandwidth.
+ */
+#define AAH_BT_ACTIVE_CONN_INTERVAL     7
+
+/*
+ * Increasing AAH_BT_CONN_SCAN_INTERVAL will increase the time it takes for devices to connect.
+ * time interval per channel, 1.6 units/msec,
+ * eg. 32 => 20 msec
+ * eg. 48 => 30 msec
+ * eg. 54 => 33.75 msec
+ */
+#define AAH_BT_CONN_SCAN_INTERVAL     (AAH_BT_ACTIVE_CONN_INTERVAL * 2 * 2)
+
+/*
+ * Increasing the scan interval can improve WiFi bandwidth slightly.
+ * But increasing it will also increase the time it takes for devices
+ * to be discovered. But it is very quick in human time.
+ */
+#define AAH_BT_NORMAL_SCAN_INTERVAL    (AAH_BT_ACTIVE_CONN_INTERVAL * 2 * 3)
+
+/*
+ * Increasing AAH_BT_ACTIVE_SLAVE_LATENCY will improve battery life in an attached BTLE device.
+ * But increasing it will also increase the time it takes for the remote to respond to
+ * commands from the master, and can increase the time it takes to exchange keys.
+ */
+#define AAH_BT_ACTIVE_SLAVE_LATENCY    75
+
+/*
+ * Increasing AAH_BT_SERVICE_TIMEOUT_COUNT will make it less likely for the remote
+ * control to spontaneously disconnect. This is mainly a problem in spatial coexistence
+ * mode when WiFi is transmitting, causing BTLE replies to be lost.
+ * But increasing it will also make it take longer for the master to detect a
+ * dead remote control and allow reconnection.
+ *
+ * Spec requires that this be set to a minimum of 2!
+ */
+#define AAH_BT_SERVICE_TIMEOUT_COUNT   20
+
+#define AAH_BT_ACTIVE_SVC_TIMEOUT     AAH_BT_CALC_SVC_TIMEOUT(AAH_BT_ACTIVE_CONN_INTERVAL,  \
+				AAH_BT_ACTIVE_SLAVE_LATENCY, AAH_BT_SERVICE_TIMEOUT_COUNT)
+
+/* AAH_BT_SCAN_WINDOW = time spent listening per interval, 1.6 units/msec,
+ * eg. 10 => 6.25 msec
+ * eg. 20 => 12.5 msec
+ * */
+#define AAH_BT_SCAN_WINDOW             10
+
+/*
+ * Set "max event length", which determines the number of
+ * times to retry when BTLE TX fails.
+ * 6 = 2 retries
+ * 4 = 1 retry
+ * 2 = 0 retries
+ * This is ignored unless we use the experimental driver provided by Marvell
+ * on 6/28/13.
+ */
+#define AAH_BT_MAX_EVENT_LENGTH         4
+
+/* Tell Marvell to give passive BTLE scans a lower priority than WiFi TX. */
+#define AAH_BT_USE_LOWER_SCAN_PRIORITY   1
 
 /* Per-remote states */
 #define CONN_STATE_INVALID		0 /* not a connection */
@@ -119,8 +188,10 @@ static const struct athome_bt_mode_settings *athome_bt_get_mode_settings(uint32_
 	static const struct athome_bt_mode_settings new_mode_settings[ATHOME_MODE_MAX] =
 	{
 		{.conn_interval = 17, .slave_latency =  60, .svc_timeout = 600}, /* IDLE */
-		{.conn_interval =  7, .slave_latency = 101, .svc_timeout = 500}, /* SEMI_IDLE */
-		{.conn_interval =  6, .slave_latency = 100, .svc_timeout = 400}, /* ACTIVE */
+		{.conn_interval = 11, .slave_latency = 101, .svc_timeout = 1000}, /* SEMI_IDLE */
+		{  .conn_interval =  AAH_BT_ACTIVE_CONN_INTERVAL,
+		   .slave_latency = AAH_BT_ACTIVE_SLAVE_LATENCY,
+		   .svc_timeout = AAH_BT_ACTIVE_SVC_TIMEOUT}, /* ACTIVE */
 	};
 
 	return (proto_ver < PROTO_VERSION_POWER_V2)
@@ -242,6 +313,9 @@ bool athome_bt_connection_went_down(uint16_t handle)
 	else
 		ret = false;
 	spin_unlock_irqrestore(&stack_state_lock, flags);
+
+	if (i >= 0)
+		aahlog("device #%d went down\n", i);
 
 	return ret;
 }
@@ -574,11 +648,10 @@ bool athome_bt_send_data(const uint8_t *MAC, uint8_t typ,
 	return true;
 }
 
-
 /* send command and then wait for complete or status event. nonzero -> quit */
 static int __attribute__((warn_unused_result))
 		athome_bt_simple_cmd(uint32_t ogf, uint32_t ocf, uint8_t plen,
-					uint8_t *dataIn, unsigned outLen,
+					const uint8_t *dataIn, unsigned outLen,
 					uint8_t *dataOut)
 {
 	uint8_t cmd[255 + HCI_COMMAND_HDR_SIZE];
@@ -593,7 +666,7 @@ static int __attribute__((warn_unused_result))
 	hdr->plen = plen;
 	w16LE(&hdr->opcode, hci_opcode_pack(ogf, ocf));
 
-	/* make sure we don't send a cmd while we're alse waiting */
+	/* make sure we don't send a cmd while we're also waiting */
 	down(&cmd_send);
 
 	spin_lock_irqsave(&stack_state_lock, flags);
@@ -950,10 +1023,6 @@ static int athome_bt_modeswitch(int which, unsigned mode)
 	if (stat->status)
 		aahlog("failed conn update try.\n");
 #else
-	if (LOG_MODESWITCH) {
-		aahlog("Skipping conn parameter update for modeswitch to %d for"
-				" conn %d\n", mode, which);
-	}
 	conns[which].pwr = conns[which].next_pwr;
 #endif
 
@@ -1138,11 +1207,12 @@ static int athome_bt_host_setup(void)
 			aahlog("   -> directed advertising\n");
 	}
 
-	aahlog("scan setup\n");
+	aahlog("scan setup, interval = %d, window = %d\n",
+			AAH_BT_NORMAL_SCAN_INTERVAL, AAH_BT_SCAN_WINDOW);
 	parP = buf;
 	put8LE(&parP, 0);	/* passive scan */
-	put16LE(&parP, 32);	/* 20ms interval per channel */
-	put16LE(&parP, 20);	/* 12.5ms of listening per interval */
+	put16LE(&parP, AAH_BT_NORMAL_SCAN_INTERVAL); /* time between listens per channel */
+	put16LE(&parP, AAH_BT_SCAN_WINDOW); /* time spent listening per interval */
 	put8LE(&parP,  0);	/* use real mac address on packets we send */
 	put8LE(&parP, 0);	/* accept all advertisement packets */
 	err = athome_bt_simple_cmd(HCI_OGF_LE, HCI_LE_Set_Scan_Parameters,
@@ -1163,6 +1233,26 @@ static int athome_bt_host_setup(void)
 	if (err)
 		return err;
 
+#if (AAH_BT_USE_LOWER_SCAN_PRIORITY)
+	aahlog("set coexistence mode configuration\n");
+/*
+ * Change coexistence behavior based on suggestions from Marvell.
+ * Changes LE scan priority to be lower than WiFi.
+ */
+	{
+		static const uint8_t coex_cmd_params[] = {
+			0x03, 0x01, 0x01, 0x01,  0x01, 0x03, 0x01, 0x00,
+			0x02, 0x02, 0x02, 0x04,  0x02, 0x00, 0x00, 0x00,
+			0x04, 0x02, 0x00, 0x00,  0x00};
+		err = athome_bt_simple_cmd(
+				0x3F,   /* OGF = HCI_OGF_VENDOR */
+				0x008A, /* OCF = HCI_CMD_MARVELL_BLE_COEX_MODE_CONFIG*/
+				sizeof(coex_cmd_params), coex_cmd_params, 0, NULL);
+		if (err)
+			return err;
+	}
+
+#endif /* USE_MODIFIED_COEXISTENCE_MODE */
 	return 0;
 }
 
@@ -1288,14 +1378,17 @@ device_handled:
 			mode_settings = athome_bt_get_mode_settings(new_proto_ver, ATHOME_MODE_ACTIVE);
 			*is_scanning = false;
 			aahlog("Trying to connect to %02X:%02X"
-				":%02X:%02X:%02X:%02X (v%08X)\n",
+				":%02X:%02X:%02X:%02X (v%08X)",
 				mac[5], mac[4], mac[3], mac[2],
 				mac[1], mac[0], new_proto_ver);
-
+			aahlog_continue(", conn_scan interval = %d, window = %d",
+				AAH_BT_CONN_SCAN_INTERVAL, AAH_BT_SCAN_WINDOW);
+			aahlog_continue(", max event length (retries) = %d\n",
+				AAH_BT_MAX_EVENT_LENGTH);
 			/* try to connect */
 			parP = buf;
-			put16LE(&parP, 32);   /* 20ms/channel */
-			put16LE(&parP, 20);   /* 12.5ms listen */
+			put16LE(&parP, AAH_BT_CONN_SCAN_INTERVAL);   /* time between listens per channel */
+			put16LE(&parP, AAH_BT_SCAN_WINDOW);   /* time to listen */
 			put8LE(&parP, 0);     /* no whitelist */
 			put8LE(&parP, 1);     /* random addr */
 			put8LE(&parP, mac[0]);/* mac addr[5] */
@@ -1309,8 +1402,8 @@ device_handled:
 			put16LE(&parP, mode_settings->conn_interval);
 			put16LE(&parP, mode_settings->slave_latency);
 			put16LE(&parP, mode_settings->svc_timeout);
-			put16LE(&parP, 20);   /* min durX.62ms */
-			put16LE(&parP, 20);   /* max durX.62ms */
+			put16LE(&parP, AAH_BT_MAX_EVENT_LENGTH); /* affects num retries */
+			put16LE(&parP, AAH_BT_MAX_EVENT_LENGTH);
 			err = athome_bt_simple_cmd(HCI_OGF_LE,
 				HCI_LE_Create_Connection,
 				parP - buf, buf, sizeof(buf),
