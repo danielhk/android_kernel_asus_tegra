@@ -288,6 +288,9 @@ static struct tegra_dc_platform_data molly_disp_pdata = {
 	.default_out	= &molly_disp_out,
 	.fb		= &molly_disp_fb_data,
 	.emc_clk_rate	= 300000000,
+#ifdef CONFIG_TEGRA_DC_CMU
+	.cmu_enable	= 1,
+#endif
 };
 
 static struct platform_device molly_disp_device = {
