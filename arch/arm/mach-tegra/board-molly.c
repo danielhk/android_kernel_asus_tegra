@@ -869,9 +869,7 @@ static void __init tegra_molly_init(void)
 	molly_regulator_init();
 	molly_sdhci_init();
 	molly_suspend_init();
-#if 0 /* disabled until we get the memory configs for real molly */
 	molly_emc_init();
-#endif
 	molly_edp_init();
 	molly_panel_init();
 	molly_pmon_init();
