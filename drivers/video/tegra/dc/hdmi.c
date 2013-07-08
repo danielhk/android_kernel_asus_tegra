@@ -1560,14 +1560,13 @@ static void tegra_dc_hdmi_write_infopack(struct tegra_dc *dc, int header_reg,
 	}
 }
 
-static int tegra_dc_find_cea_vic(const struct tegra_dc_mode *mode)
+int tegra_dc_find_cea_vic_from_fb_vmode(const struct fb_videomode *mode)
 {
 	struct fb_videomode m;
 	unsigned i;
 	unsigned best = 0;
 
-	tegra_dc_to_fb_videomode(&m, mode);
-
+	memcpy(&m, mode, sizeof(m));
 	m.vmode &= ~FB_VMODE_STEREO_MASK; /* stereo modes have the same VICs */
 
 	for (i = 1; i < CEA_MODEDB_SIZE; i++) {
@@ -1587,6 +1586,13 @@ static int tegra_dc_find_cea_vic(const struct tegra_dc_mode *mode)
 		}
 	}
 	return best;
+}
+
+static int tegra_dc_find_cea_vic(const struct tegra_dc_mode *mode)
+{
+	struct fb_videomode m;
+	tegra_dc_to_fb_videomode(&m, mode);
+	return tegra_dc_find_cea_vic_from_fb_vmode(&m);
 }
 
 static int tegra_dc_find_hdmi_vic(const struct tegra_dc_mode *mode)
@@ -1670,7 +1676,9 @@ static void tegra_dc_hdmi_setup_avi_infoframe(struct tegra_dc *dc, bool dvi)
 
 	avi.vic = tegra_dc_find_cea_vic(&dc->mode);
 	avi.m = dc->mode.avi_m;
-	dev_dbg(&dc->ndev->dev, "HDMI AVI vic=%d m=%d\n", avi.vic, avi.m);
+	avi.q = dc->mode.avi_q;
+	dev_dbg(&dc->ndev->dev, "HDMI AVI vic=%d m=%d q=%d\n",
+		avi.vic, avi.m, avi.q);
 
 	tegra_dc_hdmi_write_infopack(dc, HDMI_NV_PDISP_HDMI_AVI_INFOFRAME_HEADER,
 				     HDMI_INFOFRAME_TYPE_AVI,
@@ -2090,4 +2098,10 @@ EXPORT_SYMBOL(tegra_dc_put_edid);
 struct tegra_dc *tegra_dc_hdmi_get_dc(struct tegra_dc_hdmi_data *hdmi)
 {
 	return hdmi ? hdmi->dc : NULL;
+}
+
+int tegra_hdmi_connector_is_dvi(struct tegra_dc *dc)
+{
+	const struct tegra_dc_hdmi_data *hdmi = tegra_dc_get_outdata(dc);
+	return hdmi->dvi;
 }

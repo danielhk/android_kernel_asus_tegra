@@ -47,7 +47,7 @@ struct hdmi_avi_infoframe {
 	unsigned	c:2;	/* colorimetry */
 
 	/* PB3 */
-	unsigned	sc:2;	/* scan information */
+	unsigned	sc:2;	/* non-uniform picture scaling */
 	unsigned	q:2;	/* quantization range */
 	unsigned	ec:3;	/* extended colorimetry */
 	unsigned	itc:1;	/* it content */
@@ -241,4 +241,7 @@ unsigned long tegra_hdmi_readl(struct tegra_dc_hdmi_data *hdmi,
 void tegra_hdmi_writel(struct tegra_dc_hdmi_data *hdmi,
 				unsigned long val, unsigned long reg);
 struct tegra_dc *tegra_dc_hdmi_get_dc(struct tegra_dc_hdmi_data *hdmi);
+int tegra_hdmi_connector_is_dvi(struct tegra_dc *dc);
+int tegra_dc_find_cea_vic_from_fb_vmode(const struct fb_videomode *mode);
+
 #endif

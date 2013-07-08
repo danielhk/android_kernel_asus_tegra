@@ -321,6 +321,7 @@ struct tegra_dc_mode {
 	int	stereo_mode;
 	u32	flags;
 	u8	avi_m;
+	u8	avi_q;
 };
 
 #define TEGRA_DC_MODE_FLAG_NEG_V_SYNC	(1 << 0)
@@ -329,6 +330,11 @@ struct tegra_dc_mode {
 /* aspect ratio. 0 means unspecified or default. */
 #define TEGRA_DC_MODE_AVI_M_4_3		0x1
 #define TEGRA_DC_MODE_AVI_M_16_9	0x2
+
+/* quantization range. 0 means default for video mode. */
+#define TEGRA_DC_MODE_AVI_Q_DEFAULT	0x00
+#define TEGRA_DC_MODE_AVI_Q_LIMITED	0x01
+#define TEGRA_DC_MODE_AVI_Q_FULL	0x02
 
 enum {
 	TEGRA_DC_OUT_RGB,

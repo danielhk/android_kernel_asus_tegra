@@ -1091,7 +1091,8 @@ void tegra_dc_cmu_enable(struct tegra_dc *dc, bool cmu_enable)
 	if (dc->pdata->cmu) {
 		tegra_dc_update_cmu(dc, dc->pdata->cmu);
 	} else {
-		if (dc->out->type == TEGRA_DC_OUT_HDMI)
+		if ((dc->out->type  == TEGRA_DC_OUT_HDMI) &&
+		    (dc->mode.avi_q == TEGRA_DC_MODE_AVI_Q_LIMITED))
 			tegra_dc_update_cmu(dc, &default_limited_cmu);
 		else
 			tegra_dc_update_cmu(dc, &default_cmu);
@@ -1963,7 +1964,8 @@ static int tegra_dc_init(struct tegra_dc *dc)
 	if (dc->pdata->cmu) {
 		_tegra_dc_update_cmu(dc, dc->pdata->cmu);
 	} else {
-		if (dc->out->type == TEGRA_DC_OUT_HDMI)
+		if ((dc->out->type  == TEGRA_DC_OUT_HDMI) &&
+		    (dc->mode.avi_q == TEGRA_DC_MODE_AVI_Q_LIMITED))
 			_tegra_dc_update_cmu(dc, &default_limited_cmu);
 		else
 			_tegra_dc_update_cmu(dc, &default_cmu);
