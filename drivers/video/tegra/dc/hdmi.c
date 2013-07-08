@@ -1677,6 +1677,7 @@ static void tegra_dc_hdmi_setup_avi_infoframe(struct tegra_dc *dc, bool dvi)
 	avi.vic = tegra_dc_find_cea_vic(&dc->mode);
 	avi.m = dc->mode.avi_m;
 	avi.q = dc->mode.avi_q;
+	avi.s = HDMI_AVI_S_UNDERSCAN;
 	dev_dbg(&dc->ndev->dev, "HDMI AVI vic=%d m=%d q=%d\n",
 		avi.vic, avi.m, avi.q);
 
