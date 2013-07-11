@@ -97,6 +97,9 @@ static int athome_bt_input_init_device(struct input_dev **idevP)
 
 	idev->name = "athome_remote";
 
+	/* we have a select button under the touch pad */
+	set_bit(INPUT_PROP_BUTTONPAD, idev->propbit);
+
 	/* we support touch, buttons, misc */
 	set_bit(EV_SYN, idev->evbit);
 	set_bit(EV_ABS, idev->evbit);
