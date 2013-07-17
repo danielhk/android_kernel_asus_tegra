@@ -1033,7 +1033,11 @@ static struct tegra_suspend_platform_data molly_suspend_data = {
 #ifdef CONFIG_ARCH_TEGRA_HAS_CL_DVFS
 /* board parameters for cpu dfll */
 static struct tegra_cl_dvfs_cfg_param molly_cl_dvfs_param = {
+#if MOLLY_ON_DALMORE == 1
 	.sample_rate = 12500,
+#else
+	.sample_rate = 11500,
+#endif
 
 	.force_mode = TEGRA_CL_DVFS_FORCE_FIXED,
 	.cf = 10,
@@ -1046,6 +1050,7 @@ static struct tegra_cl_dvfs_cfg_param molly_cl_dvfs_param = {
 };
 #endif
 
+#if MOLLY_ON_DALMORE == 1
 /* TPS51632: fixed 10mV steps from 600mV to 1400mV, with offset 0x23 */
 #define PMU_CPU_VDD_MAP_SIZE ((1400000 - 600000) / 10000 + 1)
 static struct voltage_reg_map pmu_cpu_vdd_map[PMU_CPU_VDD_MAP_SIZE];
@@ -1057,6 +1062,19 @@ static inline void fill_reg_map(void)
 		pmu_cpu_vdd_map[i].reg_uV = 600000 + 10000 * i;
 	}
 }
+#else
+/* palmas: fixed 10mV steps from 600mV to 1400mV, with offset 0x10 */
+#define PMU_CPU_VDD_MAP_SIZE ((1400000 - 600000) / 10000 + 1)
+static struct voltage_reg_map pmu_cpu_vdd_map[PMU_CPU_VDD_MAP_SIZE];
+static inline void fill_reg_map(void)
+{
+	int i;
+	for (i = 0; i < PMU_CPU_VDD_MAP_SIZE; i++) {
+		pmu_cpu_vdd_map[i].reg_value = i + 0x10;
+		pmu_cpu_vdd_map[i].reg_uV = 600000 + 10000 * i;
+	}
+}
+#endif
 
 #ifdef CONFIG_ARCH_TEGRA_HAS_CL_DVFS
 static struct tegra_cl_dvfs_platform_data molly_cl_dvfs_data = {
@@ -1064,8 +1082,13 @@ static struct tegra_cl_dvfs_platform_data molly_cl_dvfs_data = {
 	.pmu_if = TEGRA_CL_DVFS_PMU_I2C,
 	.u.pmu_i2c = {
 		.fs_rate = 400000,
+#if MOLLY_ON_DALMORE == 1
 		.slave_addr = 0x86,
 		.reg = 0x00,
+#else
+		.slave_addr = 0xb0,
+		.reg = 0x23,
+#endif
 	},
 	.vdd_map = pmu_cpu_vdd_map,
 	.vdd_map_size = PMU_CPU_VDD_MAP_SIZE,
