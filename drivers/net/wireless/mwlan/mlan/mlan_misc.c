@@ -394,6 +394,8 @@ wlan_get_info_debug_info(IN pmlan_adapter pmadapter,
 			info->param.debug_info.pm_wakeup_card_req;
 		pmadapter->pm_wakeup_fw_try =
 			info->param.debug_info.pm_wakeup_fw_try;
+		pmadapter->pm_wakeup_in_secs =
+			info->param.debug_info.pm_wakeup_in_secs;
 		pmadapter->is_hs_configured =
 			info->param.debug_info.is_hs_configured;
 		pmadapter->hs_activated = info->param.debug_info.hs_activated;
@@ -477,6 +479,10 @@ wlan_get_info_debug_info(IN pmlan_adapter pmadapter,
 			info->param.debug_info.num_bridge_pkts;
 		pmpriv->num_drop_pkts = info->param.debug_info.num_drop_pkts;
 #endif
+		pmadapter->mlan_processing =
+			info->param.debug_info.mlan_processing;
+		pmadapter->mlan_rx_processing =
+			info->param.debug_info.mlan_rx_processing;
 	} else {		/* MLAN_ACT_GET */
 		ptid = ac_to_tid[WMM_AC_BK];
 		info->param.debug_info.wmm_ac_bk =
@@ -515,6 +521,8 @@ wlan_get_info_debug_info(IN pmlan_adapter pmadapter,
 			pmadapter->pm_wakeup_card_req;
 		info->param.debug_info.pm_wakeup_fw_try =
 			pmadapter->pm_wakeup_fw_try;
+		info->param.debug_info.pm_wakeup_in_secs =
+			pmadapter->pm_wakeup_in_secs;
 		info->param.debug_info.is_hs_configured =
 			pmadapter->is_hs_configured;
 		info->param.debug_info.hs_activated = pmadapter->hs_activated;
@@ -600,6 +608,10 @@ wlan_get_info_debug_info(IN pmlan_adapter pmadapter,
 			pmadapter->pending_bridge_pkts;
 		info->param.debug_info.num_drop_pkts = pmpriv->num_drop_pkts;
 #endif
+		info->param.debug_info.mlan_processing =
+			pmadapter->mlan_processing;
+		info->param.debug_info.mlan_rx_processing =
+			pmadapter->mlan_rx_processing;
 	}
 
 	pioctl_req->data_read_written =
@@ -662,10 +674,15 @@ mlan_status
 wlan_pm_wakeup_card(IN pmlan_adapter pmadapter)
 {
 	mlan_status ret = MLAN_STATUS_SUCCESS;
+	t_u32 age_ts_usec;
 	pmlan_callbacks pcb = &pmadapter->callbacks;
 
 	ENTER();
 	PRINTM(MEVENT, "Wakeup device...\n");
+	pmadapter->callbacks.moal_get_system_time(pmadapter->pmoal_handle,
+						  &pmadapter->pm_wakeup_in_secs,
+						  &age_ts_usec);
+
 	ret = pcb->moal_write_reg(pmadapter->pmoal_handle,
 				  HOST_TO_CARD_EVENT_REG, HOST_POWER_UP);
 	LEAVE();

@@ -851,7 +851,7 @@ wlan_scan_channel_list(IN mlan_private * pmpriv,
 		ret = wlan_prepare_cmd(pmpriv,
 				       cmd_no,
 				       HostCmd_ACT_GEN_SET,
-				       0, pioctl_buf, pscan_cfg_out);
+				       0, MNULL, pscan_cfg_out);
 		if (ret)
 			break;
 	}
@@ -3101,8 +3101,8 @@ wlan_scan_networks(IN mlan_private * pmpriv,
 								    moal_spin_lock,
 								    pcb->
 								    moal_spin_unlock);
-			pmadapter->pext_scan_ioctl_req = pioctl_req;
 			wlan_request_cmd_lock(pmadapter);
+			pmadapter->pscan_ioctl_req = pioctl_req;
 			pmadapter->scan_processing = MTRUE;
 			wlan_release_cmd_lock(pmadapter);
 			wlan_insert_cmd_to_pending_q(pmadapter, pcmd_node,
@@ -3202,7 +3202,6 @@ wlan_ret_802_11_scan(IN mlan_private * pmpriv,
 	mlan_status ret = MLAN_STATUS_SUCCESS;
 	mlan_adapter *pmadapter = pmpriv->adapter;
 	mlan_callbacks *pcb = MNULL;
-	mlan_ioctl_req *pioctl_req = (mlan_ioctl_req *) pioctl_buf;
 	cmd_ctrl_node *pcmd_node = MNULL;
 	HostCmd_DS_802_11_SCAN_RSP *pscan_rsp = MNULL;
 	BSSDescriptor_t *bss_new_entry = MNULL;
@@ -3223,6 +3222,8 @@ wlan_ret_802_11_scan(IN mlan_private * pmpriv,
 	t_u8 is_bgscan_resp;
 	t_u32 age_ts_usec;
 	t_u8 null_ssid[MLAN_MAX_SSID_LENGTH] = { 0 };
+	t_u32 status_code = 0;
+	pmlan_ioctl_req pscan_ioctl_req = MNULL;
 
 	ENTER();
 	pcb = (pmlan_callbacks) & pmadapter->callbacks;
@@ -3238,8 +3239,7 @@ wlan_ret_802_11_scan(IN mlan_private * pmpriv,
 		PRINTM(MERROR,
 		       "SCAN_RESP: Invalid number of AP returned (%d)!!\n",
 		       pscan_rsp->number_of_sets);
-		if (pioctl_req)
-			pioctl_req->status_code = MLAN_ERROR_CMD_SCAN_FAIL;
+		status_code = MLAN_ERROR_CMD_SCAN_FAIL;
 		ret = MLAN_STATUS_FAILURE;
 		goto done;
 	}
@@ -3295,8 +3295,7 @@ wlan_ret_802_11_scan(IN mlan_private * pmpriv,
 
 	if (ret != MLAN_STATUS_SUCCESS || !bss_new_entry) {
 		PRINTM(MERROR, "Memory allocation for bss_new_entry failed!\n");
-		if (pioctl_req)
-			pioctl_req->status_code = MLAN_ERROR_NO_MEM;
+		status_code = MLAN_ERROR_NO_MEM;
 		ret = MLAN_STATUS_FAILURE;
 		goto done;
 	}
@@ -3473,9 +3472,6 @@ wlan_ret_802_11_scan(IN mlan_private * pmpriv,
 	if (!util_peek_list
 	    (pmadapter->pmoal_handle, &pmadapter->scan_pending_q,
 	     pcb->moal_spin_lock, pcb->moal_spin_unlock)) {
-		wlan_request_cmd_lock(pmadapter);
-		pmadapter->scan_processing = MFALSE;
-		wlan_release_cmd_lock(pmadapter);
 		/*
 		 * Process the resulting scan table:
 		 *   - Remove any bad ssids
@@ -3483,34 +3479,28 @@ wlan_ret_802_11_scan(IN mlan_private * pmpriv,
 		 */
 		wlan_scan_process_results(pmpriv);
 
+		wlan_request_cmd_lock(pmadapter);
+		pmadapter->scan_processing = MFALSE;
+		pscan_ioctl_req = pmadapter->pscan_ioctl_req;
+		pmadapter->pscan_ioctl_req = MNULL;
 		/* Need to indicate IOCTL complete */
-		if (pioctl_req != MNULL) {
-			pioctl_req->status_code = MLAN_ERROR_NO_ERROR;
-
+		if (pscan_ioctl_req) {
+			pscan_ioctl_req->status_code = MLAN_ERROR_NO_ERROR;
 			/* Indicate ioctl complete */
 			pcb->moal_ioctl_complete(pmadapter->pmoal_handle,
-						 (pmlan_ioctl_req) pioctl_buf,
+						 (pmlan_ioctl_req)
+						 pscan_ioctl_req,
 						 MLAN_STATUS_SUCCESS);
 		}
+		wlan_release_cmd_lock(pmadapter);
 		pmadapter->bgscan_reported = MFALSE;
 		wlan_recv_event(pmpriv, MLAN_EVENT_ID_DRV_SCAN_REPORT, MNULL);
 	} else {
 		/* If firmware not ready, do not issue any more scan commands */
 		if (pmadapter->hw_status != WlanHardwareStatusReady) {
-			/* Flush all pending scan commands */
-			wlan_flush_scan_queue(pmadapter);
-			/* Indicate IOCTL complete */
-			if (pioctl_req != MNULL) {
-				pioctl_req->status_code =
-					MLAN_ERROR_FW_NOT_READY;
-
-				/* Indicate ioctl complete */
-				pcb->moal_ioctl_complete(pmadapter->
-							 pmoal_handle,
-							 (pmlan_ioctl_req)
-							 pioctl_buf,
-							 MLAN_STATUS_FAILURE);
-			}
+			status_code = MLAN_ERROR_FW_NOT_READY;
+			ret = MLAN_STATUS_FAILURE;
+			goto done;
 		} else {
 			/* Get scan command from scan_pending_q and put to
 			   cmd_pending_q */
@@ -3533,7 +3523,22 @@ done:
 	if (bss_new_entry)
 		pcb->moal_mfree(pmadapter->pmoal_handle,
 				(t_u8 *) bss_new_entry);
-
+	if (ret) {
+		/* Flush all pending scan commands */
+		wlan_flush_scan_queue(pmadapter);
+		wlan_request_cmd_lock(pmadapter);
+		pmadapter->scan_processing = MFALSE;
+		pscan_ioctl_req = pmadapter->pscan_ioctl_req;
+		pmadapter->pscan_ioctl_req = MNULL;
+		if (pscan_ioctl_req) {
+			pscan_ioctl_req->status_code = status_code;
+			/* Indicate ioctl complete */
+			pcb->moal_ioctl_complete(pmadapter->pmoal_handle,
+						 pscan_ioctl_req,
+						 MLAN_STATUS_FAILURE);
+		}
+		wlan_release_cmd_lock(pmadapter);
+	}
 	LEAVE();
 	return ret;
 }
@@ -3933,15 +3938,11 @@ wlan_handle_event_ext_scan_report(IN mlan_private * pmpriv,
 	wlan_parse_ext_scan_result(pmpriv, pevent_scan->num_of_set,
 				   ptlv, tlv_buf_left);
 	if (!pevent_scan->more_event) {
-		pioctl_req = pmadapter->pext_scan_ioctl_req;
+
 		if (!util_peek_list(pmadapter->pmoal_handle,
 				    &pmadapter->scan_pending_q,
 				    pcb->moal_spin_lock,
 				    pcb->moal_spin_unlock)) {
-			pmadapter->pext_scan_ioctl_req = MNULL;
-			wlan_request_cmd_lock(pmadapter);
-			pmadapter->scan_processing = MFALSE;
-			wlan_release_cmd_lock(pmadapter);
 			/*
 			 * Process the resulting scan table:
 			 *   - Remove any bad ssids
@@ -3949,6 +3950,10 @@ wlan_handle_event_ext_scan_report(IN mlan_private * pmpriv,
 			 */
 			wlan_scan_process_results(pmpriv);
 
+			wlan_request_cmd_lock(pmadapter);
+			pmadapter->scan_processing = MFALSE;
+			pioctl_req = pmadapter->pscan_ioctl_req;
+			pmadapter->pscan_ioctl_req = MNULL;
 			/* Need to indicate IOCTL complete */
 			if (pioctl_req != MNULL) {
 				pioctl_req->status_code = MLAN_ERROR_NO_ERROR;
@@ -3959,6 +3964,8 @@ wlan_handle_event_ext_scan_report(IN mlan_private * pmpriv,
 							 pioctl_req,
 							 MLAN_STATUS_SUCCESS);
 			}
+			wlan_release_cmd_lock(pmadapter);
+
 			pmadapter->bgscan_reported = MFALSE;
 			wlan_recv_event(pmpriv, MLAN_EVENT_ID_DRV_SCAN_REPORT,
 					MNULL);
@@ -3968,6 +3975,10 @@ wlan_handle_event_ext_scan_report(IN mlan_private * pmpriv,
 			if (pmadapter->hw_status != WlanHardwareStatusReady) {
 				/* Flush all pending scan commands */
 				wlan_flush_scan_queue(pmadapter);
+				wlan_request_cmd_lock(pmadapter);
+				pmadapter->scan_processing = MFALSE;
+				pioctl_req = pmadapter->pscan_ioctl_req;
+				pmadapter->pscan_ioctl_req = MNULL;
 				/* Indicate IOCTL complete */
 				if (pioctl_req != MNULL) {
 					pioctl_req->status_code =
@@ -3980,6 +3991,7 @@ wlan_handle_event_ext_scan_report(IN mlan_private * pmpriv,
 								 pioctl_req,
 								 MLAN_STATUS_FAILURE);
 				}
+				wlan_release_cmd_lock(pmadapter);
 			} else {
 				/* Get scan command from scan_pending_q and put
 				   to cmd_pending_q */

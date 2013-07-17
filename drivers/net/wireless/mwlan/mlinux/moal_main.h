@@ -144,7 +144,8 @@ enum
 #ifdef CONFIG_PROC_FS
 	MOAL_PROC_WAIT,
 #endif
-	MOAL_WSTATS_WAIT
+	MOAL_WSTATS_WAIT,
+	MOAL_IOCTL_WAIT_TIMEOUT
 };
 
 /** moal_main_state */
@@ -273,7 +274,10 @@ woal_mod_timer(pmoal_drv_timer timer, t_u32 MillisecondPeriod)
 static inline void
 woal_cancel_timer(moal_drv_timer * timer)
 {
-	del_timer(&timer->tl);
+	if (timer->timer_is_periodic)
+		del_timer(&timer->tl);
+	else
+		del_timer_sync(&timer->tl);
 	timer->timer_is_canceled = MTRUE;
 	timer->time_period = 0;
 }
@@ -517,6 +521,12 @@ out:
 #define MRVDRV_DEFAULT_UAP_WATCHDOG_TIMEOUT (41 * HZ)
 #endif
 
+/* IOCTL Timeout */
+#define MOAL_IOCTL_TIMEOUT                    (20 * HZ)
+
+/* MLAN WAIT Timeout */
+#define MLAN_WAIT_TIMEOUT                     (1 * HZ)
+
 /** Threshold value of number of times the Tx timeout happened */
 #define NUM_TX_TIMEOUT_THRESHOLD      5
 
@@ -653,6 +663,8 @@ typedef struct _wait_queue
 	t_u32 start_time;
 	/** Status from MLAN */
 	mlan_status status;
+    /** flag for wait_timeout */
+	t_u8 wait_timeout;
 } wait_queue, *pwait_queue;
 
 /** Auto Rate */
@@ -719,9 +731,6 @@ typedef struct _wait_queue
 #define DEF_VIRTUAL_BSS			  0
 #endif
 #endif /* WIFI_DIRECT_SUPPORT && V14_FEATURE */
-
-/** max interrupt idle time 3 sceond */
-#define MAX_INT_IDLE_TIME         (3 * HZ)
 
 /**
  * the maximum number of adapter supported
@@ -1021,6 +1030,10 @@ struct _moal_handle
 	t_u16 init_wait_q_woken;
 	/** Init wait queue */
 	wait_queue_head_t init_wait_q __ATTRIB_ALIGN__;
+	/** mlan wait queue token */
+	t_u16 mlan_wait_q_woken;
+	/** mlan wait queue */
+	wait_queue_head_t mlan_wait_q __ATTRIB_ALIGN__;
 #if defined(SDIO_SUSPEND_RESUME)
 	/** Device suspend flag */
 	BOOLEAN is_suspended;
@@ -1071,11 +1084,14 @@ struct _moal_handle
 	/** Bitmap for re-association on/off */
 	t_u8 reassoc_on;
 #endif				/* REASSOCIATION */
-	t_u32 last_int_jiffies;
 	/** Driver workqueue */
 	struct workqueue_struct *workqueue;
 	/** main work */
 	struct work_struct main_work;
+    /** Driver workqueue */
+	struct workqueue_struct *rx_workqueue;
+	/** main work */
+	struct work_struct rx_work;
 #if defined(STA_CFG80211) || defined(UAP_CFG80211)
 	struct wiphy *wiphy;
 	/** Country code for regulatory domain */
@@ -1815,6 +1831,7 @@ void woal_reassoc_timer_func(void *context);
 #endif /* REASSOCIATION */
 
 t_void woal_main_work_queue(struct work_struct *work);
+t_void woal_rx_work_queue(struct work_struct *work);
 
 int woal_hard_start_xmit(struct sk_buff *skb, struct net_device *dev);
 #ifdef STA_SUPPORT

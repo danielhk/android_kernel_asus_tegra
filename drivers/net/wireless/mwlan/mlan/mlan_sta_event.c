@@ -479,7 +479,7 @@ wlan_ops_sta_process_event(IN t_void * priv)
 		break;
 	case EVENT_EXT_SCAN_REPORT:
 		PRINTM(MEVENT, "EVENT: EXT_SCAN Report (%#x)\n", eventcause);
-		if (pmadapter->pext_scan_ioctl_req)
+		if (pmadapter->pscan_ioctl_req && pmadapter->ext_scan)
 			ret = wlan_handle_event_ext_scan_report(priv, pmbuf);
 		break;
 	case EVENT_MEAS_REPORT_RDY:

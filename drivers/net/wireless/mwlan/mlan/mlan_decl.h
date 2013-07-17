@@ -27,7 +27,7 @@ Change log:
 #define _MLAN_DECL_H_
 
 /** MLAN release version */
-#define MLAN_RELEASE_VERSION		"404"
+#define MLAN_RELEASE_VERSION		"410"
 
 /** Re-define generic data types for MLAN/MOAL */
 /** Signed char (1-byte) */
@@ -429,6 +429,8 @@ typedef enum _mlan_event_id
 	MLAN_EVENT_ID_DRV_REPORT_STRING = 0x8000000F,
 	MLAN_EVENT_ID_DRV_DBG_DUMP = 0x80000012,
 	MLAN_EVENT_ID_DRV_BGSCAN_RESULT = 0x80000013,
+	MLAN_EVENT_ID_MLAN_WAIT = 0x80000015,
+	MLAN_EVENT_ID_MLAN_WAKEUP = 0x80000016,
 } mlan_event_id;
 
 /** Data Structures */
@@ -909,6 +911,9 @@ MLAN_API mlan_status mlan_shutdown_fw(IN t_void * pmlan_adapter);
 
 /** Main Process */
 MLAN_API mlan_status mlan_main_process(IN t_void * pmlan_adapter);
+
+/** Rx process */
+mlan_status mlan_rx_process(IN t_void * pmlan_adapter);
 
 /** Packet Transmission */
 MLAN_API mlan_status mlan_send_packet(IN t_void * pmlan_adapter,

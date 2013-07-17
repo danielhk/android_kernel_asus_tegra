@@ -1610,7 +1610,7 @@ woal_cfg80211_assoc(moal_private * priv, void *sme)
 		memset(&ssid_bssid.bssid, 0, MLAN_MAC_ADDR_LENGTH);
 
 	if (MLAN_STATUS_SUCCESS !=
-	    woal_bss_start(priv, MOAL_IOCTL_WAIT, &ssid_bssid)) {
+	    woal_bss_start(priv, MOAL_IOCTL_WAIT_TIMEOUT, &ssid_bssid)) {
 		ret = -EFAULT;
 		goto done;
 	}

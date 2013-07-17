@@ -670,7 +670,15 @@ wlan_decode_rx_packet(mlan_adapter * pmadapter, mlan_buffer * pmbuf,
 		PRINTM(MINFO, "--- Rx: Data packet ---\n");
 		pmbuf->data_len = (pmadapter->upld_len - INTF_HEADER_LEN);
 		pmbuf->data_offset += INTF_HEADER_LEN;
-		wlan_handle_rx_packet(pmadapter, pmbuf);
+		util_enqueue_list_tail(pmadapter->pmoal_handle,
+				       &pmadapter->rx_data_queue,
+				       (pmlan_linked_list) pmbuf,
+				       pmadapter->callbacks.moal_spin_lock,
+				       pmadapter->callbacks.moal_spin_unlock);
+		util_scalar_increment(pmadapter->pmoal_handle,
+				      &pmadapter->rx_pkts_queued,
+				      pmadapter->callbacks.moal_spin_lock,
+				      pmadapter->callbacks.moal_spin_unlock);
 		pmadapter->data_received = MTRUE;
 		break;
 

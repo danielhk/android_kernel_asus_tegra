@@ -328,7 +328,7 @@ util_scalar_free(t_void * pmoal_handle,
 		 mlan_status(*moal_free_lock) (t_void * handle, t_void * plock))
 {
 	if (pscalar->flags & MLAN_SCALAR_FLAG_UNIQUE_LOCK)
-		moal_free_lock(pmoal_handle, &pscalar->plock);
+		moal_free_lock(pmoal_handle, pscalar->plock);
 }
 
 /**

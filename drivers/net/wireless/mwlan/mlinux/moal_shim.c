@@ -560,28 +560,36 @@ moal_ioctl_complete(IN t_void * pmoal_handle,
 	priv = woal_bss_index_to_priv(handle, pioctl_req->bss_index);
 
 	wait = (wait_queue *) pioctl_req->reserved_1;
-	PRINTM(MIOCTL,
-	       "IOCTL completed: %p id=0x%x sub_id=0x%x, action=%d,  status=%d, status_code=0x%x\n",
-	       pioctl_req, pioctl_req->req_id, (*(t_u32 *) pioctl_req->pbuf),
-	       (int)pioctl_req->action, status, pioctl_req->status_code);
+	if (status != MLAN_STATUS_SUCCESS)
+		PRINTM(MERROR,
+		       "IOCTL failed: %p id=0x%x, sub_id=0x%x action=%d, status_code=0x%x\n",
+		       pioctl_req, pioctl_req->req_id,
+		       (*(t_u32 *) pioctl_req->pbuf), (int)pioctl_req->action,
+		       pioctl_req->status_code);
+	else
+		PRINTM(MIOCTL,
+		       "IOCTL completed: %p id=0x%x sub_id=0x%x, action=%d,  status=%d, status_code=0x%x\n",
+		       pioctl_req, pioctl_req->req_id,
+		       (*(t_u32 *) pioctl_req->pbuf), (int)pioctl_req->action,
+		       status, pioctl_req->status_code);
 	if (wait) {
 		wait->condition = MTRUE;
 		wait->status = status;
-		if ((status != MLAN_STATUS_SUCCESS) &&
-		    (pioctl_req->status_code == MLAN_ERROR_CMD_TIMEOUT)) {
-			PRINTM(MERROR, "IOCTL: command timeout\n");
+		if (wait->wait_timeout) {
+			wake_up(wait->wait);
 		} else {
-			wake_up_interruptible(wait->wait);
+			if ((status != MLAN_STATUS_SUCCESS) &&
+			    (pioctl_req->status_code ==
+			     MLAN_ERROR_CMD_TIMEOUT)) {
+				PRINTM(MERROR, "IOCTL: command timeout\n");
+			} else {
+				wake_up_interruptible(wait->wait);
+			}
 		}
 	} else {
 		if (priv && (status == MLAN_STATUS_SUCCESS) &&
 		    (pioctl_req->action == MLAN_ACT_GET))
 			woal_process_ioctl_resp(priv, pioctl_req);
-		if (status != MLAN_STATUS_SUCCESS)
-			PRINTM(MIOCTL,
-			       "IOCTL failed: id=0x%x, action=%d, status_code=0x%x\n",
-			       pioctl_req->req_id, (int)pioctl_req->action,
-			       pioctl_req->status_code);
 		kfree(pioctl_req);
 	}
 	LEAVE();
@@ -978,10 +986,12 @@ moal_recv_event(IN t_void * pmoal_handle, IN pmlan_event pmevent)
 #endif
 #ifdef STA_CFG80211
 			if (IS_STA_CFG80211(cfg80211_wext)) {
-				woal_inform_bss_from_scan_result(priv, NULL,
-								 MOAL_NO_WAIT);
-				PRINTM(MINFO, "Reporting scan results\n");
 				if (priv->scan_request) {
+					PRINTM(MINFO,
+					       "Reporting scan results\n");
+					woal_inform_bss_from_scan_result(priv,
+									 NULL,
+									 MOAL_NO_WAIT);
 					cfg80211_scan_done(priv->scan_request,
 							   MFALSE);
 					priv->scan_request = NULL;
@@ -1790,7 +1800,20 @@ moal_recv_event(IN t_void * pmoal_handle, IN pmlan_event pmevent)
 				PRINTM(MMSG, "BSS START Complete!\n");
 			}
 		}
-
+	case MLAN_EVENT_ID_MLAN_WAIT:
+		PRINTM(MEVENT, "wlan: wait....\n");
+		priv->phandle->mlan_wait_q_woken = MFALSE;
+		/* Wait for mlan_init to complete */
+		wait_event_interruptible_timeout(priv->phandle->mlan_wait_q,
+						 priv->phandle->
+						 mlan_wait_q_woken,
+						 MLAN_WAIT_TIMEOUT);
+		break;
+	case MLAN_EVENT_ID_MLAN_WAKEUP:
+		priv->phandle->mlan_wait_q_woken = MTRUE;
+		wake_up_interruptible(&priv->phandle->mlan_wait_q);
+		PRINTM(MEVENT, "wlan: wakeup\n");
+		break;
 	default:
 		break;
 	}

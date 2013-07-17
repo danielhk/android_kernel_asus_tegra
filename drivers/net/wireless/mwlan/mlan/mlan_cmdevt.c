@@ -185,6 +185,8 @@ wlan_dump_info(mlan_adapter * pmadapter, t_u8 reason)
 		}
 	}
 	PRINTM(MERROR, "mlan_processing =%d\n", pmadapter->mlan_processing);
+	PRINTM(MERROR, "mlan_rx_processing =%d\n",
+	       pmadapter->mlan_rx_processing);
 	PRINTM(MERROR, "more_task_flag = %d\n", pmadapter->more_task_flag);
 	PRINTM(MERROR, "num_cmd_timeout = %d\n",
 	       pmadapter->dbg.num_cmd_timeout);
@@ -1794,6 +1796,16 @@ wlan_cancel_pending_scan_cmd(pmlan_adapter pmadapter)
 
 	PRINTM(MIOCTL, "Cancel scan command\n");
 	wlan_request_cmd_lock(pmadapter);
+	/* IOCTL will be completed, avoid calling IOCTL complete again from
+	   EVENT/CMDRESP */
+	if (pmadapter->pscan_ioctl_req) {
+		pioctl_buf = pmadapter->pscan_ioctl_req;
+		pmadapter->pscan_ioctl_req = MNULL;
+		pioctl_buf->status_code = MLAN_ERROR_CMD_CANCEL;
+		pcb->moal_ioctl_complete(pmadapter->pmoal_handle, pioctl_buf,
+					 MLAN_STATUS_FAILURE);
+	}
+
 	if (pmadapter->curr_cmd && pmadapter->curr_cmd->pioctl_buf) {
 		pioctl_buf = (mlan_ioctl_req *) pmadapter->curr_cmd->pioctl_buf;
 		if (pioctl_buf->req_id == MLAN_IOCTL_SCAN) {
@@ -1827,10 +1839,6 @@ wlan_cancel_pending_scan_cmd(pmlan_adapter pmadapter)
 		wlan_request_cmd_lock(pmadapter);
 	}
 	wlan_release_cmd_lock(pmadapter);
-
-	/* IOCTL will be completed, avoid calling IOCTL complete again from
-	   EVENT */
-	pmadapter->pext_scan_ioctl_req = MNULL;
 	/* Cancel all pending scan command */
 	wlan_flush_scan_queue(pmadapter);
 	LEAVE();
@@ -1855,6 +1863,17 @@ wlan_cancel_all_pending_cmd(pmlan_adapter pmadapter)
 	ENTER();
 	/* Cancel current cmd */
 	wlan_request_cmd_lock(pmadapter);
+#ifdef STA_SUPPORT
+	/* IOCTL will be completed, avoid calling IOCTL complete again from
+	   EVENT/CMDRESP */
+	if (pmadapter->pscan_ioctl_req) {
+		pioctl_buf = pmadapter->pscan_ioctl_req;
+		pmadapter->pscan_ioctl_req = MNULL;
+		pioctl_buf->status_code = MLAN_ERROR_CMD_CANCEL;
+		pcb->moal_ioctl_complete(pmadapter->pmoal_handle, pioctl_buf,
+					 MLAN_STATUS_FAILURE);
+	}
+#endif
 	if ((pmadapter->curr_cmd) && (pmadapter->curr_cmd->pioctl_buf)) {
 		pioctl_buf = (mlan_ioctl_req *) pmadapter->curr_cmd->pioctl_buf;
 		pmadapter->curr_cmd->pioctl_buf = MNULL;
@@ -1886,9 +1905,6 @@ wlan_cancel_all_pending_cmd(pmlan_adapter pmadapter)
 		wlan_insert_cmd_to_free_q(pmadapter, pcmd_node);
 	}
 #ifdef STA_SUPPORT
-	/* IOCTL will be completed, avoid calling IOCTL complete again from
-	   EVENT */
-	pmadapter->pext_scan_ioctl_req = MNULL;
 	/* Cancel all pending scan command */
 	wlan_flush_scan_queue(pmadapter);
 #endif
@@ -1916,6 +1932,19 @@ wlan_cancel_bss_pending_cmd(pmlan_adapter pmadapter, t_u32 bss_index)
 
 	PRINTM(MIOCTL, "MOAL Cancel BSS IOCTL: bss_index=%d\n", (int)bss_index);
 	wlan_request_cmd_lock(pmadapter);
+#ifdef STA_SUPPORT
+	if (pmadapter->pscan_ioctl_req &&
+	    (pmadapter->pscan_ioctl_req->bss_index == bss_index)) {
+		/* IOCTL will be completed, avoid calling IOCTL complete again
+		   from EVENT/CMDRESP */
+		flash_scan = MTRUE;
+		pioctl_buf = pmadapter->pscan_ioctl_req;
+		pmadapter->pscan_ioctl_req = MNULL;
+		pioctl_buf->status_code = MLAN_ERROR_CMD_CANCEL;
+		pcb->moal_ioctl_complete(pmadapter->pmoal_handle, pioctl_buf,
+					 MLAN_STATUS_FAILURE);
+	}
+#endif
 	if (pmadapter->curr_cmd && pmadapter->curr_cmd->pioctl_buf) {
 		pioctl_buf = (mlan_ioctl_req *) pmadapter->curr_cmd->pioctl_buf;
 		if (pioctl_buf->bss_index == bss_index) {
@@ -1955,13 +1984,7 @@ wlan_cancel_bss_pending_cmd(pmlan_adapter pmadapter, t_u32 bss_index)
 	}
 	wlan_release_cmd_lock(pmadapter);
 #ifdef STA_SUPPORT
-	if (pmadapter->pext_scan_ioctl_req &&
-	    (pmadapter->pext_scan_ioctl_req->bss_index == bss_index))
-		flash_scan = MTRUE;
 	if (flash_scan) {
-		/* IOCTL will be completed, avoid calling IOCTL complete again
-		   from EVENT */
-		pmadapter->pext_scan_ioctl_req = MNULL;
 		/* Cancel all pending scan command */
 		wlan_flush_scan_queue(pmadapter);
 	}
@@ -1983,6 +2006,7 @@ wlan_cancel_pending_ioctl(pmlan_adapter pmadapter, pmlan_ioctl_req pioctl_req)
 {
 	pmlan_callbacks pcb = &pmadapter->callbacks;
 	cmd_ctrl_node *pcmd_node = MNULL;
+	t_u8 find = MFALSE;
 
 	ENTER();
 
@@ -1991,11 +2015,20 @@ wlan_cancel_pending_ioctl(pmlan_adapter pmadapter, pmlan_ioctl_req pioctl_req)
 	       (int)pioctl_req->action);
 
 	wlan_request_cmd_lock(pmadapter);
+#ifdef STA_SUPPORT
+	/* IOCTL will be completed, avoid calling IOCTL complete again from
+	   EVENT/CMDRESP */
+	if (pmadapter->pscan_ioctl_req == pioctl_req) {
+		pmadapter->pscan_ioctl_req = MNULL;
+		find = MTRUE;
+	}
+#endif
 	if ((pmadapter->curr_cmd) &&
 	    (pmadapter->curr_cmd->pioctl_buf == pioctl_req)) {
 		pcmd_node = pmadapter->curr_cmd;
 		pcmd_node->pioctl_buf = MNULL;
 		pcmd_node->cmd_flag |= CMD_F_CANCELED;
+		find = MTRUE;
 	}
 
 	while ((pcmd_node =
@@ -2006,6 +2039,7 @@ wlan_cancel_pending_ioctl(pmlan_adapter pmadapter, pmlan_ioctl_req pioctl_req)
 				 pmadapter->callbacks.moal_spin_lock,
 				 pmadapter->callbacks.moal_spin_unlock);
 		pcmd_node->pioctl_buf = MNULL;
+		find = MTRUE;
 		wlan_release_cmd_lock(pmadapter);
 		wlan_insert_cmd_to_free_q(pmadapter, pcmd_node);
 		wlan_request_cmd_lock(pmadapter);
@@ -2013,17 +2047,15 @@ wlan_cancel_pending_ioctl(pmlan_adapter pmadapter, pmlan_ioctl_req pioctl_req)
 	wlan_release_cmd_lock(pmadapter);
 #ifdef STA_SUPPORT
 	if (pioctl_req->req_id == MLAN_IOCTL_SCAN) {
-		/* IOCTL will be completed, avoid calling IOCTL complete again
-		   from EVENT */
-		if (pmadapter->pext_scan_ioctl_req == pioctl_req)
-			pmadapter->pext_scan_ioctl_req = MNULL;
 		/* Cancel all pending scan command */
 		wlan_flush_scan_queue(pmadapter);
 	}
 #endif
-	pioctl_req->status_code = MLAN_ERROR_CMD_CANCEL;
-	pcb->moal_ioctl_complete(pmadapter->pmoal_handle, pioctl_req,
-				 MLAN_STATUS_FAILURE);
+	if (find) {
+		pioctl_req->status_code = MLAN_ERROR_CMD_CANCEL;
+		pcb->moal_ioctl_complete(pmadapter->pmoal_handle, pioctl_req,
+					 MLAN_STATUS_FAILURE);
+	}
 
 	LEAVE();
 	return;

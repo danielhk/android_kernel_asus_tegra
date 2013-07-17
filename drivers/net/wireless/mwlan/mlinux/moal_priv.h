@@ -27,13 +27,6 @@ Change log:
 #ifndef _WOAL_PRIV_H_
 #define _WOAL_PRIV_H_
 
-/** Command disabled */
-#define	CMD_DISABLED				0
-/** Command enabled */
-#define	CMD_ENABLED				1
-/** Command get */
-#define	CMD_GET					2
-
 /** 2K bytes */
 #define WOAL_2K_BYTES       2000
 

@@ -1180,6 +1180,12 @@ woal_cfg80211_del_key(struct wiphy *wiphy, struct net_device *netdev,
 	moal_private *priv = (moal_private *) woal_get_netdev_priv(netdev);
 
 	ENTER();
+	if (priv->phandle->driver_state) {
+		PRINTM(MERROR,
+		       "Block woal_cfg80211_del_key in abnormal driver state\n");
+		LEAVE();
+		return 0;
+	}
 
 	if (woal_cfg80211_set_key(priv, 0, 0, NULL, 0, NULL, 0, key_index,
 				  mac_addr, 1)) {

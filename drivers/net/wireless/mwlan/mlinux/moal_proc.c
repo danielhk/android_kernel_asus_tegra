@@ -377,6 +377,7 @@ woal_config_write(struct file *f, const char *buf, unsigned long cnt,
 	if (!strncmp(databuf, "debug_dump", strlen("debug_dump"))) {
 		priv = woal_get_priv(handle, MLAN_BSS_ROLE_ANY);
 		if (priv) {
+			PRINTM(MERROR, "Recevie debug_dump command\n");
 			woal_mlan_debug_info(priv);
 			woal_moal_debug_info(priv, NULL, MFALSE);
 		}

@@ -355,6 +355,11 @@ do {                                    \
 /** Maximum number of CFP codes for A */
 #define MRVDRV_MAX_CFP_CODE_A           5
 
+/** high rx pending packets */
+#define HIGH_RX_PENDING         50
+/** low rx pending packets */
+#define LOW_RX_PENDING          20
+
 /** Default region code */
 #define MRVDRV_DEFAULT_REGION_CODE      0x10
 
@@ -429,7 +434,6 @@ do {                                    \
 #define IS_CARD_RX_RCVD(adapter) (adapter->cmd_resp_received || \
                                   adapter->event_received || \
                                   adapter->data_received)
-
 /** Type command */
 #define MLAN_TYPE_CMD			1
 /** Type data */
@@ -1525,8 +1529,16 @@ typedef struct _mlan_adapter
 	t_void *pmain_proc_lock;
     /** mlan_processing */
 	t_u32 mlan_processing;
+    /** mlan_rx_processing */
+	t_u32 mlan_rx_processing;
+    /** rx_proc_lock for main_rx_process */
+	t_void *prx_proc_lock;
+	/* number of rx pkts queued */
+	mlan_scalar rx_pkts_queued;
     /** more task flag */
 	t_u32 more_task_flag;
+    /** delay task flag */
+	t_u32 delay_task_flag;
     /** Max tx buf size */
 	t_u16 max_tx_buf_size;
     /** Tx buf size */
@@ -1723,6 +1735,8 @@ typedef struct _mlan_adapter
 
     /** Tx lock flag */
 	t_u8 tx_lock_flag;
+    /** Rx lock flag */
+	t_u8 rx_lock_flag;
 
     /** sleep_params_t */
 	sleep_params_t sleep_params;
@@ -1778,6 +1792,8 @@ typedef struct _mlan_adapter
 	t_u16 pps_uapsd_mode;
     /** Number of wakeup tries */
 	t_u32 pm_wakeup_fw_try;
+    /** time stamp when host try to wake up firmware */
+	t_u32 pm_wakeup_in_secs;
 
     /** Host Sleep configured flag */
 	t_u8 is_hs_configured;
@@ -1806,7 +1822,8 @@ typedef struct _mlan_adapter
 
     /** max mgmt IE index in device */
 	t_u16 max_mgmt_ie_index;
-
+    /** Head of Rx data queue */
+	mlan_list_head rx_data_queue;
 #ifdef MFG_CMD_SUPPORT
 	t_u32 mfg_mode;
 #endif
@@ -1831,8 +1848,8 @@ typedef struct _mlan_adapter
     /** warm-reset IOCTL request buffer pointer */
 	pmlan_ioctl_req pwarm_reset_ioctl_req;
 #endif
-    /** Extended SCAN IOCTL request buffer pointer */
-	pmlan_ioctl_req pext_scan_ioctl_req;
+    /** SCAN IOCTL request buffer pointer */
+	pmlan_ioctl_req pscan_ioctl_req;
     /** Cal data pointer */
 	t_u8 *pcal_data;
     /** Cal data length  */

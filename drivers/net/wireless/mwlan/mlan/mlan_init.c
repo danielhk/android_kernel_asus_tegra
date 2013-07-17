@@ -645,6 +645,12 @@ wlan_init_lock_list(IN pmlan_adapter pmadapter)
 		goto error;
 	}
 	if (pcb->
+	    moal_init_lock(pmadapter->pmoal_handle, &pmadapter->prx_proc_lock)
+	    != MLAN_STATUS_SUCCESS) {
+		ret = MLAN_STATUS_FAILURE;
+		goto error;
+	}
+	if (pcb->
 	    moal_init_lock(pmadapter->pmoal_handle, &pmadapter->pmlan_cmd_lock)
 	    != MLAN_STATUS_SUCCESS) {
 		ret = MLAN_STATUS_FAILURE;
@@ -678,6 +684,13 @@ wlan_init_lock_list(IN pmlan_adapter pmadapter)
 #endif
 		}
 	}
+
+	util_init_list_head((t_void *) pmadapter->pmoal_handle,
+			    &pmadapter->rx_data_queue, MTRUE,
+			    pmadapter->callbacks.moal_init_lock);
+	util_scalar_init((t_void *) pmadapter->pmoal_handle,
+			 &pmadapter->rx_pkts_queued, 0,
+			 MNULL, pmadapter->callbacks.moal_init_lock);
 
 	/* Initialize cmd_free_q */
 	util_init_list_head((t_void *) pmadapter->pmoal_handle,
@@ -768,6 +781,9 @@ wlan_free_lock_list(IN pmlan_adapter pmadapter)
 	if (pmadapter->pint_lock)
 		pcb->moal_free_lock(pmadapter->pmoal_handle,
 				    pmadapter->pint_lock);
+	if (pmadapter->prx_proc_lock)
+		pcb->moal_free_lock(pmadapter->pmoal_handle,
+				    pmadapter->prx_proc_lock);
 	if (pmadapter->pmain_proc_lock)
 		pcb->moal_free_lock(pmadapter->pmoal_handle,
 				    pmadapter->pmain_proc_lock);
@@ -793,6 +809,13 @@ wlan_free_lock_list(IN pmlan_adapter pmadapter)
 	}
 
 	/* Free lists */
+	util_free_list_head((t_void *) pmadapter->pmoal_handle,
+			    &pmadapter->rx_data_queue, pcb->moal_free_lock);
+
+	util_scalar_free((t_void *) pmadapter->pmoal_handle,
+			 &pmadapter->rx_pkts_queued,
+			 priv->adapter->callbacks.moal_free_lock);
+
 	util_free_list_head((t_void *) pmadapter->pmoal_handle,
 			    &pmadapter->cmd_free_q,
 			    pmadapter->callbacks.moal_free_lock);

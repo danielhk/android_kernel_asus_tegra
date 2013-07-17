@@ -286,11 +286,16 @@ woal_fill_wait_queue(moal_private * priv, wait_queue * wait, t_u8 wait_option)
 	ENTER();
 	wait->start_time = jiffies;
 	wait->condition = MFALSE;
+	wait->wait_timeout = MFALSE;
 	switch (wait_option) {
 	case MOAL_NO_WAIT:
 		break;
 	case MOAL_IOCTL_WAIT:
 		wait->wait = &priv->ioctl_wait_q;
+		break;
+	case MOAL_IOCTL_WAIT_TIMEOUT:
+		wait->wait = &priv->ioctl_wait_q;
+		wait->wait_timeout = MTRUE;
 		break;
 	case MOAL_CMD_WAIT:
 		wait->wait = &priv->cmd_wait_q;
@@ -336,6 +341,10 @@ woal_wait_ioctl_complete(moal_private * priv, mlan_ioctl_req * req,
 		wait_event_interruptible_exclusive(priv->ioctl_wait_q,
 						   wait->condition);
 		break;
+	case MOAL_IOCTL_WAIT_TIMEOUT:
+		wait_event_timeout(priv->ioctl_wait_q, wait->condition,
+				   MOAL_IOCTL_TIMEOUT);
+		break;
 	case MOAL_CMD_WAIT:
 		wait_event_interruptible_exclusive(priv->cmd_wait_q,
 						   wait->condition);
@@ -356,11 +365,11 @@ woal_wait_ioctl_complete(moal_private * priv, mlan_ioctl_req * req,
 	}
 	if (wait->condition == MFALSE) {
 		req->action = MLAN_ACT_CANCEL;
-		status = mlan_ioctl(priv->phandle->pmlan_adapter, req);
 		PRINTM(MMSG,
-		       "wlan: IOCTL cancel %p id=0x%x, sub_id=0x%x, wait_option=%d, action=%d, status=%d\n",
+		       "wlan: IOCTL cancel %p id=0x%x, sub_id=0x%x, wait_option=%d, action=%d\n",
 		       req, req->req_id, (*(t_u32 *) req->pbuf), wait_option,
-		       (int)req->action, status);
+		       (int)req->action);
+		status = mlan_ioctl(priv->phandle->pmlan_adapter, req);
 	}
 	LEAVE();
 	return;

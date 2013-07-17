@@ -319,22 +319,37 @@ wlan_11n_delete_rxreorder_tbl_entry(mlan_private * priv,
 		LEAVE();
 		return;
 	}
-
+	pmadapter->callbacks.moal_spin_lock(pmadapter->pmoal_handle,
+					    pmadapter->prx_proc_lock);
+	priv->adapter->rx_lock_flag = MTRUE;
+	if (priv->adapter->mlan_rx_processing) {
+		pmadapter->callbacks.moal_spin_unlock(pmadapter->pmoal_handle,
+						      pmadapter->prx_proc_lock);
+		PRINTM(MEVENT, "wlan: wait rx work done...\n");
+		wlan_recv_event(wlan_get_priv(pmadapter, MLAN_BSS_ROLE_ANY),
+				MLAN_EVENT_ID_MLAN_WAIT, MNULL);
+	} else {
+		pmadapter->callbacks.moal_spin_unlock(pmadapter->pmoal_handle,
+						      pmadapter->prx_proc_lock);
+	}
 	wlan_11n_dispatch_pkt_until_start_win(priv, rx_reor_tbl_ptr,
 					      (rx_reor_tbl_ptr->start_win +
 					       rx_reor_tbl_ptr->win_size)
 					      & (MAX_TID_VALUE - 1));
 
 	if (rx_reor_tbl_ptr->timer_context.timer) {
-		if (rx_reor_tbl_ptr->timer_context.timer_is_set)
+		if (rx_reor_tbl_ptr->timer_context.timer_is_set) {
 			priv->adapter->callbacks.moal_stop_timer(pmadapter->
 								 pmoal_handle,
 								 rx_reor_tbl_ptr->timer_context.
 								 timer);
+			rx_reor_tbl_ptr->timer_context.timer_is_set = MFALSE;
+		}
 		priv->adapter->callbacks.moal_free_timer(pmadapter->
 							 pmoal_handle,
 							 rx_reor_tbl_ptr->timer_context.
 							 timer);
+		rx_reor_tbl_ptr->timer_context.timer = MNULL;
 	}
 
 	PRINTM(MDAT_D, "Delete rx_reor_tbl_ptr: %p\n", rx_reor_tbl_ptr);
@@ -350,6 +365,11 @@ wlan_11n_delete_rxreorder_tbl_entry(mlan_private * priv,
 	pmadapter->callbacks.moal_mfree(pmadapter->pmoal_handle,
 					(t_u8 *) rx_reor_tbl_ptr);
 
+	pmadapter->callbacks.moal_spin_lock(pmadapter->pmoal_handle,
+					    pmadapter->prx_proc_lock);
+	priv->adapter->rx_lock_flag = MFALSE;
+	pmadapter->callbacks.moal_spin_unlock(pmadapter->pmoal_handle,
+					      pmadapter->prx_proc_lock);
 	LEAVE();
 }
 

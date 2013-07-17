@@ -1400,6 +1400,8 @@ typedef struct _mlan_debug_info
 	t_u8 pm_wakeup_card_req;
     /** Corresponds to pm_wakeup_fw_try member of mlan_adapter */
 	t_u32 pm_wakeup_fw_try;
+    /** time stamp when host try to wake up firmware */
+	t_u32 pm_wakeup_in_secs;
     /** Corresponds to is_hs_configured member of mlan_adapter */
 	t_u8 is_hs_configured;
     /** Corresponds to hs_activated member of mlan_adapter */
@@ -1492,6 +1494,10 @@ typedef struct _mlan_debug_info
     /**  dropped pkts */
 	t_u32 num_drop_pkts;
 #endif
+	/** mlan_processing */
+	t_u32 mlan_processing;
+    /** mlan_rx_processing */
+	t_u32 mlan_rx_processing;
 } mlan_debug_info, *pmlan_debug_info;
 
 #ifdef UAP_SUPPORT

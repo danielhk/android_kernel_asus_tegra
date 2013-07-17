@@ -27,6 +27,16 @@ Change log:
 #ifndef _WOAL_ETH_PRIV_H_
 #define _WOAL_ETH_PRIV_H_
 
+/** Command disabled */
+#define	CMD_DISABLED                    0
+/** Command enabled */
+#define	CMD_ENABLED                     1
+/** Command get */
+#define	CMD_GET                         2
+
+/** 2K bytes */
+#define WOAL_2K_BYTES       2000
+
 /** Marvell private command identifier string */
 #define CMD_MARVELL     "MRVL_CMD"
 
@@ -128,11 +138,50 @@ Change log:
 #endif
 /** Private command: Verext */
 #define PRIV_CMD_VEREXT    	    "verext"
+#define PRIV_CMD_WMM_CFG        "wmmcfg"
+#if defined(STA_SUPPORT)
+#define PRIV_CMD_11D_CFG        "11dcfg"
+#define PRIV_CMD_11D_CLR_TBL    "11dclrtbl"
+#endif
+#define PRIV_CMD_WWS_CFG        "wwscfg"
+#if defined(REASSOCIATION)
+#define PRIV_CMD_REASSOCTRL     "reassoctrl"
+#endif
+#define PRIV_CMD_TXBUF_CFG          "txbufcfg"
+#ifdef STA_SUPPORT
+#define PRIV_CMD_AUTH_TYPE          "authtype"
+#endif
+#define PRIV_CMD_POWER_CONS         "powercons"
+#define PRIV_CMD_HT_STREAM_CFG      "htstreamcfg"
+#define PRIV_CMD_THERMAL            "thermal"
+#define PRIV_CMD_BCN_INTERVAL       "bcninterval"
+#ifdef STA_SUPPORT
+#define PRIV_CMD_GET_SIGNAL         "getsignal"
+#endif
 #if defined(STA_SUPPORT)
 #define PRIV_CMD_PMFCFG         "pmfcfg"
 #endif
 #define PRIV_CMD_INACTIVITYTO   "inactivityto"
+#define PRIV_CMD_ATIM_WINDOW    "atimwindow"
+#define PRIV_CMD_AMSDU_AGGR_CTRL    "amsduaggrctrl"
+#define PRIV_CMD_TX_BF_CAP          "httxbfcap"
+#define PRIV_CMD_SDIO_CLOCK         "sdioclock"
+#if defined(SDIO_MULTI_PORT_TX_AGGR) || defined(SDIO_MULTI_PORT_RX_AGGR)
+#define PRIV_CMD_MPA_CTRL           "mpactrl"
+#endif
+#define PRIV_CMD_SLEEP_PARAMS       "sleepparams"
+#if defined(DFS_TESTING_SUPPORT)
+#define PRIV_CMD_DFS_TESTING        "dfstesting"
+#endif
+#define PRIV_CMD_CFP_CODE           "cfpcode"
+#define PRIV_CMD_ANT_CFG            "antcfg"
 #define PRIV_CMD_SYSCLOCK       "sysclock"
+#define PRIV_CMD_ADHOC_AES      "adhocaes"
+#define PRIV_CMD_ASSOCIATE      "associate"
+#define PRIV_CMD_TX_BF_CFG      "httxbfcfg"
+#define PRIV_CMD_PORT_CTRL      "port_ctrl"
+#define PRIV_CMD_PB_BYPASS      "pb_bypass"
+#define PRIV_CMD_SD_CMD53_RW        "sdcmd53rw"
 
 /** Private command ID for Android default commands */
 #define	WOAL_ANDROID_DEF_CMD        (SIOCDEVPRIVATE + 1)
