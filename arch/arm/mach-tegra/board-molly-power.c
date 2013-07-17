@@ -618,8 +618,8 @@ static struct regulator_consumer_supply palmas_ldousb_supply[] = {
  * ENABLE1 is hooked up to CPU_PWR_REQ
  */
 /* vdd_cpu - 1.0V nominal */
-PALMAS_REGS_PDATA(smps123, 500, 1520, NULL, 1, 1, 0, NORMAL,
-		  0, PALMAS_EXT_CONTROL_ENABLE1, 0, 0, 0);
+PALMAS_REGS_PDATA(smps123, 900, 1300, NULL, 0, 0, 0, 0,
+		  0, PALMAS_EXT_CONTROL_ENABLE1, 0, 3, 0);
 /* vdd_core - 1.1V nominal */
 PALMAS_REGS_PDATA(smps45, 900,  1400, NULL, 0, 0, 0, NORMAL,
 		  0, PALMAS_EXT_CONTROL_NSLEEP, 0, 3, 0);
