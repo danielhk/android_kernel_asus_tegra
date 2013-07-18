@@ -296,6 +296,7 @@ obj-${CONFIG_MACH_MOLLY}                += board-molly.o
 obj-${CONFIG_MACH_MOLLY}                += board-molly-memory.o
 obj-${CONFIG_MACH_MOLLY}                += board-molly-pinmux.o
 obj-${CONFIG_MACH_MOLLY}                += board-molly-power.o
+obj-${CONFIG_MACH_MOLLY}                += board-molly_on_dalmore-power.o
 obj-${CONFIG_MACH_MOLLY}                += board-molly-powermon.o
 obj-${CONFIG_MACH_MOLLY}                += board-molly-sdhci.o
 obj-${CONFIG_MACH_MOLLY}                += board-molly-panel.o

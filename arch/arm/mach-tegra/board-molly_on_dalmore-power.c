@@ -1,5 +1,5 @@
 /*
- * arch/arm/mach-tegra/board-molly-power.c
+ * arch/arm/mach-tegra/board-molly_on_dalmore-power.c
  *
  * Copyright (c) 2012-2013 NVIDIA Corporation. All rights reserved.
  * Copyright (c) 2013 Google, Inc. All rights reserved.
@@ -18,7 +18,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-/* true molly */
+/* evaluate molly on dalmore */
 
 #include <linux/i2c.h>
 #include <linux/pda_power.h>
@@ -57,42 +57,180 @@
 #include "tegra11_soctherm.h"
 #include "tegra3_tsensor.h"
 
-#if MOLLY_ON_DALMORE == 0
+#if MOLLY_ON_DALMORE == 1
 
 #define PMC_CTRL		0x0
 #define PMC_CTRL_INTR_LOW	(1 << 17)
 
-/***************** TPS65913 Palmas based regulator ****************/
+#include "tegra-board-id.h"
 
-/* vdd_cpu */
-/* SMPS1, SMPS2, and SMPS3 all tied together to provide vdd_cpu */
-static struct regulator_consumer_supply palmas_smps123_supply[] = {
+#define TPS65090_CHARGER_INT	TEGRA_GPIO_PJ0
+
+/*TPS65090 consumer rails */
+static struct regulator_consumer_supply tps65090_dcdc1_supply[] = {
+	REGULATOR_SUPPLY("vdd_sys_5v0", NULL),
+};
+
+static struct regulator_consumer_supply tps65090_dcdc2_supply[] = {
+	REGULATOR_SUPPLY("vdd_sys_3v3", NULL),
+	REGULATOR_SUPPLY("vddio_hv", "tegradc.0"),
+	REGULATOR_SUPPLY("pwrdet_hv", NULL),
+	REGULATOR_SUPPLY("vdd_sys_ds_3v3", NULL),
+	REGULATOR_SUPPLY("vcc", "0-007c"),
+	REGULATOR_SUPPLY("vcc", "0-0030"),
+	REGULATOR_SUPPLY("vin", "2-0030"),
+};
+
+static struct regulator_consumer_supply tps65090_dcdc3_supply[] = {
+};
+
+static struct regulator_consumer_supply tps65090_ldo1_supply[] = {
+};
+
+static struct regulator_consumer_supply tps65090_ldo2_supply[] = {
+};
+
+static struct regulator_consumer_supply tps65090_fet1_supply[] = {
+};
+
+static struct regulator_consumer_supply tps65090_fet3_supply[] = {
+};
+
+static struct regulator_consumer_supply tps65090_fet4_supply[] = {
+	REGULATOR_SUPPLY("avdd", "spi3.2"),
+};
+
+static struct regulator_consumer_supply tps65090_fet5_supply[] = {
+	REGULATOR_SUPPLY("vdd_lvds", NULL),
+};
+
+static struct regulator_consumer_supply tps65090_fet6_supply[] = {
+	REGULATOR_SUPPLY("vddio_sd_slot", "sdhci-tegra.2"),
+};
+
+static struct regulator_consumer_supply tps65090_fet7_supply[] = {
+	REGULATOR_SUPPLY("vdd_wifi_3v3", "wlan.1"),
+	REGULATOR_SUPPLY("vdd_bt_3v3", "bluedroid_pm.0"),
+};
+
+#define TPS65090_PDATA_INIT(_id, _name, _supply_reg,			\
+	_always_on, _boot_on, _apply_uV, _en_ext_ctrl, _gpio, _wait_to)	\
+static struct regulator_init_data ri_data_##_name =			\
+{									\
+	.supply_regulator = _supply_reg,				\
+	.constraints = {						\
+		.name = tps65090_rails(_id),				\
+		.valid_modes_mask = (REGULATOR_MODE_NORMAL |		\
+				     REGULATOR_MODE_STANDBY),		\
+		.valid_ops_mask = (REGULATOR_CHANGE_MODE |		\
+				   REGULATOR_CHANGE_STATUS |		\
+				   REGULATOR_CHANGE_VOLTAGE),		\
+		.always_on = _always_on,				\
+		.boot_on = _boot_on,					\
+		.apply_uV = _apply_uV,					\
+	},								\
+	.num_consumer_supplies =					\
+		ARRAY_SIZE(tps65090_##_name##_supply),			\
+	.consumer_supplies = tps65090_##_name##_supply,			\
+};									\
+static struct tps65090_regulator_platform_data				\
+			tps65090_regulator_pdata_##_name =		\
+{									\
+	.id = TPS65090_REGULATOR_##_id,					\
+	.enable_ext_control = _en_ext_ctrl,				\
+	.gpio = _gpio,							\
+	.reg_init_data = &ri_data_##_name ,				\
+	.wait_timeout_us = _wait_to,					\
+}
+
+TPS65090_PDATA_INIT(DCDC1, dcdc1, NULL, 1, 1, 0, true, -1, -1);
+TPS65090_PDATA_INIT(DCDC2, dcdc2, NULL, 1, 1, 0, true, -1, -1);
+TPS65090_PDATA_INIT(DCDC3, dcdc3, NULL, 1, 1, 0, true, -1, -1);
+TPS65090_PDATA_INIT(LDO1, ldo1, NULL, 1, 1, 0, false, -1, -1);
+TPS65090_PDATA_INIT(LDO2, ldo2, NULL, 1, 1, 0, false, -1, -1);
+TPS65090_PDATA_INIT(FET1, fet1, NULL, 0, 0, 0, false, -1, 800);
+TPS65090_PDATA_INIT(FET3, fet3, tps65090_rails(DCDC2), 0, 0, 0, false, -1, 0);
+TPS65090_PDATA_INIT(FET4, fet4, tps65090_rails(DCDC2), 0, 0, 0, false, -1, 0);
+TPS65090_PDATA_INIT(FET5, fet5, tps65090_rails(DCDC2), 0, 0, 0, false, -1, 0);
+/* Always on for ubik */
+TPS65090_PDATA_INIT(FET6, fet6, tps65090_rails(DCDC2), 1, 0, 0, false, -1, 0);
+TPS65090_PDATA_INIT(FET7, fet7, tps65090_rails(DCDC2), 0, 0, 0, false, -1, 0);
+
+#define ADD_TPS65090_REG(_name) (&tps65090_regulator_pdata_##_name)
+static struct tps65090_regulator_platform_data *tps65090_reg_pdata[] = {
+	ADD_TPS65090_REG(dcdc1),
+	ADD_TPS65090_REG(dcdc2),
+	ADD_TPS65090_REG(dcdc3),
+	ADD_TPS65090_REG(ldo1),
+	ADD_TPS65090_REG(ldo2),
+	ADD_TPS65090_REG(fet1),
+	ADD_TPS65090_REG(fet3),
+	ADD_TPS65090_REG(fet4),
+	ADD_TPS65090_REG(fet5),
+	ADD_TPS65090_REG(fet6),
+	ADD_TPS65090_REG(fet7),
+};
+
+static struct tps65090_platform_data tps65090_pdata = {
+	.irq_base = TPS65090_TEGRA_IRQ_BASE,
+	.irq_flag = IRQF_ONESHOT | IRQF_TRIGGER_FALLING,
+	.num_reg_pdata =  ARRAY_SIZE(tps65090_reg_pdata),
+	.reg_pdata = tps65090_reg_pdata,
+};
+
+static struct i2c_board_info __initdata tps65090_regulators[] = {
+	{
+		I2C_BOARD_INFO("tps65090", 0x48),
+		.platform_data	= &tps65090_pdata,
+	},
+};
+
+/* TPS51632 DC-DC converter */
+static struct regulator_consumer_supply tps51632_dcdc_supply[] = {
 	REGULATOR_SUPPLY("vdd_cpu", NULL),
 };
 
-/* vdd_core */
-/* SMPS4 and SMPS5 are tied together to provide vdd_core */
-static struct regulator_consumer_supply palmas_smps45_supply[] = {
-	REGULATOR_SUPPLY("vdd_core", NULL),
-	REGULATOR_SUPPLY("vdd_core", "sdhci-tegra.0"),
-	REGULATOR_SUPPLY("vdd_core", "sdhci-tegra.3"),
+static struct regulator_init_data tps51632_init_data = {
+	.constraints = {						\
+		.min_uV = 500000,					\
+		.max_uV = 1520000,					\
+		.valid_modes_mask = (REGULATOR_MODE_NORMAL |		\
+					REGULATOR_MODE_STANDBY),	\
+		.valid_ops_mask = (REGULATOR_CHANGE_MODE |		\
+					REGULATOR_CHANGE_STATUS |	\
+					 REGULATOR_CHANGE_CONTROL |	\
+					REGULATOR_CHANGE_VOLTAGE),	\
+		.always_on = 1,						\
+		.boot_on =  1,						\
+		.apply_uV = 0,						\
+	},								\
+	.num_consumer_supplies = ARRAY_SIZE(tps51632_dcdc_supply),	\
+		.consumer_supplies = tps51632_dcdc_supply,		\
 };
 
-/* vdd_3v3 */
-static struct regulator_consumer_supply palmas_smps6_supply[] = {
-	REGULATOR_SUPPLY("vdd_3v3", NULL),
-	REGULATOR_SUPPLY("vddio_sdmmc", "sdhci-tegra.2"),
+static struct tps51632_regulator_platform_data tps51632_pdata = {
+	.reg_init_data = &tps51632_init_data,		\
+	.enable_pwm = false,				\
+	.max_voltage_uV = 1520000,			\
+	.base_voltage_uV = 500000,			\
+	.slew_rate_uv_per_us = 6000,			\
 };
 
-/* vdd_ddr */
-static struct regulator_consumer_supply palmas_smps7_supply[] = {
-	REGULATOR_SUPPLY("vddio_ddr", NULL),
-	REGULATOR_SUPPLY("vddio_lpddr3", NULL),
-	REGULATOR_SUPPLY("vcore2_lpddr3", NULL),
+static struct i2c_board_info __initdata tps51632_boardinfo[] = {
+	{
+		I2C_BOARD_INFO("tps51632", 0x43),
+		.platform_data	= &tps51632_pdata,
+	},
 };
 
-/* vdd_1v8 */
-static struct regulator_consumer_supply palmas_smps8_supply[] = {
+/************************ Palmas based regulator ****************/
+static struct regulator_consumer_supply palmas_smps12_supply[] = {
+	REGULATOR_SUPPLY("vddio_ddr3l", NULL),
+	REGULATOR_SUPPLY("vcore_ddr3l", NULL),
+	REGULATOR_SUPPLY("vref2_ddr3l", NULL),
+};
+
+static struct regulator_consumer_supply palmas_smps3_supply[] = {
 	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-udc.0"),
 	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-ehci.0"),
 	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-ehci.1"),
@@ -101,156 +239,168 @@ static struct regulator_consumer_supply palmas_smps8_supply[] = {
 	REGULATOR_SUPPLY("vddio_sdmmc", "sdhci-tegra.0"),
 	REGULATOR_SUPPLY("pwrdet_sdmmc1", NULL),
 	REGULATOR_SUPPLY("vddio_sdmmc", "sdhci-tegra.3"),
-	REGULATOR_SUPPLY("vdd_emmc", "sdhci-tegra.3"),
 	REGULATOR_SUPPLY("pwrdet_sdmmc4", NULL),
-	REGULATOR_SUPPLY("vddio_audio", NULL),
-	REGULATOR_SUPPLY("pwrdet_audio", NULL),
+	REGULATOR_SUPPLY("vdd_emmc", NULL),
 	REGULATOR_SUPPLY("vddio_uart", NULL),
 	REGULATOR_SUPPLY("pwrdet_uart", NULL),
 	REGULATOR_SUPPLY("vddio_gmi", NULL),
+	REGULATOR_SUPPLY("vdd_ds_1v8", NULL),
+	REGULATOR_SUPPLY("vdd_spi_1v8", NULL),
+	REGULATOR_SUPPLY("vdd_com_1v8", NULL),
+	REGULATOR_SUPPLY("vddio_wifi_1v8", "wlan.1"),
+	REGULATOR_SUPPLY("vddio_bt_1v8", "bluedroid_pm.0"),
 	REGULATOR_SUPPLY("vlogic", "0-0069"),
 	REGULATOR_SUPPLY("vid", "0-000d"),
 	REGULATOR_SUPPLY("vddio", "0-0078"),
-	REGULATOR_SUPPLY("vcore1_lpddr", NULL),
-	REGULATOR_SUPPLY("vcore_lpddr", NULL),
-	REGULATOR_SUPPLY("vddio_lpddr", NULL),
-	REGULATOR_SUPPLY("vdd_rf", NULL),
-	REGULATOR_SUPPLY("vdd_dbg", NULL),
-	REGULATOR_SUPPLY("vdd_sim_1v8", NULL),
-	REGULATOR_SUPPLY("vdd_sim1a_1v8", NULL),
-	REGULATOR_SUPPLY("vdd_sim1b_1v8", NULL),
-	REGULATOR_SUPPLY("dvdd_audio", NULL),
-	REGULATOR_SUPPLY("avdd_audio", NULL),
-	REGULATOR_SUPPLY("vdd_com_1v8", NULL),
-	REGULATOR_SUPPLY("dvdd", "spi3.2"),
-	REGULATOR_SUPPLY("avdd_pll_bb", NULL),
 };
 
-/* vdd_sys_2v9 */
-static struct regulator_consumer_supply palmas_smps9_supply[] = {
-	REGULATOR_SUPPLY("vddio_sd_slot", "sdhci-tegra.3"),
-	REGULATOR_SUPPLY("vddio_hv", "tegradc.1"),
+static struct regulator_consumer_supply palmas_smps45_supply[] = {
+	REGULATOR_SUPPLY("vdd_core", NULL),
+	REGULATOR_SUPPLY("vdd_core", "sdhci-tegra.0"),
+	REGULATOR_SUPPLY("vdd_core", "sdhci-tegra.3"),
 };
 
-/* smps10 is unused */
+static struct regulator_consumer_supply palmas_smps457_supply[] = {
+	REGULATOR_SUPPLY("vdd_core", NULL),
+	REGULATOR_SUPPLY("vdd_core", "sdhci-tegra.0"),
+	REGULATOR_SUPPLY("vdd_core", "sdhci-tegra.3"),
+};
 
-/* ldo1 - va_pllx */
-static struct regulator_consumer_supply palmas_ldo1_supply[] = {
+static struct regulator_consumer_supply palmas_smps8_supply[] = {
 	REGULATOR_SUPPLY("avdd_plla_p_c", NULL),
 	REGULATOR_SUPPLY("avdd_pllm", NULL),
 	REGULATOR_SUPPLY("avdd_pllu", NULL),
 	REGULATOR_SUPPLY("avdd_pllx", NULL),
-	REGULATOR_SUPPLY("avdd_plle", NULL),
 	REGULATOR_SUPPLY("vdd_ddr_hs", NULL),
+	REGULATOR_SUPPLY("avdd_plle", NULL),
+	REGULATOR_SUPPLY("avdd_csi_dsi_pll", "tegradc.0"),
+	REGULATOR_SUPPLY("avdd_csi_dsi_pll", "vi"),
 };
 
-/* ldo2 - va_usb3_1v2 */
-static struct regulator_consumer_supply palmas_ldo2_supply[] = {
+static struct regulator_consumer_supply palmas_smps9_supply[] = {
+	REGULATOR_SUPPLY("vddio_sd_slot", "sdhci-tegra.3"),
+};
+
+static struct regulator_consumer_supply palmas_ldo1_supply[] = {
+	REGULATOR_SUPPLY("avddio_usb", "tegra-ehci.2"),
 	REGULATOR_SUPPLY("avddio_usb", "tegra-xhci"),
-	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-xhci"),
+};
+
+static struct regulator_consumer_supply palmas_ldo2_supply[] = {
+	REGULATOR_SUPPLY("vana", "2-0036"),
+	REGULATOR_SUPPLY("avdd", "2-0010"),
 };
 
 static struct regulator_consumer_supply palmas_ldo3_supply[] = {
+	REGULATOR_SUPPLY("avdd_dsi_csi", "tegradc.0"),
+	REGULATOR_SUPPLY("avdd_dsi_csi", "vi"),
 };
 
-/* ldo4 - avdd_hsic_1v2 */
 static struct regulator_consumer_supply palmas_ldo4_supply[] = {
-	REGULATOR_SUPPLY("vddio_hsic", "tegra-ehci.1"),
-};
-
-/* ldo5 - vdd_fuse.  move to fixed? */
-static struct regulator_consumer_supply palmas_ldo5_supply[] = {
 	REGULATOR_SUPPLY("vpp_fuse", NULL),
+	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-ehci.2"),
+	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-xhci"),
 };
 
-/* ldo6 - vdd_u3v3 for ubik */
 static struct regulator_consumer_supply palmas_ldo6_supply[] = {
-	REGULATOR_SUPPLY("vpp_u3v3", NULL),
+	/* needed for temp sensor nct1008.
+	 * In molly, this is the always on 1v8 smps8 rail so
+	 * we won't bother registering a regulator for it.
+	 */
+	REGULATOR_SUPPLY("vdd", "0-004c"), /* NCT1008, i2c slave 0x4c */
+	REGULATOR_SUPPLY("vdd", "0-0069"),
+	REGULATOR_SUPPLY("vdd", "0-000d"),
+	REGULATOR_SUPPLY("vdd", "0-0078"),
 };
 
-/* ldo8 - vd_ap_rtc */
+static struct regulator_consumer_supply palmas_ldo7_supply[] = {
+	REGULATOR_SUPPLY("vdd", "2-000e"),
+};
+
 static struct regulator_consumer_supply palmas_ldo8_supply[] = {
 	REGULATOR_SUPPLY("vdd_rtc", NULL),
 };
 
-/* ldoln - va_hdmi */
-static struct regulator_consumer_supply palmas_ldoln_supply[] = {
-	REGULATOR_SUPPLY("avdd_hdmi", "tegradc.0"),
+static struct regulator_consumer_supply palmas_ldo9_supply[] = {
+	REGULATOR_SUPPLY("vddio_sdmmc", "sdhci-tegra.2"),
+	REGULATOR_SUPPLY("pwrdet_sdmmc3", NULL),
 };
 
-/* ldousb - avdd_usb */
+static struct regulator_consumer_supply palmas_ldoln_supply[] = {
+	REGULATOR_SUPPLY("hvdd_usb", "tegra-ehci.2"),
+	REGULATOR_SUPPLY("hvdd_usb", "tegra-xhci"),
+};
+
 static struct regulator_consumer_supply palmas_ldousb_supply[] = {
 	REGULATOR_SUPPLY("avdd_usb", "tegra-udc.0"),
 	REGULATOR_SUPPLY("avdd_usb", "tegra-ehci.0"),
 	REGULATOR_SUPPLY("avdd_usb", "tegra-ehci.1"),
 	REGULATOR_SUPPLY("avdd_usb", "tegra-ehci.2"),
-	REGULATOR_SUPPLY("hvdd_usb", "tegra-xhci"),
+	REGULATOR_SUPPLY("avdd_hdmi", "tegradc.0"),
 };
 
-/* NSLEEP is hooked up to CORE_PWR_REQ and
- * ENABLE1 is hooked up to CPU_PWR_REQ
- */
-/* vdd_cpu - 1.0V nominal */
-PALMAS_REGS_PDATA(smps123, 900, 1300, NULL, 0, 0, 0, 0,
-		  0, PALMAS_EXT_CONTROL_ENABLE1, 0, 3, 0);
-/* vdd_core - 1.1V nominal */
-PALMAS_REGS_PDATA(smps45, 900,  1400, NULL, 0, 0, 0, NORMAL,
-		  0, PALMAS_EXT_CONTROL_NSLEEP, 0, 3, 0);
-/* vdd_3v3 - 3.3V */
-PALMAS_REGS_PDATA(smps6, 3300,  3300, NULL, 1, 0, 1, NORMAL,
-		  0, 0, 0, 0, 0);
-/* vdd_ddr - 1.35V */
-PALMAS_REGS_PDATA(smps7, 1350,  1350, NULL, 0, 0, 0, NORMAL,
-		  0, 0, 0, 0, 0);
-/* vdd_1v8 - 1.8V */
-PALMAS_REGS_PDATA(smps8, 1800,  1800, NULL, 1, 0, 1, NORMAL,
-		  0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
-/* vdd_sys_2v9 - always on, emmc power */
-PALMAS_REGS_PDATA(smps9, 2900,  2900, NULL, 1, 0, 1, NORMAL,
-		  0, 0, 0, 0, 0);
+static struct regulator_consumer_supply palmas_ldoln_fab05_supply[] = {
+	REGULATOR_SUPPLY("avdd_hdmi", "tegradc.0"),
+};
 
-/* va_pllx - boot on? - 1.05V */
-PALMAS_REGS_PDATA(ldo1, 1050,  1050, palmas_rails(smps7), 0, 0, 1, 0,
-		  0, 0, 0, 0, 0);
-/* va_usb3_1v2 - 1.2V */
-PALMAS_REGS_PDATA(ldo2, 1200,  1200, palmas_rails(smps7), 0, 0, 1, 0,
-		  0, 0, 0, 0, 0);
-/* avdd_hdmi_pll - 1.2V */
-PALMAS_REGS_PDATA(ldo3, 1200,  1200, palmas_rails(smps8), 0, 0, 1, 0,
-		  0, 0, 0, 0, 0);
-/* avdd_hsic_1v2 - 1.2V */
-PALMAS_REGS_PDATA(ldo4, 1200,  1200, palmas_rails(smps8), 0, 0, 1, 0,
-		  0, 0, 0, 0, 0);
-/* vd_fuse - should we move this to a fixed regulator? */
-PALMAS_REGS_PDATA(ldo5, 1800,  1800, NULL, 0, 0, 1, 0,
-		  0, 0, 0, 0, 0);
-/* always on at 3.3V for Ubik -
-   should we move this to a fixed regulator? */
-PALMAS_REGS_PDATA(ldo6, 3300,  3300, NULL, 1, 0, 1, 0,
-		  0, 0, 0, 0, 0);
-/* rtc - always on and boot on.  Dalmore and pluto set
- * to 0.9V, but schematic and data sheet say 1.0-1.2V.
- * needs verification
- */
-PALMAS_REGS_PDATA(ldo8, 900,  900, NULL, 1, 1, 1, 0,
-		  0, 0, 0, 0, 0);
-/* avdd_hdmi */
-PALMAS_REGS_PDATA(ldoln, 3300, 3300, NULL, 0, 0, 1, 0,
-		  0, 0, 0, 0, 0);
-/* avdd_usb & hvdd_usb */
-PALMAS_REGS_PDATA(ldousb, 3300,  3300, NULL, 0, 0, 1, 0,
-		  0, 0, 0, 0, 0);
+static struct regulator_consumer_supply palmas_ldousb_fab05_supply[] = {
+	REGULATOR_SUPPLY("hvdd_usb", "tegra-ehci.2"),
+	REGULATOR_SUPPLY("hvdd_usb", "tegra-xhci"),
+	REGULATOR_SUPPLY("avdd_usb", "tegra-udc.0"),
+	REGULATOR_SUPPLY("avdd_usb", "tegra-ehci.0"),
+	REGULATOR_SUPPLY("avdd_usb", "tegra-ehci.1"),
+	REGULATOR_SUPPLY("avdd_usb", "tegra-ehci.2"),
+};
+
+PALMAS_REGS_PDATA(smps12, 1350,  1350, tps65090_rails(DCDC3), 0, 0, 0, NORMAL,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(smps3, 1800,  1800, tps65090_rails(DCDC3), 0, 0, 0, NORMAL,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(smps45, 900,  1400, tps65090_rails(DCDC2), 1, 1, 0, NORMAL,
+	0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+PALMAS_REGS_PDATA(smps457, 900,  1400, tps65090_rails(DCDC2), 1, 1, 0, NORMAL,
+	0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+PALMAS_REGS_PDATA(smps8, 1050,  1050, tps65090_rails(DCDC2), 0, 1, 1, NORMAL,
+	0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+PALMAS_REGS_PDATA(smps9, 2800,  2800, tps65090_rails(DCDC2), 1, 0, 0, NORMAL,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo1, 1200,  1200, tps65090_rails(DCDC2), 0, 0, 1, 0,
+	1, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo2, 2800,  2800, tps65090_rails(DCDC2), 0, 0, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo3, 1200,  1200, palmas_rails(smps3), 0, 0, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo4, 1200,  1200, tps65090_rails(DCDC2), 0, 0, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo6, 2850,  2850, tps65090_rails(DCDC2), 0, 0, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo7, 2800,  2800, tps65090_rails(DCDC2), 0, 0, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldo8, 900,  900, tps65090_rails(DCDC3), 1, 1, 1, 0,
+	0, 0, 0, 0, 0);
+/* Always on at 3.3V for Ubik */
+PALMAS_REGS_PDATA(ldo9, 3300,  3300, palmas_rails(smps9), 1, 0, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldoln, 3300, 3300, tps65090_rails(DCDC1), 0, 0, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldousb, 3300,  3300, tps65090_rails(DCDC1), 0, 0, 1, 0,
+	0, 0, 0, 0, 0);
+
+PALMAS_REGS_PDATA(ldoln_fab05, 3300, 3300, tps65090_rails(DCDC1), 0, 0, 1, 0,
+	0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(ldousb_fab05, 3300,  3300, tps65090_rails(DCDC1), 0, 0, 1, 0,
+	0, 0, 0, 0, 0);
 
 #define PALMAS_REG_PDATA(_sname) (&reg_idata_##_sname)
 
 static struct regulator_init_data *molly_reg_data[PALMAS_NUM_REGS] = {
+	PALMAS_REG_PDATA(smps12),
 	NULL,
-	PALMAS_REG_PDATA(smps123),
-	NULL,
+	PALMAS_REG_PDATA(smps3),
 	PALMAS_REG_PDATA(smps45),
+	PALMAS_REG_PDATA(smps457),
 	NULL,
-	PALMAS_REG_PDATA(smps6),
-	PALMAS_REG_PDATA(smps7),
+	NULL,
 	PALMAS_REG_PDATA(smps8),
 	PALMAS_REG_PDATA(smps9),
 	NULL,
@@ -258,11 +408,11 @@ static struct regulator_init_data *molly_reg_data[PALMAS_NUM_REGS] = {
 	PALMAS_REG_PDATA(ldo2),
 	PALMAS_REG_PDATA(ldo3),
 	PALMAS_REG_PDATA(ldo4),
-	PALMAS_REG_PDATA(ldo5),
+	NULL,
 	PALMAS_REG_PDATA(ldo6),
-	NULL,
+	PALMAS_REG_PDATA(ldo7),
 	PALMAS_REG_PDATA(ldo8),
-	NULL,
+	PALMAS_REG_PDATA(ldo9),
 	PALMAS_REG_PDATA(ldoln),
 	PALMAS_REG_PDATA(ldousb),
 	NULL,
@@ -274,25 +424,25 @@ static struct regulator_init_data *molly_reg_data[PALMAS_NUM_REGS] = {
 
 #define PALMAS_REG_INIT_DATA(_sname) (&reg_init_data_##_sname)
 static struct palmas_reg_init *molly_reg_init[PALMAS_NUM_REGS] = {
-	NULL, /* SMPS12 */
-	PALMAS_REG_INIT_DATA(smps123), /* SMPS123 */
-	NULL, /* SMPS3 */
-	PALMAS_REG_INIT_DATA(smps45), /* SMPS45 */
-	NULL, /* SMPS457 */
-	PALMAS_REG_INIT_DATA(smps6), /* SMPS6 */
-	PALMAS_REG_INIT_DATA(smps7), /* SMPS7 */
-	PALMAS_REG_INIT_DATA(smps8), /* SMPS8 */
-	PALMAS_REG_INIT_DATA(smps9), /* SMPS9 */
-	NULL, /* SMPS10 */
+	PALMAS_REG_INIT_DATA(smps12),
+	NULL,
+	PALMAS_REG_INIT_DATA(smps3),
+	PALMAS_REG_INIT_DATA(smps45),
+	PALMAS_REG_INIT_DATA(smps457),
+	NULL,
+	NULL,
+	PALMAS_REG_INIT_DATA(smps8),
+	PALMAS_REG_INIT_DATA(smps9),
+	NULL,
 	PALMAS_REG_INIT_DATA(ldo1),
 	PALMAS_REG_INIT_DATA(ldo2),
 	PALMAS_REG_INIT_DATA(ldo3),
 	PALMAS_REG_INIT_DATA(ldo4),
-	PALMAS_REG_INIT_DATA(ldo5),
+	NULL,
 	PALMAS_REG_INIT_DATA(ldo6),
-	NULL,
+	PALMAS_REG_INIT_DATA(ldo7),
 	PALMAS_REG_INIT_DATA(ldo8),
-	NULL,
+	PALMAS_REG_INIT_DATA(ldo9),
 	PALMAS_REG_INIT_DATA(ldoln),
 	PALMAS_REG_INIT_DATA(ldousb),
 	NULL,
@@ -301,6 +451,42 @@ static struct palmas_reg_init *molly_reg_init[PALMAS_NUM_REGS] = {
 	NULL,
 	NULL,
 };
+
+static void set_dalmore_power_fab05(void)
+{
+	molly_reg_data[PALMAS_REG_LDOLN] =
+				PALMAS_REG_PDATA(ldoln_fab05);
+	molly_reg_init[PALMAS_REG_LDOLN] =
+				PALMAS_REG_INIT_DATA(ldoln_fab05);
+	molly_reg_data[PALMAS_REG_LDOUSB] =
+				PALMAS_REG_PDATA(ldousb_fab05);
+	molly_reg_init[PALMAS_REG_LDOUSB] =
+				PALMAS_REG_INIT_DATA(ldousb_fab05);
+	return;
+}
+
+static void molly_tps65090_init(void)
+{
+	int err;
+
+	err = gpio_request(TPS65090_CHARGER_INT, "CHARGER_INT");
+	if (err < 0) {
+		pr_err("%s: gpio_request failed %d\n", __func__, err);
+		goto fail_init_irq;
+	}
+
+	err = gpio_direction_input(TPS65090_CHARGER_INT);
+	if (err < 0) {
+		pr_err("%s: gpio_direction_input failed %d\n", __func__, err);
+		goto fail_init_irq;
+	}
+
+	tps65090_regulators[0].irq = gpio_to_irq(TPS65090_CHARGER_INT);
+fail_init_irq:
+	i2c_register_board_info(4, tps65090_regulators,
+			ARRAY_SIZE(tps65090_regulators));
+	return;
+}
 
 /* Note: this can't be __initdata because palmas driver
  * keeps a reference to it after init.
@@ -360,12 +546,26 @@ static struct i2c_board_info __initdata palma_device[] = {
 	},
 };
 
-/* EN_USB3_VBUS From TEGRA GPIO PN4 */
+static struct regulator_consumer_supply fixed_reg_vdd_hdmi_5v0_supply[] = {
+	REGULATOR_SUPPLY("vdd_hdmi_5v0", "tegradc.0"),
+};
+
+/* EN_USB1_VBUS From TEGRA GPIO PN4 PR3(T30) */
+static struct regulator_consumer_supply fixed_reg_usb1_vbus_supply[] = {
+	REGULATOR_SUPPLY("usb_vbus", "tegra-ehci.0"),
+};
+
+/* EN_USB3_VBUS From TEGRA GPIO PM5 */
 static struct regulator_consumer_supply fixed_reg_usb3_vbus_supply[] = {
 	REGULATOR_SUPPLY("usb_vbus", "tegra-xhci"),
 };
 
-/* no gpio enable required */
+/* EN_1V8_TS From TEGRA_GPIO_PH5 */
+static struct regulator_consumer_supply fixed_reg_dvdd_ts_supply[] = {
+	REGULATOR_SUPPLY("dvdd", "spi3.2"),
+};
+
+/* EN_AVDD_HDMI_PLL From TEGRA_GPIO_PO1 */
 static struct regulator_consumer_supply fixed_reg_avdd_hdmi_pll_supply[] = {
 	REGULATOR_SUPPLY("avdd_hdmi_pll", "tegradc.0"),
 };
@@ -408,13 +608,25 @@ static struct regulator_consumer_supply fixed_reg_avdd_hdmi_pll_supply[] = {
 		},							\
 	}
 
+FIXED_REG(3,	vdd_hdmi_5v0,	vdd_hdmi_5v0,
+	tps65090_rails(DCDC1),	0,	0,
+	TEGRA_GPIO_PK1,	false,	true,	0,	5000);
+
+FIXED_REG(5,	usb1_vbus,	usb1_vbus,
+	tps65090_rails(DCDC1),	0,	0,
+	TEGRA_GPIO_PN4,	true,	true,	0,	5000);
+
 FIXED_REG(6,	usb3_vbus,	usb3_vbus,
-	  palmas_rails(ldousb),	0,	0,
-	  TEGRA_GPIO_PN4,	true,	true,	0,	5000);
+	tps65090_rails(DCDC1),	0,	0,
+	TEGRA_GPIO_PK6,	true,	true,	0,	5000);
+
+FIXED_REG(8,	dvdd_ts,	dvdd_ts,
+	palmas_rails(smps3),	0,	0,
+	TEGRA_GPIO_PH5,	false,	false,	1,	1800);
 
 FIXED_REG(10,	avdd_hdmi_pll,	avdd_hdmi_pll,
-	  palmas_rails(ldo3),	0,	0,
-	  -1,	false,	true,	1,	1200);
+	palmas_rails(ldo3),	0,	0,
+	TEGRA_GPIO_PO1,	false,	true,	1,	1200);
 /*
  * Creating the fixed regulator device tables
  */
@@ -422,7 +634,10 @@ FIXED_REG(10,	avdd_hdmi_pll,	avdd_hdmi_pll,
 #define ADD_FIXED_REG(_name)    (&fixed_reg_##_name##_dev)
 
 static struct platform_device *fixed_reg_devs_molly[] = {
+	ADD_FIXED_REG(usb1_vbus),
 	ADD_FIXED_REG(usb3_vbus),
+	ADD_FIXED_REG(vdd_hdmi_5v0),
+	ADD_FIXED_REG(dvdd_ts),
 	ADD_FIXED_REG(avdd_hdmi_pll),
 };
 
@@ -432,12 +647,19 @@ int __init molly_palmas_regulator_init(void)
 	u32 pmc_ctrl;
 	int i;
 
+	struct board_info board_info;
+
+	tegra_get_board_info(&board_info);
+
 	/* TPS65913: Normal state of INT request line is LOW.
 	 * configure the power management controller to trigger PMU
 	 * interrupts when HIGH.
 	 */
 	pmc_ctrl = readl(pmc + PMC_CTRL);
 	writel(pmc_ctrl | PMC_CTRL_INTR_LOW, pmc + PMC_CTRL);
+
+	if (board_info.fab == BOARD_FAB_A05)
+		set_dalmore_power_fab05();
 
 	for (i = 0; i < PALMAS_NUM_REGS ; i++) {
 		pmic_platform.reg_data[i] = molly_reg_data[i];
@@ -497,7 +719,7 @@ static struct tegra_suspend_platform_data molly_suspend_data = {
 #ifdef CONFIG_ARCH_TEGRA_HAS_CL_DVFS
 /* board parameters for cpu dfll */
 static struct tegra_cl_dvfs_cfg_param molly_cl_dvfs_param = {
-	.sample_rate = 11500,
+	.sample_rate = 12500,
 
 	.force_mode = TEGRA_CL_DVFS_FORCE_FIXED,
 	.cf = 10,
@@ -510,14 +732,14 @@ static struct tegra_cl_dvfs_cfg_param molly_cl_dvfs_param = {
 };
 #endif
 
-/* palmas: fixed 10mV steps from 600mV to 1400mV, with offset 0x10 */
+/* TPS51632: fixed 10mV steps from 600mV to 1400mV, with offset 0x23 */
 #define PMU_CPU_VDD_MAP_SIZE ((1400000 - 600000) / 10000 + 1)
 static struct voltage_reg_map pmu_cpu_vdd_map[PMU_CPU_VDD_MAP_SIZE];
 static inline void fill_reg_map(void)
 {
 	int i;
 	for (i = 0; i < PMU_CPU_VDD_MAP_SIZE; i++) {
-		pmu_cpu_vdd_map[i].reg_value = i + 0x10;
+		pmu_cpu_vdd_map[i].reg_value = i + 0x23;
 		pmu_cpu_vdd_map[i].reg_uV = 600000 + 10000 * i;
 	}
 }
@@ -528,8 +750,8 @@ static struct tegra_cl_dvfs_platform_data molly_cl_dvfs_data = {
 	.pmu_if = TEGRA_CL_DVFS_PMU_I2C,
 	.u.pmu_i2c = {
 		.fs_rate = 400000,
-		.slave_addr = 0xb0,
-		.reg = 0x23,
+		.slave_addr = 0x86,
+		.reg = 0x00,
 	},
 	.vdd_map = pmu_cpu_vdd_map,
 	.vdd_map_size = PMU_CPU_VDD_MAP_SIZE,
@@ -561,11 +783,13 @@ subsys_initcall_sync(molly_fixed_regulator_init);
 
 int __init molly_regulator_init(void)
 {
+	molly_tps65090_init();
 #ifdef CONFIG_ARCH_TEGRA_HAS_CL_DVFS
 	molly_cl_dvfs_init();
 #endif
 	molly_palmas_regulator_init();
 
+	i2c_register_board_info(4, tps51632_boardinfo, 1);
 	platform_device_register(&molly_pda_power_device);
 	return 0;
 }
