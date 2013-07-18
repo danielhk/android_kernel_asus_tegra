@@ -81,102 +81,119 @@ static struct regulator_consumer_supply palmas_smps45_supply[] = {
 /* vdd_3v3 */
 static struct regulator_consumer_supply palmas_smps6_supply[] = {
 	REGULATOR_SUPPLY("vdd_3v3", NULL),
-	REGULATOR_SUPPLY("vddio_sdmmc", "sdhci-tegra.2"),
 };
 
 /* vdd_ddr */
 static struct regulator_consumer_supply palmas_smps7_supply[] = {
 	REGULATOR_SUPPLY("vddio_ddr", NULL),
-	REGULATOR_SUPPLY("vddio_lpddr3", NULL),
-	REGULATOR_SUPPLY("vcore2_lpddr3", NULL),
 };
 
 /* vdd_1v8 */
 static struct regulator_consumer_supply palmas_smps8_supply[] = {
-	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-udc.0"),
-	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-ehci.0"),
-	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-ehci.1"),
-	REGULATOR_SUPPLY("avdd_osc", NULL),
-	REGULATOR_SUPPLY("vddio_sys", NULL),
-	REGULATOR_SUPPLY("vddio_sdmmc", "sdhci-tegra.0"),
-	REGULATOR_SUPPLY("pwrdet_sdmmc1", NULL),
-	REGULATOR_SUPPLY("vddio_sdmmc", "sdhci-tegra.3"),
-	REGULATOR_SUPPLY("vdd_emmc", "sdhci-tegra.3"),
+	REGULATOR_SUPPLY("vddio", NULL), /* VIO_IN */
+#if 0 /* molly has no camera */
+	REGULATOR_SUPPLY("vddio_cam", "vi"), /* VDDIO_CAM */
+#endif
+	REGULATOR_SUPPLY("vdd", "2-004c"), /* VDD of TMP451 */
+	REGULATOR_SUPPLY("vddio_sys", NULL), /* VDDIO_SYS */
+	REGULATOR_SUPPLY("avdd_osc", NULL), /* AVDD_OSC */
+	REGULATOR_SUPPLY("vddio_1v8", "1-0032"), /* VDD_1V8 of LP5521 */
+	REGULATOR_SUPPLY("vddio_gmi", NULL), /* VDDIO_GMI_1 and VDDIO_GMI_2 */
+	REGULATOR_SUPPLY("vddio_1v8_jtag", NULL), /* VDD_1V8 of
+						j-tag interface */
+	REGULATOR_SUPPLY("vddio_sdmmc", "sdhci-tegra.3"), /* VDDIO_SDMMC4
+							of SDMMC4 */
+	REGULATOR_SUPPLY("vdd_emmc", "sdhci-tegra.3"), /* VDD of eMMC */
 	REGULATOR_SUPPLY("pwrdet_sdmmc4", NULL),
-	REGULATOR_SUPPLY("vddio_audio", NULL),
-	REGULATOR_SUPPLY("pwrdet_audio", NULL),
-	REGULATOR_SUPPLY("vddio_uart", NULL),
+	REGULATOR_SUPPLY("vddio_sdmmc", "sdhci-tegra.0"), /* VDDIO_SDMMC1
+							of SDMMC1 */
+	REGULATOR_SUPPLY("pwrdet_sdmmc1", NULL),
+	REGULATOR_SUPPLY("vddio_uart", NULL), /* VDDIO_UART of UART */
 	REGULATOR_SUPPLY("pwrdet_uart", NULL),
-	REGULATOR_SUPPLY("vddio_gmi", NULL),
-	REGULATOR_SUPPLY("vlogic", "0-0069"),
-	REGULATOR_SUPPLY("vid", "0-000d"),
-	REGULATOR_SUPPLY("vddio", "0-0078"),
-	REGULATOR_SUPPLY("vcore1_lpddr", NULL),
-	REGULATOR_SUPPLY("vcore_lpddr", NULL),
-	REGULATOR_SUPPLY("vddio_lpddr", NULL),
-	REGULATOR_SUPPLY("vdd_rf", NULL),
-	REGULATOR_SUPPLY("vdd_dbg", NULL),
-	REGULATOR_SUPPLY("vdd_sim_1v8", NULL),
-	REGULATOR_SUPPLY("vdd_sim1a_1v8", NULL),
-	REGULATOR_SUPPLY("vdd_sim1b_1v8", NULL),
-	REGULATOR_SUPPLY("dvdd_audio", NULL),
-	REGULATOR_SUPPLY("avdd_audio", NULL),
-	REGULATOR_SUPPLY("vdd_com_1v8", NULL),
-	REGULATOR_SUPPLY("dvdd", "spi3.2"),
-	REGULATOR_SUPPLY("avdd_pll_bb", NULL),
+	REGULATOR_SUPPLY("vddio_aw_ah397", NULL), /* VDD of AW-AH397 */
+	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-udc.0"), /* AVDD_USB_PLL
+							of USB */
+	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-ehci.0"), /* AVDD_USB_PLL
+							of USB */
+	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-ehci.1"), /* AVDD_USB_PLL
+							of USB */
+	REGULATOR_SUPPLY("vdd_1v8_ubik", NULL), /* VCCA of UBIK module */
+	REGULATOR_SUPPLY("pwrdet_audio", NULL),
 };
 
 /* vdd_sys_2v9 */
 static struct regulator_consumer_supply palmas_smps9_supply[] = {
-	REGULATOR_SUPPLY("vddio_sd_slot", "sdhci-tegra.3"),
-	REGULATOR_SUPPLY("vddio_hv", "tegradc.1"),
+	REGULATOR_SUPPLY("vddio_sd_slot", "sdhci-tegra.3"), /* VDDF of eMMC */
+	REGULATOR_SUPPLY("vddio_hv", "tegradc.0"), /* VDDIO_HV
+						of HV (1.8V ~ 3.3V) */
+#if 0 /* no driver is controlling this (always on) */
+	REGULATOR_SUPPLY("vdd_2v9_hdmi_ls", "tegradc.0"), /* VCCA of HDMI output
+								level-shifter */
+#endif
 };
 
 /* smps10 is unused */
 
 /* ldo1 - va_pllx */
 static struct regulator_consumer_supply palmas_ldo1_supply[] = {
-	REGULATOR_SUPPLY("avdd_plla_p_c", NULL),
-	REGULATOR_SUPPLY("avdd_pllm", NULL),
-	REGULATOR_SUPPLY("avdd_pllu", NULL),
-	REGULATOR_SUPPLY("avdd_pllx", NULL),
-	REGULATOR_SUPPLY("avdd_plle", NULL),
-	REGULATOR_SUPPLY("vdd_ddr_hs", NULL),
+	REGULATOR_SUPPLY("avdd_plla_p_c", NULL), /* AVDD_PLLA_P_C of PLL */
+	REGULATOR_SUPPLY("avdd_pllm", NULL), /* AVDD_PLLM of PLL */
+	REGULATOR_SUPPLY("avdd_pllu", NULL), /* AVDD_PLLU of PLL */
+	REGULATOR_SUPPLY("avdd_pllx", NULL), /* AVDD_PLLX of PLL */
+	REGULATOR_SUPPLY("avdd_plle", NULL), /* AVDD_PLLE of PLL */
+	REGULATOR_SUPPLY("vdd_ddr_hs", NULL), /* VDDIO_DDR_HS of DDR3 */
 };
 
 /* ldo2 - va_usb3_1v2 */
 static struct regulator_consumer_supply palmas_ldo2_supply[] = {
-	REGULATOR_SUPPLY("avddio_usb", "tegra-xhci"),
-	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-xhci"),
+	REGULATOR_SUPPLY("avddio_usb", "tegra-xhci"), /* AVDDIO_USB3 of USB */
+	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-xhci"), /* AVDDIO_USB3 of USB */
 };
 
+/* ldo3 - avdd_hdmi_pll */
 static struct regulator_consumer_supply palmas_ldo3_supply[] = {
 };
 
 /* ldo4 - avdd_hsic_1v2 */
 static struct regulator_consumer_supply palmas_ldo4_supply[] = {
-	REGULATOR_SUPPLY("vddio_hsic", "tegra-ehci.1"),
+	REGULATOR_SUPPLY("vddio_hsic", "tegra-ehci.1"), /* VDDIO_HSIC of HSIC */
 };
 
-/* ldo5 - vdd_fuse.  move to fixed? */
+/* ldo5 - vdd_fuse */
 static struct regulator_consumer_supply palmas_ldo5_supply[] = {
-	REGULATOR_SUPPLY("vpp_fuse", NULL),
+	REGULATOR_SUPPLY("vpp_fuse", NULL), /* VPP_FUSE */
 };
 
 /* ldo6 - vdd_u3v3 for ubik */
 static struct regulator_consumer_supply palmas_ldo6_supply[] = {
-	REGULATOR_SUPPLY("vpp_u3v3", NULL),
+	REGULATOR_SUPPLY("vpp_u3v3", NULL), /* VCCB and VCCIO of UBIK module */
 };
+
+/* ldo7 is unused */
 
 /* ldo8 - vd_ap_rtc */
 static struct regulator_consumer_supply palmas_ldo8_supply[] = {
-	REGULATOR_SUPPLY("vdd_rtc", NULL),
+	REGULATOR_SUPPLY("vdd_rtc", NULL), /* VDD_RTC */
 };
+
+/* ldo9 is unused */
 
 /* ldoln - va_hdmi */
 static struct regulator_consumer_supply palmas_ldoln_supply[] = {
-	REGULATOR_SUPPLY("avdd_hdmi", "tegradc.0"),
+	REGULATOR_SUPPLY("avdd_hdmi", "tegradc.0"), /* AVDD_HDMI of HDMI */
 };
+
+#if 0
+/* ldovrtc - vdd_pmu_vrtc
+ * TODO: LDOVRTC is not implemented in the palmas regulator driver currently.
+ *       We might want to review if we need to implement for this part later.
+ */
+static struct regulator_consumer_supply palmas_ldovrtc_supply[] = {
+	REGULATOR_SUPPLY("vdd_pmu_vrtc", NULL),
+};
+#endif
+
+/* ldovana is unused */
 
 /* ldousb - avdd_usb */
 static struct regulator_consumer_supply palmas_ldousb_supply[] = {
@@ -190,27 +207,41 @@ static struct regulator_consumer_supply palmas_ldousb_supply[] = {
 /* NSLEEP is hooked up to CORE_PWR_REQ and
  * ENABLE1 is hooked up to CPU_PWR_REQ
  */
-/* vdd_cpu - 1.0V nominal */
-PALMAS_REGS_PDATA(smps123, 900, 1300, NULL, 0, 0, 0, 0,
+/* vdd_cpu - 1.0V nominal.
+ * According to T114 data sheet, VDD_CPU should be in 0.882V ~ 1.377V
+ * Total caps on CPU = 3x22uF + 6x4.7uF + 10x1uF = 104uF,
+ * so we set TSTEP = 2.5mV/us for smps123
+ */
+PALMAS_REGS_PDATA(smps123, 882, 1377, NULL, 0, 0, 0, NORMAL,
 		  0, PALMAS_EXT_CONTROL_ENABLE1, 0, 3, 0);
-/* vdd_core - 1.1V nominal */
-PALMAS_REGS_PDATA(smps45, 900,  1400, NULL, 0, 0, 0, NORMAL,
+/* vdd_core - 1.1V nominal.
+ * According to T114 data sheet, VDD_CORE should be in 0.873V ~ 1.2875V
+ * Total caps on CORE = 2x22uF + 5x4.7uF + 1x1uF = 68.5uF,
+ * so please set TSTEP = 2.5mV/us for smps45
+ */
+PALMAS_REGS_PDATA(smps45, 873,  1288, NULL, 0, 0, 0, NORMAL,
 		  0, PALMAS_EXT_CONTROL_NSLEEP, 0, 3, 0);
-/* vdd_3v3 - 3.3V */
+
+/* vdd_3v3 - 3.3V,
+ * XXX: vdd_3v3 supplies to INA3221, GEN1_I2C, Wifi/BT module, UBIK,
+ *      and LAN9730, but these device drivers are not implemented
+ *      to configure the vdd currently.  So, set vdd_3v3 as "always on"
+ *      temporarily.
+ */
 PALMAS_REGS_PDATA(smps6, 3300,  3300, NULL, 1, 0, 1, NORMAL,
 		  0, 0, 0, 0, 0);
-/* vdd_ddr - 1.35V */
-PALMAS_REGS_PDATA(smps7, 1350,  1350, NULL, 0, 0, 0, NORMAL,
+/* vdd_ddr - 1.35V, should be always on */
+PALMAS_REGS_PDATA(smps7, 1350,  1350, NULL, 1, 0, 1, NORMAL,
 		  0, 0, 0, 0, 0);
-/* vdd_1v8 - 1.8V */
-PALMAS_REGS_PDATA(smps8, 1800,  1800, NULL, 1, 0, 1, NORMAL,
-		  0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+/* vdd_1v8 - 1.8V, should be always on */
+PALMAS_REGS_PDATA(smps8, 1800,  1800, NULL, 1, 1, 1, NORMAL,
+		  0, 0, 0, 0, 0);
 /* vdd_sys_2v9 - always on, emmc power */
 PALMAS_REGS_PDATA(smps9, 2900,  2900, NULL, 1, 0, 1, NORMAL,
 		  0, 0, 0, 0, 0);
 
-/* va_pllx - boot on? - 1.05V */
-PALMAS_REGS_PDATA(ldo1, 1050,  1050, palmas_rails(smps7), 0, 0, 1, 0,
+/* va_pllx - boot on? - 1.05V, should be always on */
+PALMAS_REGS_PDATA(ldo1, 1050,  1050, palmas_rails(smps7), 1, 0, 1, 0,
 		  0, 0, 0, 0, 0);
 /* va_usb3_1v2 - 1.2V */
 PALMAS_REGS_PDATA(ldo2, 1200,  1200, palmas_rails(smps7), 0, 0, 1, 0,
@@ -221,25 +252,23 @@ PALMAS_REGS_PDATA(ldo3, 1200,  1200, palmas_rails(smps8), 0, 0, 1, 0,
 /* avdd_hsic_1v2 - 1.2V */
 PALMAS_REGS_PDATA(ldo4, 1200,  1200, palmas_rails(smps8), 0, 0, 1, 0,
 		  0, 0, 0, 0, 0);
-/* vd_fuse - should we move this to a fixed regulator? */
+/* vd_fuse - 1.8V, should we move this to a fixed regulator? */
 PALMAS_REGS_PDATA(ldo5, 1800,  1800, NULL, 0, 0, 1, 0,
 		  0, 0, 0, 0, 0);
 /* always on at 3.3V for Ubik -
    should we move this to a fixed regulator? */
 PALMAS_REGS_PDATA(ldo6, 3300,  3300, NULL, 1, 0, 1, 0,
 		  0, 0, 0, 0, 0);
-/* rtc - always on and boot on.  Dalmore and pluto set
- * to 0.9V, but schematic and data sheet say 1.0-1.2V.
- * needs verification
- */
+/* vdd_rtc should follow vdd_core when vdd_core is on (tracking mode)
+ * when vdd_core is off, vdd_rtc can be set as 0.9V */
 PALMAS_REGS_PDATA(ldo8, 900,  900, NULL, 1, 1, 1, 0,
 		  0, 0, 0, 0, 0);
-/* avdd_hdmi */
+/* avdd_hdmi - 3.3V */
 PALMAS_REGS_PDATA(ldoln, 3300, 3300, NULL, 0, 0, 1, 0,
 		  0, 0, 0, 0, 0);
-/* avdd_usb & hvdd_usb */
+/* avdd_usb & hvdd_usb - 3.3V */
 PALMAS_REGS_PDATA(ldousb, 3300,  3300, NULL, 0, 0, 1, 0,
-		  0, 0, 0, 0, 0);
+		  0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
 
 #define PALMAS_REG_PDATA(_sname) (&reg_idata_##_sname)
 
@@ -367,7 +396,8 @@ static struct regulator_consumer_supply fixed_reg_usb3_vbus_supply[] = {
 
 /* no gpio enable required */
 static struct regulator_consumer_supply fixed_reg_avdd_hdmi_pll_supply[] = {
-	REGULATOR_SUPPLY("avdd_hdmi_pll", "tegradc.0"),
+	REGULATOR_SUPPLY("avdd_hdmi_pll", "tegradc.0"), /* AVDD_HDMI_PLL
+							of HDMI */
 };
 
 /* Macro for defining fixed regulator sub device data */
