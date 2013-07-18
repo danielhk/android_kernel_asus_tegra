@@ -1,7 +1,7 @@
 /*
  * include/linux/tegra_nvavp.h
  *
- * Copyright (c) 2012, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2013, NVIDIA CORPORATION.  All Rights Reserved.
  *
  * This file is licensed under the terms of the GNU General Public License
  * version 2. This program is licensed "as is" without any warranty of any
@@ -21,6 +21,7 @@
 #define NVAVP_UCODE_EXT		0x00000001 /*use external ucode provided */
 
 enum {
+	NVAVP_MODULE_ID_CPU	= 1,
 	NVAVP_MODULE_ID_AVP	= 2,
 	NVAVP_MODULE_ID_VCP	= 3,
 	NVAVP_MODULE_ID_BSEA	= 27,

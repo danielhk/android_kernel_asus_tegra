@@ -1,7 +1,7 @@
 /*
  * drivers/media/video/tegra/nvavp/nvavp_dev.c
  *
- * Copyright (c) 2012, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2013, NVIDIA CORPORATION. All rights reserved.
  *
  * This file is licensed under the terms of the GNU General Public License
  * version 2. This program is licensed "as is" without any warranty of any
@@ -43,6 +43,7 @@
 #include <mach/legacy_irq.h>
 #include <linux/nvmap.h>
 #include <mach/powergate.h>
+#include <linux/pm_qos.h>
 
 #if defined(CONFIG_TEGRA_AVP_KERNEL_ON_MMU)
 #include "../avp/headavp.h"
@@ -137,6 +138,10 @@ struct nvavp_info {
 
 	/* client for driver allocations, persistent */
 	struct nvmap_client		*nvmap;
+
+	/* client to change min cpu freq rate*/
+	struct	pm_qos_request min_cpu_req;
+	bool	boost_cpu;
 
 	struct nvavp_channel		channel_info[NVAVP_NUM_CHANNELS];
 	bool				pending;
@@ -1090,6 +1095,12 @@ static void nvavp_uninit(struct nvavp_info *nvavp)
 		disable_irq(nvavp->mbox_from_avp_pend_irq);
 		nvavp_pushbuffer_deinit(nvavp);
 		nvavp_halt_avp(nvavp);
+		if (nvavp->boost_cpu && !IS_ERR_OR_NULL(&nvavp->min_cpu_req)) {
+			pm_qos_update_request(&nvavp->min_cpu_req,
+					PM_QOS_CPU_FREQ_MIN_DEFAULT_VALUE);
+			pm_qos_remove_request(&nvavp->min_cpu_req);
+			nvavp->boost_cpu = false;
+		}
 	}
 
 	/*
@@ -1103,6 +1114,35 @@ static void nvavp_uninit(struct nvavp_info *nvavp)
 	/* write a 1 to the intr_clr field to clear the interrupt */
 	reg = TIMER_PCR_INTR;
 	writel(reg, IO_ADDRESS(TEGRA_TMR2_BASE + TIMER_PCR));
+}
+
+static int nvcpu_set_clock(struct nvavp_info *nvavp,
+				struct nvavp_clock_args config,
+				unsigned long arg)
+{
+	dev_dbg(&nvavp->nvhost_dev->dev, "%s: update cpu freq to clk_rate=%u\n",
+			__func__, config.rate);
+
+	mutex_lock(&nvavp->open_lock);
+	if (!nvavp->boost_cpu && config.rate > 0) {
+		pm_qos_add_request(&nvavp->min_cpu_req,
+					PM_QOS_CPU_FREQ_MIN,
+					PM_QOS_DEFAULT_VALUE);
+		pm_qos_update_request(&nvavp->min_cpu_req, config.rate);
+		nvavp->boost_cpu = true;
+	} else if (nvavp->boost_cpu) {
+		pm_qos_update_request(&nvavp->min_cpu_req,
+					PM_QOS_CPU_FREQ_MIN_DEFAULT_VALUE);
+		pm_qos_remove_request(&nvavp->min_cpu_req);
+		nvavp->boost_cpu = false;
+	}
+	mutex_unlock(&nvavp->open_lock);
+
+	if (copy_to_user((void __user *)arg, &config,
+			sizeof(struct nvavp_clock_args)))
+		return -EFAULT;
+	else
+		return 0;
 }
 
 static int nvavp_set_clock_ioctl(struct file *filp, unsigned int cmd,
@@ -1123,6 +1163,8 @@ static int nvavp_set_clock_ioctl(struct file *filp, unsigned int cmd,
 		nvavp->sclk_rate = config.rate;
 	else if	(config.id == NVAVP_MODULE_ID_EMC)
 		nvavp->emc_clk_rate = config.rate;
+	else if (config.id == NVAVP_MODULE_ID_CPU)
+		return nvcpu_set_clock(nvavp, config, arg);
 
 	c = nvavp_clk_get(nvavp, config.id);
 	if (IS_ERR_OR_NULL(c))
@@ -1894,7 +1936,10 @@ static int tegra_nvavp_suspend(struct platform_device *ndev, pm_message_t state)
 	struct nvavp_info *nvavp = platform_get_drvdata(ndev);
 	int ret = 0;
 
-	mutex_lock(&nvavp->open_lock);
+	if (!mutex_trylock(&nvavp->open_lock)) {
+		pr_warn("%s: nvavp->open_lock is occupied\n", __func__);
+		return -EBUSY;
+	}
 
 	if (nvavp->refcount) {
 		if (!nvavp->clk_enabled) {
