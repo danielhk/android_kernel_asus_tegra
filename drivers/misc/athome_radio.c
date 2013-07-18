@@ -34,6 +34,7 @@
 #include <linux/platform_device.h>
 #include <linux/workqueue.h>
 #include <linux/poll.h>
+#include <linux/delay.h>
 
 #include "athome_transport.h"
 
@@ -514,6 +515,10 @@ static int __init athome_radio_gpio_init(struct  athome_state *st)
 		        ATHOME_RADIO_MOD_NAME);
 		return ret;
 	}
+
+	/* We just placed device in reset, let it settle before checking
+	   irq GPIO state */
+	udelay(100);
 
 	if (!gpio_get_value(st->gpio_irq)) {
 		pr_err("%s: IRQ gpio is asserted at boot\n",
