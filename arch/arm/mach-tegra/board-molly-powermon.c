@@ -351,11 +351,16 @@ static struct ina3221_platform_data power_mon_info = {
 		"VIN_5V0_CCD", /* CPU/Core/DDR */
 	},
 	.shunt_resistor = {5, 5}, /* 5 mOhm */
-	.cont_conf_data = ((6 << 12) | /* enable ch1 and ch2, no ch3 */
-			   INA3221_AVG | INA3221_VBUS_CT |
+	/* Enable ch1 and ch2, ch3 is unused */
+	.cont_conf_data = ((6 << 12) | INA3221_AVG | INA3221_VBUS_CT |
 			   INA3221_VSHUNT_CT | INA3221_CONT_MODE),
-	.trig_conf_data = ((6 << 12) | /* enable ch1 and ch2, no ch3 */
-			   INA3221_TRIG_MODE),
+	/* Enable ch1 and ch2, ch3 is unused */
+	.trig_conf_data = ((6 << 12) | INA3221_TRIG_MODE),
+	/* ch1 (Total Power) 2800 mA
+	 * ch2 (AP + MEM) 1500 mA
+	 * ch3 (Unused)
+	 */
+	.crit_alert_limit_curr = {2800, 1500},
 };
 
 static struct i2c_board_info molly_i2c0_ina3221_board_info[] = {
