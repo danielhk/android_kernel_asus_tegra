@@ -30,6 +30,9 @@
 #define INA3221_BUS_VOL_CHAN2		0x04
 #define INA3221_SHUNT_VOL_CHAN3		0x05
 #define INA3221_BUS_VOL_CHAN3		0x06
+#define INA3221_CRIT_ALERT_CHAN1	0x07
+#define INA3221_CRIT_ALERT_CHAN2	0x09
+#define INA3221_CRIT_ALERT_CHAN3	0x0B
 #define INA3221_MASK_ENABLE		0x0F
 
 #define INA3221_RESET			0x8000
@@ -56,6 +59,8 @@ struct ina3221_platform_data {
 	u32 shunt_resistor[INA3221_NUMBER_OF_RAILS]; /* specify in mOhms */
 	u16 cont_conf_data; /* config data for continuous mode */
 	u16 trig_conf_data; /* config data for triggered mode */
+	s32 crit_alert_limit_curr[INA3221_NUMBER_OF_RAILS]; /* critical alert
+					limit current for ch1/ch2/ch3 (in mA) */
 };
 
 #endif /* _LINUX_INA3221_H */

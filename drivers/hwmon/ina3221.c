@@ -450,6 +450,8 @@ static int __devinit ina3221_probe(struct i2c_client *client,
 {
 	struct ina3221_data *data;
 	int ret, i;
+	s16 val;
+	s64 tmp;
 
 	data = devm_kzalloc(&client->dev, sizeof(struct ina3221_data),
 						GFP_KERNEL);
@@ -479,6 +481,40 @@ static int __devinit ina3221_probe(struct i2c_client *client,
 			goto exit_remove;
 		}
 	}
+
+#define INA3221_SHUNT_VOLTAGE_FULL_SCALE_RANGE 163800 /* in uV */
+#define INA3221_SHUNT_VOLTAGE_LEVEL 4095 /* == (0x7FF8 >> 3)  */
+#define INA3221_SHUNT_VOLTAGE_PER_BIT \
+	(INA3221_SHUNT_VOLTAGE_FULL_SCALE_RANGE / INA3221_SHUNT_VOLTAGE_LEVEL)
+	/* configure the critical alert limit current for all 3 channels */
+	for (i = 0; i < INA3221_NUMBER_OF_RAILS; i++) {
+		if (data->plat_data->crit_alert_limit_curr[i] == 0)
+			continue;
+
+		tmp = ((s64)(data->plat_data->crit_alert_limit_curr[i]))
+			* ((s64)(data->plat_data->shunt_resistor[i]));
+		tmp = div_s64(tmp, INA3221_SHUNT_VOLTAGE_PER_BIT);
+		if (abs64(tmp) > INA3221_SHUNT_VOLTAGE_LEVEL) {
+			dev_err(&client->dev,
+				"ch%d invalid critical alert: %d mA, %d mOhm\n",
+				i + 1,
+				data->plat_data->crit_alert_limit_curr[i],
+				data->plat_data->shunt_resistor[i]);
+			goto exit_remove;
+		}
+		val = (s16)(tmp << 3); /* bit 0~2 are not used */
+		ret = i2c_smbus_write_word_data(client,
+			INA3221_CRIT_ALERT_CHAN1 + (i * 2),
+			cpu_to_be16((val)));
+		if (ret < 0) {
+			dev_err(&client->dev,
+				"fail (%d) set critical alert (ch%d: %d mA)\n",
+				ret, i + 1,
+				data->plat_data->crit_alert_limit_curr[i]);
+			goto exit_remove;
+		}
+	}
+
 	data->client = client;
 	data->nb.notifier_call = ina3221_hotplug_notify;
 	register_hotcpu_notifier(&(data->nb));
