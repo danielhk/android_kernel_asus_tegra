@@ -930,23 +930,72 @@ static int athome_bt_data_rx(int which, uint8_t *in_data, uint32_t len)
 							&bb, sizeof(bb));
 			}
 		}
+
 		if (inp_tch && secure) {
 			uint16_t x, y;
 
 			for (i = 0; i < ATHOME_MAX_FINGERS; i++) {
+				bool is_down;
+
 				x = r16LE(&inp_tch->fingers[i].X);
 				y = r16LE(&inp_tch->fingers[i].Y);
+				is_down = ((x != AAH_RAW_X_MAX) ||
+					   (y != AAH_RAW_Y_MAX));
 
-				athome_bt_input_send_touch(which, i, x, y);
+				athome_bt_input_send_touch(which, i, x, y,
+							   is_down);
 			}
 		}
+
 		if (LOG_INPUT_EVENTS)
 			aahlog_continue("}\n");
 		i = inp->info & ATHOME_INPUT_INFO_MASK_TIMESTAMP;
+
 		athome_bt_input_frame(which,
-				i == ATHOME_INPUT_INFO_MASK_TIMESTAMP ?
-					AAH_BT_UNKNOWN_MSEC : ((long)i * 10));
+				i == ATHOME_INPUT_INFO_MASK_TIMESTAMP
+				? AAH_BT_UNKNOWN_TS_DELTA
+			       	: ((long)i * 10000));
 		break;
+
+	case ATHOME_PKT_RX_TOUCH_V2: {
+		if (secure) {
+			struct athome_pkt_rx_touch_v2 *tv2;
+			bool is_down;
+
+			tv2 = (struct athome_pkt_rx_touch_v2*)data;
+
+			is_down = (tv2->x & 0x8000) != 0;
+			tv2->x <<= 1;
+			tv2->y <<= 1;
+
+			athome_bt_input_send_touch(which, 0,
+						   tv2->x, tv2->y, is_down);
+			athome_bt_input_frame(which,
+					tv2->ts_delta == ((uint16_t)(-1))
+					? AAH_BT_UNKNOWN_TS_DELTA
+					: ((long)tv2->ts_delta * 10));
+		}
+	} break;
+
+	case ATHOME_PKT_RX_BTN_V2: {
+		if (secure) {
+			struct athome_pkt_rx_btn_v2 *bv2;
+			bool is_down;
+
+			bv2 = (struct athome_pkt_rx_btn_v2*)data;
+
+			is_down = (bv2->data & 0x80) != 0;
+
+			athome_bt_input_send_button(which,
+						    (bv2->data & ~0x80),
+						    is_down);
+			athome_bt_input_frame(which,
+					bv2->ts_delta == ((uint16_t)(-1))
+					? AAH_BT_UNKNOWN_TS_DELTA
+					: ((long)bv2->ts_delta * 10));
+		}
+	} break;
+
 
 	case ATHOME_PKT_RX_AUDIO_0:
 	case ATHOME_PKT_RX_AUDIO_1:

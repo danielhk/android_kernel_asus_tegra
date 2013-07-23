@@ -78,9 +78,6 @@ static unsigned short ikeys[] = {KEY_BACK, KEY_HOMEPAGE, KEY_VOLUMEUP,
 					KEY_VOLUMEDOWN, AAH_BT_KEY_DPAD_CENTER,
 					AAH_BT_KEY_POWER, AAH_BT_KEY_INPUT};
 
-#define RAW_X_MAX 0xffff
-#define RAW_Y_MAX 0xffff
-
 static int athome_bt_input_init_device(struct input_dev **idevP)
 {
 	int err, i;
@@ -117,12 +114,12 @@ static int athome_bt_input_init_device(struct input_dev **idevP)
 
 	/* touch params */
 	input_mt_init_slots(idev, ATHOME_MAX_FINGERS);
-	input_set_abs_params(idev, ABS_MT_POSITION_X, 0, RAW_X_MAX, 0, 0);
-	input_set_abs_params(idev, ABS_MT_POSITION_Y, 0, RAW_Y_MAX, 0, 0);
+	input_set_abs_params(idev, ABS_MT_POSITION_X, 0, AAH_RAW_X_MAX, 0, 0);
+	input_set_abs_params(idev, ABS_MT_POSITION_Y, 0, AAH_RAW_Y_MAX, 0, 0);
 	input_abs_set_res(idev, ABS_MT_POSITION_X,
-					RAW_X_MAX / AAH_BT_TOUCHPAD_WIDTH);
+				AAH_RAW_X_MAX / AAH_BT_TOUCHPAD_WIDTH);
 	input_abs_set_res(idev, ABS_MT_POSITION_Y,
-					RAW_Y_MAX / AAH_BT_TOUCHPAD_HEIGHT);
+				AAH_RAW_Y_MAX / AAH_BT_TOUCHPAD_HEIGHT);
 
 	/* without misc scan capability, volume keys will do nothing */
 	input_set_capability(idev, EV_MSC, MSC_SCAN);
@@ -191,30 +188,33 @@ void athome_bt_input_deinit(void)
 		athome_bt_input_del_device(inputs[i].idev);
 }
 
-void athome_bt_input_send_touch(unsigned which, int pointer_idx,
-						uint16_t x, uint16_t y)
+void athome_bt_input_send_touch(unsigned which,
+				int pointer_idx,
+				uint16_t x,
+				uint16_t y,
+				bool is_down)
 {
 	struct input_dev *idev;
 	uint32_t mask = 1UL << pointer_idx;
-	bool wasdown, isdown = ((x != RAW_X_MAX) || (y != RAW_Y_MAX));
+	bool wasdown;
 
 	BUG_ON(which >= ARRAY_SIZE(inputs));
 
 	idev = inputs[which].idev;
 	wasdown = !!(inputs[which].fingers_down & mask);
 
-	if (isdown && !wasdown)
+	if (is_down && !wasdown)
 		athome_bt_led_show_event(HACK_LED_EVENT_TOUCH_DOWN);
-	else if (!isdown && wasdown)
+	else if (!is_down && wasdown)
 		athome_bt_led_show_event(HACK_LED_EVENT_INPUT_UP);
 
-	if (!isdown && !wasdown)
+	if (!is_down && !wasdown)
 		return;
 
 	input_mt_slot(idev, pointer_idx);
-	input_mt_report_slot_state(idev, MT_TOOL_FINGER, isdown);
+	input_mt_report_slot_state(idev, MT_TOOL_FINGER, is_down);
 
-	if (isdown) {
+	if (is_down) {
 		if (LOG_INPUT_EVENTS)
 			aahlog_continue(" [%d] raw: ( %5d , %5d)\n",
 					pointer_idx, x, y);
@@ -245,15 +245,28 @@ void athome_bt_input_send_buttons(unsigned which, uint32_t mask)
 	}
 }
 
-void athome_bt_input_frame(unsigned which, long msec_since_last)
+void athome_bt_input_send_button(unsigned which, uint8_t id, bool down)
+{
+	struct input_dev *idev;
+
+	BUG_ON(which >= ARRAY_SIZE(inputs));
+
+	if (id < ARRAY_SIZE(ikeys)) {
+		idev = inputs[which].idev;
+		input_event(idev, EV_MSC, MSC_SCAN, id);
+		input_report_key(idev, ikeys[id], down);
+	}
+}
+
+void athome_bt_input_frame(unsigned which, long usec_since_last)
 {
 	BUG_ON(which >= ARRAY_SIZE(inputs));
 
-	if (msec_since_last == AAH_BT_UNKNOWN_MSEC)
+	if (usec_since_last == AAH_BT_UNKNOWN_TS_DELTA)
 		athome_bt_input_reset_time(which);
 	else
 		timespec_add_ns(&inputs[which].last_evt,
-				(uint64_t)msec_since_last * NSEC_PER_MSEC);
+				(uint64_t)usec_since_last * NSEC_PER_USEC);
 
 	input_event(inputs[which].idev, EV_MSC, MSC_ANDROID_TIME_SEC,
 					inputs[which].last_evt.tv_sec);

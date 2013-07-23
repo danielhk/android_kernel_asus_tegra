@@ -25,8 +25,19 @@
 #define ENCR_RND_NUM			0x474A204143204744ULL
 #define ENCR_DIV			0x6F67
 #define MIN_PROTO_VERSION		0x00010000
-#define PROTO_VERSION_AUDIO_V2	0x00010001 /* change highest quality SBC compression */
-#define PROTO_VERSION_POWER_V2	0x00010002 /* disables slave latency in active mode */
+
+/* A (very) brief history of proto versions
+ *
+ * PROTO_VERSION_AUDIO_V2      : change highest quality SBC compression
+ * PROTO_VERSION_POWER_V2      : disables slave latency in active mode
+ * PROTO_VERSION_SPAKE         : change pairing to require SPAKE based exchange
+ * PROTO_VERSION_V2_INPUT_EVTS : added v2 input evt messages (hires timestamps)
+ */
+#define PROTO_VERSION_AUDIO_V2		0x00010001
+#define PROTO_VERSION_POWER_V2		0x00010002
+#define PROTO_VERSION_SPAKE   		0x00010100
+#define PROTO_VERSION_V2_INPUT_EVTS   	0x00010101
+
 #define CONNECT_TIMEOUT			5000 /* try for 5 seconds to connect */
 #define ENCRYPT_DAT_TIMEOUT		1000 /* 1 sec for encrypt data echo */
 #define ENCRYPT_TIMEOUT			1000 /* 1 sec for encryption */
@@ -223,6 +234,34 @@ struct athome_bt_stats {
 	} __packed;
 #define ATHOME_PKT_RX_NFC		8
 #define ATHOME_PKT_RX_NFC_RF_DETECT	9
+
+#define ATHOME_PKT_RX_TOUCH_V2		11
+struct athome_pkt_rx_touch_v2 {
+	/* The time in 10uSec units since the last v2_touch event, or 0xFFFF if
+	 * the delta is unknown, or too large to represent in 16 bits */
+	uint16_t ts_delta;
+
+	/* x[15]    : finger is up/down
+	 * x[0..14] : x position
+	 * y[15]    : unused, must be 0
+	 * y[0..14] : y position
+	 */
+	uint16_t x;
+	uint16_t y;
+} __packed;
+
+#define ATHOME_PKT_RX_BTN_V2   		12
+struct athome_pkt_rx_btn_v2 {
+	/* The time in 10uSec units since the last v2_touch event, or 0xFFFF if
+	 * the delta is unknown, or too large to represent in 16 bits */
+	uint16_t ts_delta;
+
+	/* data[7]    : up/down status (1 => down)
+	 * data[0..6] : button id
+	 */
+	uint8_t data;
+} __packed;
+
 #define ATHOME_PKT_RX_PAIRING		119
 
 #define ATHOME_PKT_TX_ACK		0

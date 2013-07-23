@@ -46,14 +46,21 @@ void athome_bt_led_show_event(int event_type);
 
 #define ATHOME_MAX_FINGERS			3
 
-#define AAH_BT_UNKNOWN_MSEC			-1
+#define AAH_BT_UNKNOWN_TS_DELTA			-1
+
+#define AAH_RAW_X_MAX 0xffff
+#define AAH_RAW_Y_MAX 0xffff
 
 int athome_bt_input_init(void);
 void athome_bt_input_deinit(void);
-void athome_bt_input_send_touch(unsigned which, int pointer_idx,
-					uint16_t x, uint16_t y);
+void athome_bt_input_send_touch(unsigned which,
+				int pointer_idx,
+				uint16_t x,
+				uint16_t y,
+				bool is_down);
 void athome_bt_input_send_buttons(unsigned which, uint32_t mask);
-void athome_bt_input_frame(unsigned which, long msec_since_last);
+void athome_bt_input_send_button(unsigned which, uint8_t id, bool down);
+void athome_bt_input_frame(unsigned which, long usec_since_last);
 
 
 #endif
