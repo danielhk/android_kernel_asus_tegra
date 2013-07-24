@@ -717,6 +717,44 @@ static struct soctherm_platform_data molly_soctherm_data = {
 				},
 			},
 		},
+#if 0
+		/* handler for POWERGOOD signal from TPS65913
+		 * if we ever hook it up in thermal sensor
+		 * mode.  right now we use external thermal
+		 * sensor chip TMP451.
+		 */
+		[THROTTLE_OC2] = {
+			.throt_mode = BRIEF,
+			.polarity = 0,
+			.intr = true,
+			.devs = {
+				[THROTTLE_DEV_CPU] = {
+					.enable = true,
+					.depth = 50,
+				},
+				[THROTTLE_DEV_GPU] = {
+					.enable = true,
+					.depth = 50,
+				},
+			},
+		},
+#endif
+		/* handler for CRITICAL signal from INA3221. */
+		[THROTTLE_OC4] = {
+			.throt_mode = BRIEF,
+			.polarity = 1, /* 1 = active low, 0 = active high */
+			.intr = true,
+			.devs = {
+				[THROTTLE_DEV_CPU] = {
+					.enable = true,
+					.depth = 50,
+				},
+				[THROTTLE_DEV_GPU] = {
+					.enable = true,
+					.depth = 50,
+				},
+			},
+		},
 	},
 	.tshut_pmu_trip_data = &tpdata_palmas,
 };
