@@ -29,6 +29,9 @@
 # 2: All PRINTM()
 CONFIG_DEBUG=1
 
+# SDIO suspend/resume
+CONFIG_SDIO_SUSPEND_RESUME=y
+
 #############################################################################
 # Compiler Flags
 #############################################################################
@@ -47,6 +50,14 @@ ifeq ($(CONFIG_DEBUG),2)
 	ccflags-y += -DDEBUG_LEVEL1
 	ccflags-y += -DDEBUG_LEVEL2
 endif
+
+ifeq ($(CONFIG_SDIO_SUSPEND_RESUME),y)
+	ccflags-y += -DSDIO_SUSPEND_RESUME
+endif
+
+#############################################################################
+# Make Targets
+#############################################################################
 
 mbt8xxx-y := bt_main.o bt_proc.o mbt_char.o
 mbt8xxx-y += bt_init.o
