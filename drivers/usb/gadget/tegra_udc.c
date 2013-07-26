@@ -1432,9 +1432,10 @@ static void tegra_detect_charging_type_is_cdp_or_dcp(struct tegra_udc *udc)
 		 * line status as 0 (SE0). This really should not happen as we
 		 * disabled the kernel preemption before reaching here.
 		 * Bug can be raised here but it is also safe to assume
-		 * as CDP.
+		 * as non-standard charger.
 		 */
-		tegra_udc_set_charger_type(udc, CONNECT_TYPE_CDP);
+		tegra_udc_set_charger_type(udc,
+			CONNECT_TYPE_NON_STANDARD_CHARGER);
 
 	spin_unlock_irqrestore(&udc->lock, flags);
 }

@@ -1429,8 +1429,9 @@ static bool utmi_phy_charger_detect(struct tegra_usb_phy *phy)
 	}
 
 	/* DCD timeout max value is 900mS */
+#define DCD_TIMEOUT_MAX_VALUE 900
 	dcd_timeout_ms = 0;
-	while (dcd_timeout_ms < 900) {
+	while (dcd_timeout_ms < DCD_TIMEOUT_MAX_VALUE) {
 		/* standard DCD detect for SDP/DCP/CDP */
 		if (utmi_phy_dcd_detect(phy))
 			break;
@@ -1442,6 +1443,12 @@ static bool utmi_phy_charger_detect(struct tegra_usb_phy *phy)
 			break;
 		usleep_range(20000, 22000);
 		dcd_timeout_ms += 22;
+	}
+
+	if (dcd_timeout_ms >= DCD_TIMEOUT_MAX_VALUE) {
+		pr_info("%s: DCD detect timeout, treat as an unknown charger\n",
+			__func__);
+		return true;
 	}
 
 	/* Enable charger detection logic */
