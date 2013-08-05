@@ -40,24 +40,36 @@
 /*
  * Increasing AAH_BT_ACTIVE_CONN_INTERVAL will reduce the quality of recorded audio and touch
  * but may improve WiFi bandwidth.
+ * Time interval is 1.25 msec per unit.
+ *   6 =>  7.50 msec
+ *   7 =>  8.75 msec
+ *   8 => 10.00 msec
+ *   9 => 11.25 msec
+ *  10 => 12.50 msec
+ *  11 => 13.75 msec
+ *  12 => 15.00 msec
  */
 #define AAH_BT_ACTIVE_CONN_INTERVAL     7
 
 /*
- * Increasing AAH_BT_CONN_SCAN_INTERVAL will increase the time it takes for devices to connect.
- * time interval per channel, 1.6 units/msec,
- * eg. 32 => 20 msec
- * eg. 48 => 30 msec
- * eg. 54 => 33.75 msec
- */
-#define AAH_BT_CONN_SCAN_INTERVAL     (AAH_BT_ACTIVE_CONN_INTERVAL * 2 * 2)
-
-/*
- * Increasing the scan interval can improve WiFi bandwidth slightly.
+ * The scan interval determines how often we will listen for advertising packets.
+ * Time interval per channel is 0.625 msec per unit.
+ * To calculate the time in msec, multiply the last number of the scan setting
+ * by the connection interval time. For example, if the connection interval is 8
+ * then (AAH_BT_ACTIVE_CONN_INTERVAL * 2 * 23) will give us a scan interval of
+ *
+ *    10.00 msec * 23 = 230 msec
+ *
+ * Increasing the normal scan interval can improve WiFi bandwidth slightly.
  * But increasing it will also increase the time it takes for devices
- * to be discovered. But it is very quick in human time.
+ * to be discovered.
  */
+
+/* Scan interval while looking for the first device to connect with. */
 #define AAH_BT_NORMAL_SCAN_INTERVAL    (AAH_BT_ACTIVE_CONN_INTERVAL * 2 * 3)
+
+/* Scan interval while actively connecting to a remote device. */
+#define AAH_BT_CONN_SCAN_INTERVAL      (AAH_BT_ACTIVE_CONN_INTERVAL * 2 * 2)
 
 /*
  * Increasing AAH_BT_ACTIVE_SLAVE_LATENCY will improve battery life in an attached BTLE device.
@@ -81,7 +93,7 @@
 				AAH_BT_ACTIVE_SLAVE_LATENCY, AAH_BT_SERVICE_TIMEOUT_COUNT)
 
 /* AAH_BT_SCAN_WINDOW = time spent listening per interval, 1.6 units/msec,
- * eg. 10 => 6.25 msec
+ * eg. 10 => 6.25 msec  RECOMMENDED
  * eg. 20 => 12.5 msec
  * */
 #define AAH_BT_SCAN_WINDOW             10
@@ -92,8 +104,7 @@
  * 6 = 2 retries
  * 4 = 1 retry
  * 2 = 0 retries
- * This is ignored unless we use the experimental driver provided by Marvell
- * on 6/28/13.
+ * This was ignored by some Marvell drivers before July 2013.
  */
 #define AAH_BT_MAX_EVENT_LENGTH         4
 
@@ -137,6 +148,12 @@ struct athome_bt_mode_settings
 	uint16_t svc_timeout;
 };
 
+struct athome_bt_thread_context
+{
+	uint8_t nconns;
+	/* TODO Move other globals that are only used by the thread into this context. */
+};
+
 /* stack state */
 #define INVALID			0xFFFF
 static struct sk_buff_head rx_evt;
@@ -160,10 +177,11 @@ static uint16_t disconnH = 0;
 static uint16_t inflight_ogf = INVALID;
 static uint16_t inflight_ocf = INVALID;
 static struct athome_bt_conn conns[ATHOME_RMT_MAX_CONNS] = {{0,},};
-static uint8_t nconns = 0;
 static uint8_t *cmd_rsp_buf;
 static size_t cmd_rsp_buf_size;
 static bool devices_exist = false;
+
+
 
 /*
  * These settings are tuned to work with the Bemote Power manager.
@@ -1195,6 +1213,73 @@ bool athome_bt_is_connected_to(const bdaddr_t *macP)
 	return i >= 0;
 }
 
+/*
+ * The buf array should contain at least EVT_PACKET_LEN bytes.
+ * We pass in the buf to avoid allocating large arrays on the stack.
+ */
+static int athome_bt_set_scan_enabled(bool enabled, uint8_t *buf)
+{
+	char *mode = enabled ? "enabled" : "disabled";
+	uint8_t *evt_data = buf + HCI_EVENT_HDR_SIZE;
+	uint8_t *cmd_cmpl_data = evt_data + sizeof(struct hci_ev_cmd_complete);
+	uint8_t *parP;
+	int err;
+	int sta;
+
+	parP = buf;
+	put8LE(&parP, enabled ? 1 : 0);	/* scanning enabled or disabled */
+	put8LE(&parP, 0);	/* duplicate filter off */
+	err = athome_bt_simple_cmd(HCI_OGF_LE,
+				HCI_LE_Set_Scan_Enable,
+				parP - buf, buf,
+				sizeof(buf), buf);
+	if (err) {
+		aahlog("failed to send cmd to set scan parameters.\n");
+		return err;
+	}
+	sta = *cmd_cmpl_data;
+	if (sta)	/* check status */
+		aahlog("failed to set scan %s, sta=%d.\n", mode, sta);
+	else
+		aahlog("scan %s\n", mode);
+	return 0;
+}
+
+/*
+ * The buf array should contain at least EVT_PACKET_LEN bytes.
+ * We pass in the buf to avoid allocating large arrays on the stack.
+ */
+static int athome_bt_set_scan_timing(
+		int scan_interval,
+		int scan_window,
+		uint8_t *buf)
+{
+	uint8_t *evt_data = buf + HCI_EVENT_HDR_SIZE;
+	uint8_t *cmd_cmpl_data = evt_data + sizeof(struct hci_ev_cmd_complete);
+	uint8_t *parP;
+	int err;
+	int sta;
+
+	aahlog("set scan timing: interval = %d, window = %d\n", scan_interval, scan_window);
+	parP = buf;
+	put8LE(&parP, 0);	/* passive scan */
+	put16LE(&parP, scan_interval); /* time between listens per channel */
+	put16LE(&parP, scan_window); /* time spent listening per interval */
+	put8LE(&parP,  0);	/* use real mac address on packets we send */
+	put8LE(&parP, 0);	/* accept all advertisement packets */
+	err = athome_bt_simple_cmd(HCI_OGF_LE, HCI_LE_Set_Scan_Parameters,
+				parP - buf, buf, sizeof(buf), buf);
+	if (err) {
+		aahlog("failed to send cmd to set scan parameters.\n");
+		return err;
+	}
+
+	sta = *cmd_cmpl_data;
+	if (sta)	/* check status */
+		aahlog("failed to set scan timing, sta = %d\n", sta);
+	return 0;
+}
+
 static int athome_bt_host_setup(void)
 {
 	uint8_t buf[EVT_PACKET_LEN];
@@ -1203,7 +1288,8 @@ static int athome_bt_host_setup(void)
 	uint8_t aclBufNum;
 	uint16_t aclBufSz;
 	uint8_t *parP;
-	uint err, i;
+	uint i;
+	int err;
 
 	aahlog("host setup\n");
 	parP = buf;
@@ -1331,22 +1417,10 @@ static int athome_bt_host_setup(void)
 			aahlog("   -> directed advertising\n");
 	}
 
-	aahlog("scan setup, interval = %d, window = %d\n",
-			AAH_BT_NORMAL_SCAN_INTERVAL, AAH_BT_SCAN_WINDOW);
-	parP = buf;
-	put8LE(&parP, 0);	/* passive scan */
-	put16LE(&parP, AAH_BT_NORMAL_SCAN_INTERVAL); /* time between listens per channel */
-	put16LE(&parP, AAH_BT_SCAN_WINDOW); /* time spent listening per interval */
-	put8LE(&parP,  0);	/* use real mac address on packets we send */
-	put8LE(&parP, 0);	/* accept all advertisement packets */
-	err = athome_bt_simple_cmd(HCI_OGF_LE, HCI_LE_Set_Scan_Parameters,
-				parP - buf, buf, sizeof(buf), buf);
+	err = athome_bt_set_scan_timing(AAH_BT_NORMAL_SCAN_INTERVAL,
+		AAH_BT_SCAN_WINDOW, buf);
 	if (err)
 		return err;
-
-	parP = cmd_cmpl_data;
-	if (get8LE(&parP))	/* check status */
-		aahlog("failed to set scan parameters.\n");
 
 	aahlog("set clock accuracy\n");
 	parP = buf;
@@ -1376,13 +1450,15 @@ static int athome_bt_host_setup(void)
 			return err;
 	}
 
-#endif /* USE_MODIFIED_COEXISTENCE_MODE */
+#endif /* AAH_BT_USE_LOWER_SCAN_PRIORITY */
 	return 0;
 }
 
 static int athome_bt_process_evt(struct sk_buff *skb, bool *is_scanning,
 			bool *is_connecting, uint32_t *proto_ver,
-			bool *did_something, struct timer_list *timeout)
+			bool *did_something,
+			struct timer_list *timeout,
+			struct athome_bt_thread_context *thread_context)
 {
 	/* clock accuracy velues indexed as per BT 4.0 spec */
 	static const unsigned clockA[] = {500,250,150,100,75,50,30,20};
@@ -1464,7 +1540,7 @@ static int athome_bt_process_evt(struct sk_buff *skb, bool *is_scanning,
 			bacpy(&conns[i].MAC, &ci->bdaddr);
 			memset(&conns[i].stats, 0, sizeof(conns[i].stats));
 			conns[i].last_time = get_time();
-			nconns++;
+			thread_context->nconns++;
 
 			bacpy(&ce.MAC, &ci->bdaddr);
 			athome_bt_usr_enqueue( BT_ATHOME_EVT_CONNECTED,
@@ -1494,7 +1570,7 @@ device_handled:
 		if (athome_bt_discovered(data, &mac,
 			skb->len - sizeof(*evt), &new_proto_ver) &&
 				!*is_connecting &&
-				nconns != ATHOME_RMT_MAX_CONNS) {
+				thread_context->nconns != ATHOME_RMT_MAX_CONNS) {
 
 			const struct athome_bt_mode_settings *mode_settings;
 			BUG_ON(!new_proto_ver);
@@ -1679,16 +1755,14 @@ device_handled:
 static int athome_bt_thread(void *unusedData)
 {
 	uint8_t buf[EVT_PACKET_LEN];
-	uint8_t *evt_data = buf + HCI_EVENT_HDR_SIZE;
-	uint8_t *cmd_cmpl_data = evt_data + sizeof(struct hci_ev_cmd_complete);
 	bool is_scanning = false, is_connecting = false;
 	uint32_t proto_ver;
-	uint8_t *parP, sta;
 	uint16_t handle;
 	unsigned long flags;
 	struct timer_list timeout;
 	unsigned i;
 	int ret = 0;
+	struct athome_bt_thread_context thread_context = {0};
 
 	if (!devices_exist) {
 		aahlog("devices_created\n");
@@ -1725,27 +1799,16 @@ static int athome_bt_thread(void *unusedData)
 		bool did_something = false;
 		bool is_disconnecting = false;
 
-		/* always scanning, if possible */
+		/* Only scan if we can connect to more Bemotes. */
 		if (!is_scanning && !is_connecting) {
+			if (thread_context.nconns < ATHOME_RMT_MAX_CONNS) {
+				ret = athome_bt_set_scan_enabled(true, buf);
+				if (ret)
+					break; /* exit while loop */
 
-			aahlog("scan start\n");
-			parP = buf;
-			put8LE(&parP, 1);	/* scanning on */
-			put8LE(&parP, 0);	/* duplicate filter off */
-			ret = athome_bt_simple_cmd(HCI_OGF_LE,
-						HCI_LE_Set_Scan_Enable,
-						parP - buf, buf,
-						sizeof(buf), buf);
-			if (ret)
-				break; /* exit while loop */
-			parP = cmd_cmpl_data;
-			sta = get8LE(&parP);
-			if (sta)	/* check status */
-				aahlog("failed to set scan on sta=%d.\n", sta);
-
-			aahlog("scanning...\n");
-			is_scanning = 1;
-			did_something = 1;
+				is_scanning = 1;
+				did_something = 1;
+			}
 		}
 
 		/* see if we have events to process */
@@ -1755,7 +1818,7 @@ static int athome_bt_thread(void *unusedData)
 		if (skb) {
 			athome_bt_process_evt(skb, &is_scanning,
 					&is_connecting, &proto_ver,
-					&did_something, &timeout);
+					&did_something, &timeout, &thread_context);
 			kfree_skb(skb);
 			skb = NULL;
 		}
@@ -1841,7 +1904,10 @@ static int athome_bt_thread(void *unusedData)
 				conns[i].state = CONN_STATE_INVALID;
 				conns[i].gone = false;
 				is_disconnecting = true;
-				nconns--;
+				if (thread_context.nconns == 0)
+					aahlog("more disconnections than connections!\n");
+				else
+					thread_context.nconns--;
 				did_something = 1;
 			} else if (conns[i].pwr != conns[i].next_pwr &&
 						!conns[i].in_modeswitch) {
@@ -1950,7 +2016,6 @@ void athome_bt_stack_shutdown(void)
 	inflight_ogf = INVALID;
 	inflight_ocf = INVALID;
 	disconnH = 0;
-	nconns = 0;
 	cmd_rsp_buf = NULL;
 	for(i = 0; i < ATHOME_RMT_MAX_CONNS; i++)
 		conns[i].state = CONN_STATE_INVALID;

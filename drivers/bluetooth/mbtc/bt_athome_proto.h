@@ -55,7 +55,10 @@
 
 
 /*  ====== userspace-relevant defines ====== */
-#define ATHOME_RMT_MAX_CONNS			4
+/* We originally specced 4 Bemotes.
+ * On 8/16/13 the spec was changed to only support 1 Bemote.
+ */
+#define ATHOME_RMT_MAX_CONNS			1
 #define BT_ATHOME_MAX_USER_LEN			280
 
 #define BT_ATHOME_STATE_BINDING		0 /* data ok, unsecure only */
