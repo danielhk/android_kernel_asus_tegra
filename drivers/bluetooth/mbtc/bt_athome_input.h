@@ -60,7 +60,8 @@ void athome_bt_input_send_touch(unsigned which,
 				bool is_down);
 void athome_bt_input_send_buttons(unsigned which, uint32_t mask);
 void athome_bt_input_send_button(unsigned which, uint8_t id, bool down);
-void athome_bt_input_frame(unsigned which, long usec_since_last);
+void athome_bt_input_calculate_time(unsigned which, long usec_since_last);
+void athome_bt_input_frame(unsigned which);
 
 
 #endif

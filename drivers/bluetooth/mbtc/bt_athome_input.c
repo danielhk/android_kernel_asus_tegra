@@ -12,8 +12,10 @@
  * GNU General Public License for more details.
  */
 
+#include <linux/debugfs.h>
 #include <linux/input.h>
 #include <linux/input/mt.h>
+#include <linux/kernel.h>
 #include <linux/ktime.h>
 #include "bt_athome_input.h"
 #include "bt_athome_logging.h"
@@ -68,9 +70,19 @@ static struct {
 	struct input_dev *idev;
 	uint8_t fingers_down;
 	char uniq[16];
+	int32_t vx, vy;
+	int32_t px, py;
 	struct timespec last_evt;
+	struct timespec last_touch_evt;
 } inputs[ATHOME_RMT_MAX_CONNS];
 
+static struct {
+	u32 enabled;
+	u16 alpha;
+	u16 beta;
+} filter_params = {.enabled = 1, .alpha = 50, .beta = 0};
+
+static struct dentry *debugfs_dir;
 
 /* to see events live: in adb do "getevent -lt /dev/input/event1" */
 
@@ -146,15 +158,54 @@ static void athome_bt_input_del_device(struct input_dev *idev)
 	input_free_device(idev);
 }
 
+static int athome_bt_input_init_debug(void)
+{
+	struct dentry *entry;
+	debugfs_dir = debugfs_create_dir("athome_bt_input", NULL);
+	if (!debugfs_dir)
+		return -ENODEV;
+
+	entry = debugfs_create_u16("alpha", 0600, debugfs_dir,
+			&filter_params.alpha);
+	if (!entry) {
+		aahlog("Failed to create debugfs file for alpha attr.\n");
+		return -ENODEV;
+	}
+	entry = debugfs_create_u16("beta", 0600, debugfs_dir,
+			&filter_params.beta);
+	if (!entry) {
+		aahlog("Failed to create debugfs file for beta attr.\n");
+		return -ENODEV;
+	}
+	entry = debugfs_create_bool("enabled", 0600, debugfs_dir,
+			&filter_params.enabled);
+	if (!entry) {
+		aahlog("Failed to create debugfs file for alpha-beta filter "
+				"enabled attr.\n");
+		return -ENODEV;
+	}
+	return 0;
+}
+
+static void athome_bt_input_deinit_debug(void)
+{
+	debugfs_remove_recursive(debugfs_dir);
+}
+
 void athome_bt_input_reset_time(unsigned which)
 {
 	ktime_get_ts(&inputs[which].last_evt);
+	inputs[which].last_touch_evt = inputs[which].last_evt;
 }
 
 int athome_bt_input_init(void)
 {
 	int err;
 	size_t i;
+
+	if (athome_bt_input_init_debug()) {
+		aahlog_continue("Failed to create debugfs entries");
+	}
 
 	for (i = 0; i < ATHOME_RMT_MAX_CONNS; i++) {
 
@@ -184,6 +235,8 @@ void athome_bt_input_deinit(void)
 {
 	int i;
 
+	athome_bt_input_deinit_debug();
+
 	for(i = 0; i < ATHOME_RMT_MAX_CONNS; i++)
 		athome_bt_input_del_device(inputs[i].idev);
 }
@@ -197,15 +250,23 @@ void athome_bt_input_send_touch(unsigned which,
 	struct input_dev *idev;
 	uint32_t mask = 1UL << pointer_idx;
 	bool wasdown;
+	struct timespec delta_timespec;
+	s32 dt;
+	s32 rx, ry;
 
 	BUG_ON(which >= ARRAY_SIZE(inputs));
 
 	idev = inputs[which].idev;
 	wasdown = !!(inputs[which].fingers_down & mask);
 
-	if (is_down && !wasdown)
+	if (is_down && !wasdown) {
 		athome_bt_led_show_event(HACK_LED_EVENT_TOUCH_DOWN);
-	else if (!is_down && wasdown)
+		inputs[which].last_touch_evt = inputs[which].last_evt;
+		inputs[which].vx = 0;
+		inputs[which].vy = 0;
+		inputs[which].px = x;
+		inputs[which].py = y;
+	} else if (!is_down && wasdown)
 		athome_bt_led_show_event(HACK_LED_EVENT_INPUT_UP);
 
 	if (!is_down && !wasdown)
@@ -215,12 +276,54 @@ void athome_bt_input_send_touch(unsigned which,
 	input_mt_report_slot_state(idev, MT_TOOL_FINGER, is_down);
 
 	if (is_down) {
-		if (LOG_INPUT_EVENTS)
-			aahlog_continue(" [%d] raw: ( %5d , %5d)\n",
-					pointer_idx, x, y);
-		input_report_abs(idev, ABS_MT_POSITION_X, x);
-		input_report_abs(idev, ABS_MT_POSITION_Y, y);
+		if (filter_params.enabled) {
+			delta_timespec = timespec_sub(inputs[which].last_evt,
+					inputs[which].last_touch_evt);
+			dt = delta_timespec.tv_sec * MSEC_PER_SEC;
+			dt += delta_timespec.tv_nsec / NSEC_PER_MSEC;
+
+			inputs[which].px = inputs[which].px +
+					(inputs[which].vx * dt);
+			inputs[which].py = inputs[which].py +
+					(inputs[which].vy * dt);
+
+			rx = x - inputs[which].px;
+			ry = y - inputs[which].py;
+
+			inputs[which].px +=
+					((s32)filter_params.alpha * rx) / 100;
+			inputs[which].py +=
+					((s32)filter_params.alpha * ry) / 100;
+			if (dt > 0) {
+				inputs[which].vx += (s32)filter_params.beta *
+						rx / (100 * dt);
+				inputs[which].vy += (s32)filter_params.beta *
+						ry / (100 * dt);
+			}
+
+			inputs[which].px = clamp(inputs[which].px,
+					0, AAH_RAW_X_MAX);
+			inputs[which].py = clamp(inputs[which].py,
+					0, AAH_RAW_Y_MAX);
+			inputs[which].last_touch_evt = inputs[which].last_evt;
+
+			input_report_abs(idev, ABS_MT_POSITION_X,
+					inputs[which].px);
+			input_report_abs(idev, ABS_MT_POSITION_Y,
+					inputs[which].py);
+		} else {
+			input_report_abs(idev, ABS_MT_POSITION_X, x);
+			input_report_abs(idev, ABS_MT_POSITION_Y, y);
+		}
 		inputs[which].fingers_down |= mask;
+		if (LOG_INPUT_EVENTS)
+			aahlog_continue(" [%d] raw: (%5d , %5d),"
+					" predicted: (%5d , %5d),"
+					" delta (%d, %d)\n",
+					pointer_idx, x, y,
+					inputs[which].px, inputs[which].py,
+					x - inputs[which].px,
+					y - inputs[which].py);
 	} else { /* was down */
 
 		if (LOG_INPUT_EVENTS)
@@ -258,7 +361,7 @@ void athome_bt_input_send_button(unsigned which, uint8_t id, bool down)
 	}
 }
 
-void athome_bt_input_frame(unsigned which, long usec_since_last)
+void athome_bt_input_calculate_time(unsigned which, long usec_since_last)
 {
 	BUG_ON(which >= ARRAY_SIZE(inputs));
 
@@ -267,6 +370,11 @@ void athome_bt_input_frame(unsigned which, long usec_since_last)
 	else
 		timespec_add_ns(&inputs[which].last_evt,
 				(uint64_t)usec_since_last * NSEC_PER_USEC);
+}
+
+void athome_bt_input_frame(unsigned which)
+{
+	BUG_ON(which >= ARRAY_SIZE(inputs));
 
 	input_event(inputs[which].idev, EV_MSC, MSC_ANDROID_TIME_SEC,
 					inputs[which].last_evt.tv_sec);

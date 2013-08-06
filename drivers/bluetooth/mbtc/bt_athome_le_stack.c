@@ -956,10 +956,11 @@ static int athome_bt_data_rx(int which, uint8_t *in_data, uint32_t len)
 			aahlog_continue("}\n");
 		i = inp->info & ATHOME_INPUT_INFO_MASK_TIMESTAMP;
 
-		athome_bt_input_frame(which,
+		athome_bt_input_calculate_time(which,
 				i == ATHOME_INPUT_INFO_MASK_TIMESTAMP
 				? AAH_BT_UNKNOWN_TS_DELTA
-			       	: ((long)i * 10000));
+				: ((long)i * 10000));
+		athome_bt_input_frame(which);
 		break;
 
 	case ATHOME_PKT_RX_TOUCH_V2: {
@@ -973,12 +974,13 @@ static int athome_bt_data_rx(int which, uint8_t *in_data, uint32_t len)
 			tv2->x <<= 1;
 			tv2->y <<= 1;
 
-			athome_bt_input_send_touch(which, 0,
-						   tv2->x, tv2->y, is_down);
-			athome_bt_input_frame(which,
+			athome_bt_input_calculate_time(which,
 					tv2->ts_delta == ((uint16_t)(-1))
 					? AAH_BT_UNKNOWN_TS_DELTA
 					: ((long)tv2->ts_delta * 10));
+			athome_bt_input_send_touch(which, 0,
+					tv2->x, tv2->y, is_down);
+			athome_bt_input_frame(which);
 		}
 	} break;
 
@@ -991,13 +993,14 @@ static int athome_bt_data_rx(int which, uint8_t *in_data, uint32_t len)
 
 			is_down = (bv2->data & 0x80) != 0;
 
-			athome_bt_input_send_button(which,
-						    (bv2->data & ~0x80),
-						    is_down);
-			athome_bt_input_frame(which,
+			athome_bt_input_calculate_time(which,
 					bv2->ts_delta == ((uint16_t)(-1))
 					? AAH_BT_UNKNOWN_TS_DELTA
 					: ((long)bv2->ts_delta * 10));
+			athome_bt_input_send_button(which,
+					(bv2->data & ~0x80),
+					is_down);
+			athome_bt_input_frame(which);
 		}
 	} break;
 
