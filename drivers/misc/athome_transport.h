@@ -20,14 +20,15 @@
 #ifndef _ATHOME_TRANSPORT_H_
 #define _ATHOME_TRANSPORT_H_
 
+#include <linux/types.h>
+
 #include <linux/athome_radio.h>
 
 int __init athome_transport_open(struct athome_platform_data *ptd);
 void athome_transport_close(void);
-int athome_transport_start(void);
-int athome_transport_send(const unsigned char*, unsigned);
-int athome_transport_recv(unsigned char*, unsigned);
-int athome_transport_stop(void);
+
+int athome_xfer_tx(const uint8_t *msg, size_t len);
+int athome_xfer_rx(uint8_t *buf, size_t len);
 
 #endif
 

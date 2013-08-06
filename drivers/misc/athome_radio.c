@@ -50,9 +50,6 @@
  */
 #define MAX_MSG_SIZE    1024
 
-/* protocol defines */
-#define PKT_TYP_DATA    0x00
-#define PKT_TYP_RTR     0x10
 
 struct athome_msg {
 	unsigned len;
@@ -93,6 +90,13 @@ static uint8_t *get_tx_buf_ptr(struct athome_state *st, uint txidx)
 static uint8_t *get_rx_buf_ptr(struct athome_state *st, uint rxidx)
 {
 	return st->buffers + (TX_BUF_NUM + rxidx) * MAX_MSG_SIZE;
+}
+
+static void athome_radio_reset(struct athome_state *st)
+{
+	/* stay in reset until userland services release it */
+	gpio_set_value(st->gpio_rst, 0);
+	udelay(100);
 }
 
 static void athome_radio_flush_nolock(struct athome_state *st, int tx, int rx)
@@ -314,26 +318,9 @@ static unsigned int athome_radio_poll(struct file *filp,
 	return mask;
 }
 
-static void athome_radio_packet_init(uint8_t *pkt, uint8_t type, uint16_t len)
-{
-	pkt[0] = type;
-	pkt[1] = (uint8_t)(len >> 8);  /* network byte order */
-	pkt[2] = (uint8_t)(len);
-}
-
-static uint8_t athome_radio_packet_get_type(const uint8_t *pkt)
-{
-	return pkt[0];
-}
-
-static uint16_t athome_radio_packet_get_size(const uint8_t *pkt)
-{
-	return  (((uint16_t) pkt[1]) << 8) | pkt[2];
-}
-
 static void athome_radio_tx_work(struct work_struct *w)
 {
-	uint8_t hdr[3];
+	int rc;
 	struct  athome_msg msg;
 	struct  athome_state *st = container_of(w,
 						struct athome_state, tx_work);
@@ -343,19 +330,11 @@ static void athome_radio_tx_work(struct work_struct *w)
 
 	msg = st->tx_msg[st->posTXR];
 
-	/* send msg */
-	if (athome_transport_start())
-		return;
-
-	athome_radio_packet_init(hdr, PKT_TYP_DATA, msg.len);
-
-	if (athome_transport_send(hdr, 3))
-		pr_alert("TX: failed to send hdr\n");
-
-	if (athome_transport_send(msg.data, msg.len))
-		pr_alert("TX: failed to send data\n");
-
-	athome_transport_stop();
+	rc = athome_xfer_tx(msg.data, msg.len);
+	if (rc < 0) {
+		pr_alert("%s: TX xfer failed (%d)\n",
+		          ATHOME_RADIO_MOD_NAME, rc);
+	}
 
 	st->tx_msg[st->posTXR].len  = 0;
 	st->tx_msg[st->posTXR].data = NULL;
@@ -374,11 +353,10 @@ static void athome_radio_tx_work(struct work_struct *w)
 
 static void athome_radio_rx_work(struct work_struct *w)
 {
-	uint8_t type;
-	uint8_t hdr[3];
+	int rc;
+	int rx_cnt = 0;
 	struct  athome_state *st = container_of(w, struct athome_state,
 						rx_work);
-	size_t  len = MAX_MSG_SIZE;
 	uint8_t *rxbuf;
 
 Again:
@@ -390,54 +368,33 @@ Again:
 		return;
 	}
 
-	/* grab the bus  */
-	if (athome_transport_start())
-		return;
-
-	/* read header   */
-	athome_radio_packet_init(hdr, PKT_TYP_RTR, 0);
-	if (athome_transport_send(hdr, 3)) {
-		pr_alert("%s: RX: failed to send header\n", ATHOME_RADIO_MOD_NAME);
-		goto rx_drain;
-	}
-
-	if (athome_transport_recv(hdr, 3)) {
-		pr_alert("%s: RX: failed to recv header\n", ATHOME_RADIO_MOD_NAME);
-		goto rx_drain;
-	}
-
-	type = athome_radio_packet_get_type(hdr);
-	if (type != PKT_TYP_RTR) {
-		pr_alert("%s: Got packet with type %d. Ignoring\n",
-		          ATHOME_RADIO_MOD_NAME,  type);
-		goto rx_drain;
-	}
-
-	len = athome_radio_packet_get_size(hdr);
-	if (len == 0 || len > MAX_MSG_SIZE) {
-		pr_alert("%s: Got packet with length %d. Ignoring\n",
-		          ATHOME_RADIO_MOD_NAME, len);
-		len = MAX_MSG_SIZE;
-		goto rx_drain;
-	}
-
-	if (atomic_read(&st->rx_num_used) == RX_BUF_NUM) {
-		/* no rx buffers */
-		pr_alert("%s: No rx buffers available. Ignoring\n",
-			      ATHOME_RADIO_MOD_NAME);
-		goto rx_drain;
-	}
-
-	/* read body */
+	/* we should always have at least one free buffer */
 	rxbuf = get_rx_buf_ptr(st, st->posRXW);
-	if (athome_transport_recv(rxbuf, len)) {
-		pr_alert("%s: RX: failed to recv data\n", ATHOME_RADIO_MOD_NAME);
-		goto rx_drain; /* this is the best thing we can do to recover */
+
+	/* receive data */
+	rx_cnt++;
+	rc = athome_xfer_rx(rxbuf, MAX_MSG_SIZE);
+	if (rc < 0) {
+		/* rx xfer failed */
+		pr_alert("%s: RX xfer failed (%d)\n",
+		          ATHOME_RADIO_MOD_NAME, rc);
+		goto rx_done;
+	} else if (rc == 0) {
+		/* no data */
+		goto rx_done;
+	}
+
+	if (atomic_read(&st->rx_num_used) == RX_BUF_NUM-1) {
+		/* that was the last rx buffer, and since we will always need
+		   at least one, discard it */
+		pr_alert("%s: out of rx buffers. Discarding\n",
+		          ATHOME_RADIO_MOD_NAME);
+		goto rx_done;
 	}
 
 	if (atomic_read(&st->opened)) {
 
-		st->rx_msg[st->posRXW].len  = len;
+		st->rx_msg[st->posRXW].len  = rc;
 		st->rx_msg[st->posRXW].data = rxbuf;
 		st->posRXW++;
 		if (st->posRXW == RX_BUF_NUM)
@@ -450,23 +407,22 @@ Again:
 	}
 
 rx_done:
-	/* release the bus */
-	athome_transport_stop();
 
 	/* check the state of irq line */
 	if (gpio_get_value(st->gpio_irq) == 0) {
-		/* DOLATER: Add upper bounds on the number of retries */
-		goto Again; /* still asserted */
+		if (rx_cnt < 50) {
+			goto Again; /* still asserted */
+		} else {
+			/* reset chip */
+			athome_radio_reset(st);
+			pr_alert("%s: Too much work or IRQ line might be stuck."
+			         "Resetting radio\n", ATHOME_RADIO_MOD_NAME);
+		}
 	}
 
 	/* reenable irq */
 	enable_irq(gpio_to_irq(st->gpio_irq));
 	return;
-
-rx_drain:
-	/* drain rx */
-	athome_transport_recv(NULL, len);
-	goto rx_done;
 }
 
 static irqreturn_t athome_radio_irq(int irq, void *data)

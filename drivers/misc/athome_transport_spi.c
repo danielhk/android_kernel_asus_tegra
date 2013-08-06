@@ -34,6 +34,10 @@
 #include "athome_transport.h"
 #include <linux/athome_radio.h>
 
+/*  */
+#define XFER_TYPE_TX        0x00
+#define XFER_TYPE_RX        0x10
+#define XFER_TYPE_NONE      0x33
 
 /* we'll have to do manual control of the CS pin, since linux does not let
 us keep cs low while we do some work and start another transaction, but that
@@ -92,33 +96,31 @@ void athome_transport_close(void)
 	gpio_free(cs_gpio);
 }
 
-int athome_transport_start(void)
+static int _athome_xfer_start(void)
 {
-	if (spi_dev) {
-		int ret = spi_bus_lock(spi_dev->master);
-		gpio_set_value(cs_gpio, 0);
-		udelay(10);
-
-		return ret;
-	} else {
-		pr_err("%s: no spi_dev\n", __func__);
-		return -ENODEV;
-	}
+	int ret = spi_bus_lock(spi_dev->master);
+	gpio_set_value(cs_gpio, 0);
+	udelay(10);
+	return ret;
 }
 
-static int athome_transport_op(const unsigned char *out,
-			       unsigned char *in, unsigned len)
+static int _athome_xfer_stop(void)
+{
+	gpio_set_value(cs_gpio, 1);
+	udelay(60);
+	return spi_bus_unlock(spi_dev->master);
+}
+
+/*
+ *
+ */
+static int _athome_xfer(const uint8_t *tx, uint8_t *rx, size_t len)
 {
 	struct spi_message m;
 	struct spi_transfer t = {0};
 
-	if (!spi_dev) {
-		pr_err("%s: no spi_dev\n", __func__);
-		return -ENODEV;
-	}
-
-	t.tx_buf = out;
-	t.rx_buf = in;
+	t.tx_buf = tx;
+	t.rx_buf = rx;
 	t.len    = len;
 
 	spi_message_init(&m);
@@ -127,25 +129,118 @@ static int athome_transport_op(const unsigned char *out,
 	return spi_sync_locked(spi_dev, &m);
 }
 
-int athome_transport_send(const unsigned char *buf, unsigned len)
-{
-	return athome_transport_op(buf, NULL, len);
-}
 
-int athome_transport_recv(unsigned char *buf, unsigned len)
+/*
+ *
+ */
+int athome_xfer_tx(const uint8_t *msg, size_t len)
 {
-	return athome_transport_op(NULL, buf, len);
-}
+	int rc, ret;
+	uint8_t hdr[3];
+	struct spi_message m;
+	struct spi_transfer t0 = {0};
+	struct spi_transfer t1 = {0};
 
-int athome_transport_stop(void)
-{
 	if (!spi_dev) {
 		pr_err("%s: no spi_dev\n", __func__);
 		return -ENODEV;
 	}
-	gpio_set_value(cs_gpio, 1);
-	udelay(50);
-	return spi_bus_unlock(spi_dev->master);
+
+	/* grab the bus and assert CS */
+	rc = _athome_xfer_start();
+	if (rc)
+		return rc;
+
+	/* Tx SPI message consists of header followed up by message body */
+	hdr[0] = XFER_TYPE_TX;
+	hdr[1] = (uint8_t)(len >> 8);  /* network byte order */
+	hdr[2] = (uint8_t)(len);
+
+	t0.tx_buf = hdr;
+	t0.rx_buf = NULL;
+	t0.len    = sizeof(hdr);
+
+	t1.tx_buf = msg;
+	t1.rx_buf = NULL;
+	t1.len    = len;
+
+	spi_message_init(&m);
+	spi_message_add_tail(&t0, &m);
+	spi_message_add_tail(&t1, &m);
+
+	ret = spi_sync_locked(spi_dev, &m);
+
+	/* Release the bus, deassert CS */
+	rc =_athome_xfer_stop();
+	if (rc)
+		return rc;
+
+	return ret;
+}
+
+/*
+ *
+ */
+int athome_xfer_rx(uint8_t *buf, size_t buf_len)
+{
+	int rc, ret;
+	uint8_t hdr[3];
+	size_t msg_len;
+
+	if (!spi_dev) {
+		pr_err("%s: no spi_dev\n", __func__);
+		return -ENODEV;
+	}
+
+	/* grab the bus and assert CS */
+	rc = _athome_xfer_start();
+	if (rc)
+		return rc;
+
+	/* read header */
+	hdr[0] = XFER_TYPE_RX;
+	hdr[1] = 0;
+	hdr[2] = 0;
+
+	rc = _athome_xfer(hdr, hdr, 3);
+	if (rc) {
+		ret = rc;
+		goto done;
+	}
+
+	/* parse header */
+	if (likely(hdr[0] == XFER_TYPE_RX)) { /* a valid RX msg */
+		msg_len = (((uint16_t) hdr[1]) << 8) | hdr[2];
+		if (likely(msg_len <= buf_len)) {
+			/* read message */
+			ret = msg_len;
+			rc = _athome_xfer(NULL, buf, msg_len);
+		} else { /* message is bigger then buffer */
+			/* read maximum length and discard it */
+			ret = 0;
+			rc = _athome_xfer(NULL, buf, buf_len);
+		}
+	} else { /* not an valid RX msg */
+		if (hdr[0] == XFER_TYPE_NONE) { /* looks like no msg was queued */
+			/* just drop it */
+			rc = ret = 0;
+		} else { /* malformatted message */
+			/* read maximum length and discard it */
+			ret = 0;
+			rc = _athome_xfer(NULL, buf, buf_len);
+		}
+	}
+	if (rc)
+		ret = rc;
+
+done:
+
+	/* Release the bus, deassert CS */
+	rc =_athome_xfer_stop();
+	if (rc)
+		return rc;
+
+	return ret;
 }
 
 
