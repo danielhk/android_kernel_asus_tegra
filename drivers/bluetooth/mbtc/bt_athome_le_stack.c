@@ -64,7 +64,7 @@
  * But increasing it will also increase the time it takes for the remote to respond to
  * commands from the master, and can increase the time it takes to exchange keys.
  */
-#define AAH_BT_ACTIVE_SLAVE_LATENCY    75
+#define AAH_BT_ACTIVE_SLAVE_LATENCY    2
 
 /*
  * Increasing AAH_BT_SERVICE_TIMEOUT_COUNT will make it less likely for the remote
