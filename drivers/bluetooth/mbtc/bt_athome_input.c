@@ -32,35 +32,23 @@
 
 int aah_io_led_hack( uint rgb_color );
 
+/* Map event types to colors. */
+static int event_colors[HACK_LED_EVENT_COUNT] = {
+	[HACK_LED_EVENT_CONNECT] = HACK_LED_YELLOW,
+	[HACK_LED_EVENT_AWAKE] = HACK_LED_YELLOW,
+	[HACK_LED_EVENT_TOUCH_DOWN] = HACK_LED_GREEN,
+	[HACK_LED_EVENT_BUTTON_DOWN] = HACK_LED_RED,
+	[HACK_LED_EVENT_INPUT_UP] = HACK_LED_GRAY,
+	[HACK_LED_EVENT_ASLEEP] = HACK_LED_BLUE,
+	[HACK_LED_EVENT_DISCONNECT] = HACK_LED_BLACK,
+	};
+
 void athome_bt_led_show_event(int event_type)
 {
-	static bool toggle;
-	switch(event_type) {
-		case HACK_LED_EVENT_CONNECT:
-		case HACK_LED_EVENT_AWAKE:
-			aah_io_led_hack(HACK_LED_YELLOW);
-			toggle = false;
-			break;
-
-		case HACK_LED_EVENT_TOUCH_DOWN:
-			aah_io_led_hack(HACK_LED_GREEN);
-			break;
-
-		case HACK_LED_EVENT_BUTTON_DOWN:
-			aah_io_led_hack(HACK_LED_RED);
-			break;
-
-		case HACK_LED_EVENT_INPUT_UP:
-			aah_io_led_hack(HACK_LED_GRAY);
-			break;
-
-		case HACK_LED_EVENT_ASLEEP:
-			aah_io_led_hack(HACK_LED_BLUE);
-			break;
-
-		case HACK_LED_EVENT_DISCONNECT:
-			aah_io_led_hack(HACK_LED_BLACK);
-			break;
+	static int previous_event_type = -1;
+	if (event_type != previous_event_type) {
+		previous_event_type = event_type;
+		aah_io_led_hack(event_colors[event_type]);
 	}
 }
 #endif /* HACK_DEBUG_USING_LED */
@@ -74,6 +62,7 @@ static struct {
 	int32_t px, py;
 	struct timespec last_evt;
 	struct timespec last_touch_evt;
+	uint32_t touch_count; /* cleared on finger up */
 } inputs[ATHOME_RMT_MAX_CONNS];
 
 static struct {
@@ -206,6 +195,8 @@ int athome_bt_input_init(void)
 	if (athome_bt_input_init_debug()) {
 		aahlog_continue("Failed to create debugfs entries");
 	}
+	aahlog("touch filter, alpha = %d, beta = %d, enabled = %d\n",
+		filter_params.alpha, filter_params.beta, filter_params.enabled);
 
 	for (i = 0; i < ATHOME_RMT_MAX_CONNS; i++) {
 
@@ -239,6 +230,17 @@ void athome_bt_input_deinit(void)
 
 	for(i = 0; i < ATHOME_RMT_MAX_CONNS; i++)
 		athome_bt_input_del_device(inputs[i].idev);
+}
+
+/* Print touch event log less often as the count goes up. */
+static bool athome_bt_should_report_touch(uint32_t count)
+{
+	if (count < (0x3F00))
+		return ((count & 0x3F) == 0);
+	else if (count < (0x3FF00))
+		return ((count & 0x3FF) == 0);
+	else
+		return ((count & 0x3FFF) == 0);
 }
 
 void athome_bt_input_send_touch(unsigned which,
@@ -275,7 +277,10 @@ void athome_bt_input_send_touch(unsigned which,
 	input_mt_slot(idev, pointer_idx);
 	input_mt_report_slot_state(idev, MT_TOOL_FINGER, is_down);
 
+	inputs[which].touch_count++;
+
 	if (is_down) {
+
 		if (filter_params.enabled) {
 			delta_timespec = timespec_sub(inputs[which].last_evt,
 					inputs[which].last_touch_evt);
@@ -311,13 +316,27 @@ void athome_bt_input_send_touch(unsigned which,
 					inputs[which].px);
 			input_report_abs(idev, ABS_MT_POSITION_Y,
 					inputs[which].py);
+
+			if (LOG_INPUT_EVENTS) {
+				if (athome_bt_should_report_touch(inputs[which].touch_count))
+					aahlog("[%d] finger down, %4u touch events, px = %5d, py = %5d\n",
+						pointer_idx, inputs[which].touch_count,
+						inputs[which].px, inputs[which].py);
+			}
 		} else {
 			input_report_abs(idev, ABS_MT_POSITION_X, x);
 			input_report_abs(idev, ABS_MT_POSITION_Y, y);
+			if (LOG_INPUT_EVENTS) {
+				if (athome_bt_should_report_touch(inputs[which].touch_count))
+					aahlog("[%d] finger down, %4u touch events, x = %5d, y = %5d\n",
+						pointer_idx, inputs[which].touch_count, x, y);
+			}
 		}
+
 		inputs[which].fingers_down |= mask;
-		if (LOG_INPUT_EVENTS)
-			aahlog_continue(" [%d] raw: (%5d , %5d),"
+
+		if (LOG_INPUT_SPEW)
+			aahlog("[%d] raw: (%5d , %5d),"
 					" predicted: (%5d , %5d),"
 					" delta (%d, %d)\n",
 					pointer_idx, x, y,
@@ -325,10 +344,12 @@ void athome_bt_input_send_touch(unsigned which,
 					x - inputs[which].px,
 					y - inputs[which].py);
 	} else { /* was down */
+		inputs[which].fingers_down &= ~mask;
 
 		if (LOG_INPUT_EVENTS)
-			aahlog_continue(" [%d] finger release\n", pointer_idx);
-		inputs[which].fingers_down &= ~mask;
+			aahlog("[%d] finger release after %4u touch events\n",
+				pointer_idx, inputs[which].touch_count);
+		inputs[which].touch_count = 0;
 	}
 }
 
@@ -338,6 +359,12 @@ void athome_bt_input_send_buttons(unsigned which, uint32_t mask)
 	int i;
 
 	BUG_ON(which >= ARRAY_SIZE(inputs));
+
+	if (LOG_INPUT_EVENTS)
+		aahlog("[%d] button mask = 0x%08X\n", which, mask);
+
+	athome_bt_led_show_event((mask != 0)
+		? HACK_LED_EVENT_BUTTON_DOWN : HACK_LED_EVENT_INPUT_UP);
 
 	idev = inputs[which].idev;
 
@@ -353,6 +380,12 @@ void athome_bt_input_send_button(unsigned which, uint8_t id, bool down)
 	struct input_dev *idev;
 
 	BUG_ON(which >= ARRAY_SIZE(inputs));
+
+	if (LOG_INPUT_EVENTS)
+		aahlog("[%d] button %d %s\n", which, id, (down ? "down" : "up"));
+
+	athome_bt_led_show_event(down
+		? HACK_LED_EVENT_BUTTON_DOWN : HACK_LED_EVENT_INPUT_UP);
 
 	if (id < ARRAY_SIZE(ikeys)) {
 		idev = inputs[which].idev;

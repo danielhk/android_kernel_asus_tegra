@@ -43,6 +43,10 @@
 
 #include "sbcdec.h"
 
+
+#define btlesbc_log(...)         pr_info("mic_btle_sbc: " __VA_ARGS__)
+#define btlesbc_continue(...)    pr_info(__VA_ARGS__)
+
 MODULE_AUTHOR("Phil Burk <philburk@google.com>");
 MODULE_DESCRIPTION("BTLE SBC Mic");
 MODULE_LICENSE("GPL");
@@ -50,6 +54,7 @@ MODULE_SUPPORTED_DEVICE("{{ALSA,RemoteMic soundcard}}");
 
 /* If set to 1, generate a sine wave instead of decoding SBC audio. */
 #define FAKE_SOUND 0
+
 /* If set to 1, occasionally print how many SBC packets
  * have been sent from BTLE. */
 #define DEBUG_COUNT_PACKETS 1
@@ -88,6 +93,8 @@ static bool enable[SNDRV_CARDS] = {true, false};
 static char *model[SNDRV_CARDS]; /* = {[0 ... (SNDRV_CARDS - 1)] = NULL}; */
 static int pcm_devs[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};
 static int pcm_substreams[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};
+
+static int sbc_packet_counter;
 
 module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for btlesbc soundcard.");
@@ -246,10 +253,6 @@ static int btlesbc_decode_sbc_packet(
 	return num_samples;
 }
 
-#if DEBUG_COUNT_PACKETS
-static int debug_decoder_callback_counter;
-#endif
-
 /**
  * This is called by the Android@Home Bluetooth driver when it gets an
  * SBC packet from Bemote.
@@ -270,10 +273,11 @@ void athome_bt_audio_dec(
 {
 	smp_rmb(); /* for s_current_substream and the write_index */
 
+	sbc_packet_counter++;
 #if DEBUG_COUNT_PACKETS
-	if ((debug_decoder_callback_counter++ & 0x3FF) == 0) {
-		pr_info("%s called %d times, %s\n", __func__,
-			debug_decoder_callback_counter,
+	if ((sbc_packet_counter & 0x3FF) == 1) {
+		btlesbc_log("%s called %d times, %s\n", __func__,
+			sbc_packet_counter,
 			((s_current_substream == NULL) ? "ignored" : "on"));
 	}
 #endif
@@ -381,13 +385,11 @@ static int btlesbc_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
-#if DEBUG_COUNT_PACKETS
-		debug_decoder_callback_counter = 0;
-#endif
 		/* TODO use other device ids besides zero */
-		pr_info("%s starting audio\n", __func__);
+		btlesbc_log("%s starting audio\n", __func__);
 		sbc_decoder_reset();
 		btlesbc->peak_level = 0;
+		sbc_packet_counter = 0;
 		s_current_substream = substream;
 		smp_wmb(); /* so other thread will see s_current_substream */
 #if FAKE_SOUND
@@ -396,8 +398,8 @@ static int btlesbc_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 		return 0;
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
-		pr_info("%s stopping audio, peak_level = %d\n",
-			__func__, btlesbc->peak_level);
+		btlesbc_log("%s stopping audio, peak_level = %d, sbc packet count = %d\n",
+			__func__, btlesbc->peak_level, sbc_packet_counter);
 #if FAKE_SOUND
 		synth_timer_stop();
 #endif
@@ -412,7 +414,7 @@ static int btlesbc_pcm_prepare(struct snd_pcm_substream *substream)
 {
 	struct snd_btlesbc *btlesbc = snd_pcm_substream_chip(substream);
 	struct snd_pcm_runtime *runtime = substream->runtime;
-	pr_info("%s, rate = %d, period_size = %d, buffer_size = %d\n",
+	btlesbc_log("%s, rate = %d, period_size = %d, buffer_size = %d\n",
 		__func__, (int) runtime->rate,
 		(int) runtime->period_size,
 		(int) runtime->buffer_size);
@@ -453,9 +455,6 @@ static int btlesbc_pcm_hw_params(struct snd_pcm_substream *substream,
 	btlesbc->write_index = 0;
 	smp_wmb();
 
-	pr_info("%s, frames_per_buffer = %u\n", __func__,
-		btlesbc->frames_per_buffer);
-
 	return ret;
 }
 
@@ -473,7 +472,6 @@ static int btlesbc_pcm_open(struct snd_pcm_substream *substream)
 	/* Initialize time for simulated signals. */
 	btlesbc->previous_jiffies = jiffies;
 #endif
-	pr_info("mic_btle_sbc: %s, open substream\n", __func__);
 
 	runtime->hw = btlesbc->pcm_hw;
 	if (substream->pcm->device & 1) {
@@ -489,7 +487,7 @@ static int btlesbc_pcm_open(struct snd_pcm_substream *substream)
 	 * the substream starts. We don't need DMA because it will just
 	 * get written to by the BTLE code.
 	 */
-	pr_info("%s, allocating %u bytes, built %s %s\n", __func__,
+	btlesbc_log("%s, allocating %u bytes, built %s %s\n", __func__,
 		MAX_BUFFER_SIZE, __DATE__, __TIME__);
 	/* We only use this buffer in this driver and we do not do
 	 * DMA so vmalloc should be OK. */
@@ -506,9 +504,9 @@ static int btlesbc_pcm_open(struct snd_pcm_substream *substream)
 static int btlesbc_pcm_close(struct snd_pcm_substream *substream)
 {
 	struct snd_btlesbc *btlesbc = snd_pcm_substream_chip(substream);
-	pr_info("%s: CLOSE substream\n", __func__);
 
 	if (btlesbc->buffer) {
+		btlesbc_log("%s, freeing %u bytes\n", __func__, MAX_BUFFER_SIZE);
 		vfree(btlesbc->buffer);
 		btlesbc->buffer = NULL;
 	}
@@ -670,7 +668,7 @@ static void btlesbc_proc_read(struct snd_info_entry *entry,
 	struct snd_btlesbc *btlesbc = entry->private_data;
 	int i;
 
-	pr_info("mic_btle_sbc: %s, fill in proc\n", __func__);
+	btlesbc_log("%s, fill in proc\n", __func__);
 	for (i = 0; i < ARRAY_SIZE(fields); i++) {
 		snd_iprintf(buffer, "%s ", fields[i].name);
 		if (fields[i].size == sizeof(int))

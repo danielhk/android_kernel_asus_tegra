@@ -36,6 +36,7 @@ void athome_bt_led_show_event(int event_type);
 #define HACK_LED_EVENT_INPUT_UP      4
 #define HACK_LED_EVENT_ASLEEP        5
 #define HACK_LED_EVENT_DISCONNECT    6
+#define HACK_LED_EVENT_COUNT         7
 
 #define AAH_BT_KEY_DPAD_CENTER			353
 #define AAH_BT_KEY_POWER			177

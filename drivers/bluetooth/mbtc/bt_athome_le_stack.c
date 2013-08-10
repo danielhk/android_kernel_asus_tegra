@@ -574,8 +574,17 @@ bool athome_bt_send_data(const uint8_t *MAC, uint8_t typ,
 	int i, which;
 
 	if (data_sz > ACL_AAH_PKT_SZ) {
-		aahlog("trying to send large packet (%d)\n", data_sz);
+		aahlog("trying to send too large packet (%d)\n", data_sz);
 		return false;
+	}
+
+	switch (typ) {
+		case ATHOME_PKT_TX_SET_PARAM:
+			aahlog("TX_SET_PARAM p#=%d, d[0]=0x%02X,  d[1]=0x%02X,\n",
+				data[0], data[1], data[2]);
+			break;
+		default:
+			break;
 	}
 
 	/* split data as per spec */
@@ -599,28 +608,33 @@ bool athome_bt_send_data(const uint8_t *MAC, uint8_t typ,
 	which = athome_bt_find_by_mac_l(MAC);
 	if (which < 0) {
 		/* we failed to find it */
-	} else if (for_user && conns[which].state == CONN_STATE_ENCRYPT_SETUP)
+		aahlog("could not find by MAC\n");
+	} else if (for_user && conns[which].state == CONN_STATE_ENCRYPT_SETUP) {
 		/* users cannot send before we encrypt */
+		aahlog("cannot send data before encryption\n");
 		which = -1;
-	else if (conns[which].state == CONN_STATE_JUST_ESTABLISHED ||
+	} else if (conns[which].state == CONN_STATE_JUST_ESTABLISHED ||
 			conns[which].state == CONN_STATE_INVALID ||
 			conns[which].state == CONN_STATE_ENCRYPTING ||
 			conns[which].state == CONN_STATE_REENCRYPTING ||
 			conns[which].state == CONN_STATE_DISCONNECT ||
-			conns[which].state == CONN_STATE_TEARDOWN)
+			conns[which].state == CONN_STATE_TEARDOWN) {
 		/* in these states nobody can send */
+		aahlog("cannot send data in state %d\n", conns[which].state);
 		which = -1;
-	else if (conns[which].state == CONN_STATE_BINDING &&
+	} else if (conns[which].state == CONN_STATE_BINDING &&
 					typ != ATHOME_PKT_TX_ACK &&
 					typ != ATHOME_PKT_TX_SET_PARAM &&
 					typ != ATHOME_PKT_TX_ENC &&
-					typ != ATHOME_PKT_TX_PAIRING)
+					typ != ATHOME_PKT_TX_PAIRING) {
 		/* only some packet types allowed in binding mode */
 		/*
 			XXX: TODO: once binding is proper, stop allowing
 			set_param command here
 		*/
+		aahlog("cannot send packet type %d when binding\n", typ);
 		which = -1;
+	}
 
 	if (which < 0) {
 
@@ -854,8 +868,13 @@ static int athome_bt_data_rx(int which, uint8_t *in_data, uint32_t len)
 	case CONN_STATE_BINDING:
 		/* only some packets allowed in bind mode */
 		ok = type == ATHOME_PKT_RX_ACK ||
-		     type == ATHOME_PKT_RX_INPUT ||
-		     type == ATHOME_PKT_RX_PAIRING;
+			/*
+			 * TODO Why isn't this code also looking for ATHOME_PKT_RX_TOUCH_V2
+			 * and ATHOME_PKT_RX_BTN_V2? Binding works.
+			 * Maybe it doesn't need to look for input at all.
+			 */
+				type == ATHOME_PKT_RX_INPUT ||
+				type == ATHOME_PKT_RX_PAIRING;
 		secure = false;
 		break;
 	}
@@ -863,6 +882,8 @@ static int athome_bt_data_rx(int which, uint8_t *in_data, uint32_t len)
 	/* done here so as to be under spinlock */
 	if (ok) switch (type) {
 	case ATHOME_PKT_RX_INPUT:
+	case ATHOME_PKT_RX_TOUCH_V2:
+	case ATHOME_PKT_RX_BTN_V2:
 		stats_incr = &conns[which].stats.input;
 		break;
 	case ATHOME_PKT_RX_ACCEL:
@@ -889,7 +910,8 @@ static int athome_bt_data_rx(int which, uint8_t *in_data, uint32_t len)
 	spin_unlock_irqrestore(&stack_state_lock, flags);
 
 	if (!ok) {
-		aahlog("got data while not allowed. Dropping\n");
+		aahlog("got data while not allowed. Dropping. type = %d, state = %d\n",
+			type, conns[which].state);
 		return 0;
 	}
 
@@ -920,8 +942,6 @@ static int athome_bt_data_rx(int which, uint8_t *in_data, uint32_t len)
 					aahlog(" ->  now: 0x%08X\n", buttons);
 			}
 
-			athome_bt_led_show_event(buttons
-				? HACK_LED_EVENT_BUTTON_DOWN : HACK_LED_EVENT_INPUT_UP);
 			athome_bt_input_send_buttons(which,
 						buttons & ~SECURE_BTN_MASK);
 
@@ -1023,9 +1043,17 @@ static int athome_bt_data_rx(int which, uint8_t *in_data, uint32_t len)
 		conns[which].next_pwr = msw->mode;
 		athome_bt_led_show_event((msw->mode == ATHOME_MODE_ACTIVE)
 			? HACK_LED_EVENT_AWAKE : HACK_LED_EVENT_ASLEEP);
-		if (LOG_MODESWITCH)
-			aahlog("Requested modeswitch to %d for conn %d\n",
+		if (LOG_MODESWITCH) {
+			aahlog("Requested modeswitch to %d for conn %d",
 							msw->mode, which);
+			if (conns[which].pwr == ATHOME_MODE_ACTIVE) {
+				aahlog_continue(", #pkts_rx = %6llu, #pkts_input = %6llu\n",
+							conns[which].stats.pkts_rx,
+							conns[which].stats.input);
+			} else {
+				aahlog_continue("\n");
+			}
+		}
 		/* Deliberate fall-through to the default case in order to send
 		 * the mode switch packet to user-land for further
 		 * logging/backend analysis.
