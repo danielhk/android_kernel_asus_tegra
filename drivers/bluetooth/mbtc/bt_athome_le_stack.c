@@ -194,7 +194,12 @@ static const struct athome_bt_mode_settings *athome_bt_get_mode_settings(uint32_
 		   .svc_timeout = AAH_BT_ACTIVE_SVC_TIMEOUT}, /* ACTIVE */
 	};
 
-	return (proto_ver < PROTO_VERSION_POWER_V2)
+	/*
+	 * There was a problem in early versions of Bemote that caused it to
+	 * timeout during encryption if the slave latency was too high.
+	 * b/10198360
+	 */
+	return (proto_ver < PROTO_VERSION_SPAKE)
 		? &old_mode_settings[mode]
 		: &new_mode_settings[mode];
 }
