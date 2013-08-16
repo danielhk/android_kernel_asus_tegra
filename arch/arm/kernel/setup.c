@@ -963,6 +963,20 @@ void __init setup_arch(char **cmdline_p)
 	mdesc = setup_machine_fdt(__atags_pointer);
 	if (!mdesc)
 		mdesc = setup_machine_tags(machine_arch_type);
+#if defined(CONFIG_CMDLINE_EXTEND)
+	else {
+		/* setup_machine_fdt() copied the commandline in
+		 * the dtb to boot_command_line.  we need to change
+		 * boot_command_line to have CONFIG_CMDLINE first.
+		 */
+		strlcat(default_command_line, " ", COMMAND_LINE_SIZE);
+		strlcat(default_command_line, boot_command_line,
+			COMMAND_LINE_SIZE);
+		/* swap */
+		strlcpy(boot_command_line, default_command_line,
+			COMMAND_LINE_SIZE);
+	}
+#endif
 	machine_desc = mdesc;
 	machine_name = mdesc->name;
 	if (mdesc->soc) {
