@@ -307,7 +307,7 @@ static int param_set_battery_present(const char *key,
 					const struct kernel_param *kp)
 {
 	battery_present = map_get_value(map_present, key, battery_present);
-	power_supply_changed(&test_power_supplies[0]);
+	power_supply_changed(&test_power_supplies[1]);
 	return 0;
 }
 
