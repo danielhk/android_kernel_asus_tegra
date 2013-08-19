@@ -53,7 +53,7 @@ static void athome_bt_log_uuids(const uint8_t **data, uint8_t* L, unsigned len)
  * produce a simple final decision to or not to connect, and whom to.
  */
 static bool athome_bt_discovered_device(const uint8_t **bufP,
-			bool try_connect, uint8_t *macP,
+			bool try_connect, bdaddr_t *macP,
 			int* remain_bytes, uint32_t *proto_ver)
 {
 	static const char *advTypes[] = {"ADV_IND", "ADV_DIRECT_IND",
@@ -63,7 +63,8 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 	bool needflags = true, needmanuf = true;
 	uint8_t slen = 0;
 	const uint8_t *snum = NULL; /* only devices in bind mode */
-	uint8_t evtType, is_addr_rand, mac[AAH_BT_MAC_SZ];
+	uint8_t evtType, is_addr_rand;
+	bdaddr_t mac;
 	uint8_t len, j;
 	const uint8_t *data, *end;
 	struct athome_bt_known_remote *item;
@@ -99,8 +100,8 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 	buf += sizeof(*adv_info);
 
 	evtType = adv_info->evt_type;;
-	is_addr_rand = adv_info -> bdaddr_type;
-	memcpy(mac, adv_info->bdaddr.b, sizeof(mac));
+	is_addr_rand = adv_info->bdaddr_type;
+	bacpy(&mac, &adv_info->bdaddr);
 	len = adv_info->length;
 	data = buf;
 	buf += len;
@@ -116,8 +117,8 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 
 	if (LOG_DISCOVERY) {
 		aahlog("DEV %02X:%02X:%02X:%02X:%02X:%02X(%c) "
-			"%s: RSSI %d (%u):", mac[5], mac[4],
-			mac[3], mac[2], mac[1], mac[0],
+			"%s: RSSI %d (%u):", mac.b[5], mac.b[4],
+			mac.b[3], mac.b[2], mac.b[1], mac.b[0],
 			is_addr_rand ? 'R' : 'P',
 			advTypes[evtType], rssi, len);
 		for (j = 0; j < len; j++)
@@ -292,7 +293,7 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 		aahlog_continue("\n");
 
 	/* It may be a device we know about. Check that. */
-	item = athome_bt_find_known(mac);
+	item = athome_bt_find_known(&mac);
 	if (item) {
 		found = true;
 		want_bind = item->bind_mode;
@@ -335,7 +336,7 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 			/* prepare event & send it to userspace */
 			if (slen >= AAH_BT_SLEN_MAX)
 				slen = AAH_BT_SLEN_MAX;
-			memcpy(dd->MAC, mac, sizeof(dd->MAC));
+			bacpy(&dd->MAC, &mac);
 			memcpy(dd->ver, ver, sizeof(dd->ver));
 			memcpy(dd->ser_num, snum, slen);
 			dd->RSSI = rssi;
@@ -366,11 +367,11 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 
 	/* Do not connect to it if we are already connected */
 	if (can_connect) {
-		if (athome_bt_is_connected_to(mac))
+		if (athome_bt_is_connected_to(&mac))
 			aahlog(" -> already connected\n");
 		else {
 			try_connect = true;
-			memcpy(macP, mac, sizeof(mac));
+			bacpy(macP, &mac);
 			*proto_ver = ver_val;
 		}
 	}
@@ -380,7 +381,7 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 }
 
 /* process adv response, see if anything of use is in it, if so, what */
-bool athome_bt_discovered(const uint8_t *buf, uint8_t *macP, int len,
+bool athome_bt_discovered(const uint8_t *buf, bdaddr_t *macP, int len,
 							uint32_t *proto_ver)
 {
 	bool try_connect = false;

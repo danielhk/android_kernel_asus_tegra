@@ -118,7 +118,7 @@ struct athome_bt_conn {
 	uint16_t handle;
 	uint8_t state, pwr, next_pwr;
 	bool gone, timeout, outstanding, in_modeswitch;
-	uint8_t MAC[AAH_BT_MAC_SZ];
+	bdaddr_t MAC;
 	uint8_t LTK[AAH_BT_LTK_SZ];
 	uint32_t proto_ver;
 	struct timer_list timer;
@@ -226,12 +226,12 @@ static const struct athome_bt_mode_settings *athome_bt_get_mode_settings(uint32_
 
 
 /* returns <0 if not found, call only with state lock held */
-static int athome_bt_find_by_mac_l(const uint8_t* MAC)
+static int athome_bt_find_by_mac_l(const bdaddr_t *macP)
 {
 	int i;
 
 	for(i = 0; i < ATHOME_RMT_MAX_CONNS; i++) {
-		if (memcmp(conns[i].MAC, MAC, AAH_BT_MAC_SZ))
+		if (bacmp(&conns[i].MAC, macP))
 			continue;
 
 		if (conns[i].gone)
@@ -309,7 +309,7 @@ bool athome_bt_connection_went_down(uint16_t handle)
 		if (conns[i].outstanding)
 			up(&tx_wait);
 		athome_bt_update_time_stats_l(i);
-		memcpy(&de.MAC, conns[i].MAC, sizeof(de.MAC));
+		bacpy(&de.MAC, &conns[i].MAC);
 		memcpy(&de.stats, &conns[i].stats, sizeof(de.stats));
 		athome_bt_usr_enqueue(BT_ATHOME_EVT_DISCONNECTED, &de,
 								sizeof(de));
@@ -382,7 +382,7 @@ bool athome_bt_compl_pkts(uint16_t handle, uint16_t num)
 }
 
 /* pass i < 0 to do a lookup by mac */
-static void athome_bt_start_encr(const uint8_t *MAC, int i)
+static void athome_bt_start_encr(const bdaddr_t *macP, int i)
 {
 	struct athome_tx_pkt_enc enc_pkt;
 	struct athome_bt_known_remote *K;
@@ -393,7 +393,7 @@ static void athome_bt_start_encr(const uint8_t *MAC, int i)
 
 	spin_lock_irqsave(&stack_state_lock, flags);
 	if (i < 0) {
-		i = athome_bt_find_by_mac_l(MAC);
+		i = athome_bt_find_by_mac_l(macP);
 		if (i < 0) {
 			/* we failed to find it*/
 		} else if (conns[i].state == CONN_STATE_JUST_ESTABLISHED ||
@@ -413,7 +413,7 @@ static void athome_bt_start_encr(const uint8_t *MAC, int i)
 		return;
 	}
 
-	K = athome_bt_find_known(conns[i].MAC);
+	K = athome_bt_find_known(&conns[i].MAC);
 	if (K)
 		memcpy(conns[i].LTK, &K->LTK, sizeof(K->LTK));
 	else {
@@ -433,22 +433,22 @@ static void athome_bt_start_encr(const uint8_t *MAC, int i)
 	spin_unlock_irqrestore(&stack_state_lock, flags);
 
 	/* send the packet */
-	athome_bt_send_data(conns[i].MAC, ATHOME_PKT_TX_ENC, &enc_pkt,
+	athome_bt_send_data(&conns[i].MAC, ATHOME_PKT_TX_ENC, &enc_pkt,
 						sizeof(enc_pkt), false);
 }
 
-void athome_bt_start_encr_for_mac(const uint8_t *mac)
+void athome_bt_start_encr_for_mac(const bdaddr_t *macP)
 {
-	athome_bt_start_encr(mac, -1);
+	athome_bt_start_encr(macP, -1);
 }
 
-void athome_bt_disc_from_mac(const uint8_t *mac)
+void athome_bt_disc_from_mac(const bdaddr_t *macP)
 {
 	unsigned long flags;
 	int i;
 
 	spin_lock_irqsave(&stack_state_lock, flags);
-	i = athome_bt_find_by_mac_l(mac);
+	i = athome_bt_find_by_mac_l(macP);
 
 	if (i >= 0) {
 		conns[i].state = CONN_STATE_DISCONNECT;
@@ -472,8 +472,7 @@ void athome_bt_get_state(struct bt_athome_state *state)
 		if (conns[i].state == CONN_STATE_INVALID || conns[i].gone)
 			continue;
 
-		memcpy(state->remotes[state->num].MAC,
-				conns[i].MAC, sizeof(conns[i].MAC));
+		bacpy(&state->remotes[state->num].MAC, &conns[i].MAC);
 
 		switch (conns[i].state) {
 		case CONN_STATE_JUST_ESTABLISHED:
@@ -513,13 +512,13 @@ void athome_bt_get_state(struct bt_athome_state *state)
 	spin_unlock_irqrestore(&stack_state_lock, flags);
 }
 
-bool athome_bt_get_stats(struct athome_bt_stats *stats, const uint8_t *mac)
+bool athome_bt_get_stats(struct athome_bt_stats *stats, const bdaddr_t *macP)
 {
 	unsigned long flags;
 	int i;
 
 	spin_lock_irqsave(&stack_state_lock, flags);
-	i = athome_bt_find_by_mac_l(mac);
+	i = athome_bt_find_by_mac_l(macP);
 	if (i >= 0) {
 		athome_bt_update_time_stats_l(i);
 		memcpy(stats, &conns[i].stats, sizeof(*stats));
@@ -561,8 +560,8 @@ bool athome_bt_process_le_data(uint16_t handle, const uint8_t *buf,
 	return false;
 }
 
-bool athome_bt_send_data(const uint8_t *MAC, uint8_t typ,
-			const void *dataP, uint8_t data_sz, bool for_user)
+bool athome_bt_send_data(const bdaddr_t *macP, uint8_t typ,
+			 const void *dataP, uint8_t data_sz, bool for_user)
 {
 
 	uint8_t buf[ACL_AAH_PKT_SZ + HCI_ACL_HDR_SIZE] = {0, };
@@ -605,7 +604,7 @@ bool athome_bt_send_data(const uint8_t *MAC, uint8_t typ,
 
 	/* get handle info and record we're sending */
 	spin_lock_irqsave(&stack_state_lock, flags);
-	which = athome_bt_find_by_mac_l(MAC);
+	which = athome_bt_find_by_mac_l(macP);
 	if (which < 0) {
 		/* we failed to find it */
 		aahlog("could not find by MAC\n");
@@ -820,7 +819,7 @@ static int athome_bt_data_rx(int which, uint8_t *in_data, uint32_t len)
 	spin_lock_irqsave(&stack_state_lock, flags);
 	conns[which].stats.pkts_rx++;
 	conns[which].stats.bytes_rx += len + 1; /* type byte */
-	memcpy(usr_data->MAC, conns[which].MAC, sizeof(usr_data->MAC));
+	bacpy(&usr_data->MAC, &conns[which].MAC);
 	switch(conns[which].state) {
 	case CONN_STATE_REENCRYPT_SETUP:
 		if (type != ATHOME_PKT_RX_ACK ||
@@ -948,8 +947,7 @@ static int athome_bt_data_rx(int which, uint8_t *in_data, uint32_t len)
 			/* send binding buttons to userspace */
 			if (buttons & SECURE_BTN_MASK) {
 				struct bt_athome_bind_key bb;
-				memcpy(&bb.MAC, conns[which].MAC,
-							sizeof(bb.MAC));
+				bacpy(&bb.MAC, &conns[which].MAC);
 				bb.key = !!(buttons & ATHOME_PAIR_BTN_CHAR);
 				athome_bt_usr_enqueue(BT_ATHOME_EVT_BIND_KEY,
 							&bb, sizeof(bb));
@@ -1143,13 +1141,13 @@ static void athome_bt_timeout(unsigned long which)
 	wake_up_interruptible(&rx_wait);
 }
 
-bool athome_bt_is_connected_to(const uint8_t *mac)
+bool athome_bt_is_connected_to(const bdaddr_t *macP)
 {
 	unsigned long flags;
 	int i;
 
 	spin_lock_irqsave(&stack_state_lock, flags);
-	i = athome_bt_find_by_mac_l(mac);
+	i = athome_bt_find_by_mac_l(macP);
 	spin_unlock_irqrestore(&stack_state_lock, flags);
 
 	return i >= 0;
@@ -1403,7 +1401,7 @@ static int athome_bt_process_evt(struct sk_buff *skb, bool *is_scanning,
 			struct athome_bt_known_remote *K;
 			struct bt_athome_connected ce;
 
-			K = athome_bt_find_known(ci->bdaddr.b);
+			K = athome_bt_find_known(&ci->bdaddr);
 			if (!K) {
 				aahlog("device became unknown unexpectedly\n");
 				/* pretend we found no slots */
@@ -1422,12 +1420,12 @@ static int athome_bt_process_evt(struct sk_buff *skb, bool *is_scanning,
 			conns[i].next_pwr = ATHOME_MODE_ACTIVE;
 			conns[i].in_modeswitch = false;
 			conns[i].proto_ver = *proto_ver;
-			memcpy(conns[i].MAC, ci->bdaddr.b, AAH_BT_MAC_SZ);
+			bacpy(&conns[i].MAC, &ci->bdaddr);
 			memset(&conns[i].stats, 0, sizeof(conns[i].stats));
 			conns[i].last_time = get_time();
 			nconns++;
 
-			memcpy(ce.MAC, ci->bdaddr.b, sizeof(ce.MAC));
+			bacpy(&ce.MAC, &ci->bdaddr);
 			athome_bt_usr_enqueue( BT_ATHOME_EVT_CONNECTED,
 							&ce, sizeof(ce));
 		}
@@ -1442,17 +1440,17 @@ device_handled:
 			spin_unlock_irqrestore( &stack_state_lock, flags);
 			return athome_bt_disconnect(handle);
 		} else if (need_encr)
-			athome_bt_start_encr(ci->bdaddr.b, i);
+			athome_bt_start_encr(&ci->bdaddr, i);
 
 	} else if (evt->evt == HCI_EV_LE_META &&
 		meta->subevent ==
 			HCI_EV_LE_ADVERTISING_REPORT) {
 
-		uint8_t mac[AAH_BT_MAC_SZ];
+		bdaddr_t mac;
 		uint32_t new_proto_ver = 0;
 
 		*did_something = true;
-		if (athome_bt_discovered(data, mac,
+		if (athome_bt_discovered(data, &mac,
 			skb->len - sizeof(*evt), &new_proto_ver) &&
 				!*is_connecting &&
 				nconns != ATHOME_RMT_MAX_CONNS) {
@@ -1464,8 +1462,8 @@ device_handled:
 			*is_scanning = false;
 			aahlog("Trying to connect to %02X:%02X"
 				":%02X:%02X:%02X:%02X (v%08X)",
-				mac[5], mac[4], mac[3], mac[2],
-				mac[1], mac[0], new_proto_ver);
+				mac.b[5], mac.b[4], mac.b[3], mac.b[2],
+				mac.b[1], mac.b[0], new_proto_ver);
 			aahlog_continue(", conn_scan interval = %d, window = %d",
 				AAH_BT_CONN_SCAN_INTERVAL, AAH_BT_SCAN_WINDOW);
 			aahlog_continue(", max event length (retries) = %d\n",
@@ -1476,12 +1474,12 @@ device_handled:
 			put16LE(&parP, AAH_BT_SCAN_WINDOW);   /* time to listen */
 			put8LE(&parP, 0);     /* no whitelist */
 			put8LE(&parP, 1);     /* random addr */
-			put8LE(&parP, mac[0]);/* mac addr[5] */
-			put8LE(&parP, mac[1]);/* mac addr[4] */
-			put8LE(&parP, mac[2]);/* mac addr[3] */
-			put8LE(&parP, mac[3]);/* mac addr[2] */
-			put8LE(&parP, mac[4]);/* mac addr[1] */
-			put8LE(&parP, mac[5]);/* mac addr[0] */
+			put8LE(&parP, mac.b[0]);/* mac addr[5] */
+			put8LE(&parP, mac.b[1]);/* mac addr[4] */
+			put8LE(&parP, mac.b[2]);/* mac addr[3] */
+			put8LE(&parP, mac.b[3]);/* mac addr[2] */
+			put8LE(&parP, mac.b[4]);/* mac addr[1] */
+			put8LE(&parP, mac.b[5]);/* mac addr[0] */
 			put8LE(&parP, 0);     /* send pub. adr */
 			put16LE(&parP, mode_settings->conn_interval);
 			put16LE(&parP, mode_settings->conn_interval);
@@ -1565,8 +1563,7 @@ device_handled:
 			if (LOG_MODESWITCH)
 				aahlog("Conn %d now in state "
 					"%d\n", which, i);
-			memcpy(mse.MAC, conns[which].MAC,
-				sizeof(mse.MAC));
+			bacpy(&mse.MAC, &conns[which].MAC);
 			mse.new_mode = i;
 			athome_bt_usr_enqueue(
 				BT_ATHOME_EVT_MODE_SWITCHED,

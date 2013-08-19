@@ -23,7 +23,7 @@
  * of the devices listed in it. If so, fill "macP" with the MAC and
  * return true. Else return false;
  */
-bool athome_bt_discovered(const uint8_t *buf, uint8_t *macP, int len,
+bool athome_bt_discovered(const uint8_t *buf, bdaddr_t *macP, int len,
 							uint32_t *proto_ver);
 
 struct athome_bt_adv_manuf_data{

@@ -21,7 +21,7 @@
 /*
  * If connected to a given MAC, schedule a disconnection soon. Async.
  */
-void athome_bt_disc_from_mac(const uint8_t *mac);
+void athome_bt_disc_from_mac(const bdaddr_t *macP);
 
 /*
  * Get driver state (list of connections and their states)
@@ -31,12 +31,12 @@ void athome_bt_get_state(struct bt_athome_state *state);
 /*
  * If connected to a given MAC, schedule encryption to start soon
  */
-void athome_bt_start_encr_for_mac(const uint8_t *mac);
+void athome_bt_start_encr_for_mac(const bdaddr_t *macP);
 
 /*
  * Get a connection's statistics
  */
-bool athome_bt_get_stats(struct athome_bt_stats *stats, const uint8_t *mac);
+bool athome_bt_get_stats(struct athome_bt_stats *stats, const bdaddr_t *macP);
 
 /*
  * Send a packet to a remote. Returns false on certain failures, but a return
@@ -44,13 +44,13 @@ bool athome_bt_get_stats(struct athome_bt_stats *stats, const uint8_t *mac);
  * the BTLE chip. Higher level code, if it wants to, can deal with higher-level
  * reliability.
  */
-bool athome_bt_send_data(const uint8_t *mac, uint8_t typ,
+bool athome_bt_send_data(const bdaddr_t *macP, uint8_t typ,
 			const void *data, uint8_t data_sz, bool for_user);
 
 /*
  * Check if we're currently connected to a given MAC
  */
-bool athome_bt_is_connected_to(const uint8_t *mac);
+bool athome_bt_is_connected_to(const bdaddr_t *macP);
 
 /*
  * Filters:

@@ -49,7 +49,6 @@
  */
 #define AAH_BT_MARVELL_MCA		HCI_Marvell_MCA_30_ppm
 
-#define AAH_BT_MAC_SZ				6
 #define AAH_BT_LTK_SZ				16
 #define AAH_BT_ENTROPY_SZ			16
 #define AAH_BT_SLEN_MAX				20
@@ -96,7 +95,7 @@ struct athome_bt_stats {
 /* messages TO driver */
 #define BT_ATHOME_MSG_ADD_DEV			0x00
 	struct bt_athome_add_dev {
-		uint8_t MAC[AAH_BT_MAC_SZ];
+		bdaddr_t MAC;
 		uint8_t LTK[AAH_BT_LTK_SZ];
 	} __packed;
 #define BT_ATHOME_MSG_SET_BIND_MODE		0x01
@@ -105,32 +104,32 @@ struct athome_bt_stats {
 	} __packed;
 #define BT_ATHOME_MSG_DO_BIND			0x02
 	struct bt_athome_do_bind {
-		uint8_t MAC[AAH_BT_MAC_SZ];
+		bdaddr_t MAC;
 	} __packed;
 #define BT_ATHOME_MSG_STOP_BIND			0x03
 	struct bt_athome_stop_bind {
-		uint8_t MAC[AAH_BT_MAC_SZ];
+		bdaddr_t MAC;
 	} __packed;
 #define BT_ATHOME_MSG_ENCRYPT			0x04
 	struct bt_athome_encrypt {
-		uint8_t MAC[AAH_BT_MAC_SZ];
+		bdaddr_t MAC;
 	} __packed;
 #define BT_ATHOME_MSG_DEL_DEV			0x05
 	struct bt_athome_del_dev {
-		uint8_t MAC[AAH_BT_MAC_SZ];
+		bdaddr_t MAC;
 	} __packed;
 #define BT_ATHOME_MSG_GET_STATE			0x06
 	/* no params -> generate BT_ATHOME_EVT_STATE */
 #define BT_ATHOME_MSG_DATA			0x07
 	struct bt_athome_send_data {
-		uint8_t MAC[AAH_BT_MAC_SZ];
+		bdaddr_t MAC;
 		uint8_t pkt_typ;
 		uint8_t pkt_data[]; /* len <= 25 */
 	} __packed;
 #define BT_ATHOME_MSG_DEV_STATS			0x08
 	/* MAC -> generate BT_ATHOME_EVT_DEV_STATS */
 	struct bt_athome_get_dev_stats {
-		uint8_t MAC[AAH_BT_MAC_SZ];
+		bdaddr_t MAC;
 	} __packed;
 
 /* events FROM driver */
@@ -139,7 +138,7 @@ struct athome_bt_stats {
 	struct bt_athome_state {
 		uint8_t num;
 		struct {
-			uint8_t MAC[AAH_BT_MAC_SZ];
+			bdaddr_t MAC;
 			/* see BT_ATHOME_STATE_* */
 			uint8_t con_state;
 			/* see ATHOME_MODE_* */
@@ -150,27 +149,27 @@ struct athome_bt_stats {
 	} __packed;
 #define BT_ATHOME_EVT_CONNECTED			0x82
 	struct bt_athome_connected {
-		uint8_t MAC[AAH_BT_MAC_SZ];
+		bdaddr_t MAC;
 	} __packed;
 #define BT_ATHOME_EVT_DISCONNECTED		0x83
 	struct bt_athome_disconnected {
-		uint8_t MAC[AAH_BT_MAC_SZ];
+		bdaddr_t MAC;
 		struct athome_bt_stats stats;
 	} __packed;
 #define BT_ATHOME_EVT_MODE_SWITCHED		0x84
 	struct bt_athome_mode_switched {
-		uint8_t MAC[AAH_BT_MAC_SZ];
+		bdaddr_t MAC;
 		uint8_t new_mode;
 	} __packed;
 #define BT_ATHOME_EVT_DATA			0x85
 	struct bt_athome_got_data {
-		uint8_t MAC[AAH_BT_MAC_SZ];
+		bdaddr_t MAC;
 		uint8_t pkt_typ;
 		uint8_t pkt_data[]; /* len <= 25 */
 	} __packed;
 #define BT_ATHOME_EVT_DISCOVERED		0x86
 	struct bt_athome_discovered {
-		uint8_t MAC[AAH_BT_MAC_SZ];
+		bdaddr_t MAC;
 		uint8_t ver[4];
 		int8_t RSSI;
 		uint8_t RFU[8];
@@ -178,12 +177,12 @@ struct athome_bt_stats {
 	} __packed;
 #define BT_ATHOME_EVT_DEV_STATS			0x87
 	struct bt_athome_dev_stats {
-		uint8_t MAC[AAH_BT_MAC_SZ];
+		bdaddr_t MAC;
 		struct athome_bt_stats stats;
 	} __packed;
 #define BT_ATHOME_EVT_BIND_KEY			0x88
 	struct bt_athome_bind_key {
-		uint8_t MAC[AAH_BT_MAC_SZ];
+		bdaddr_t MAC;
 		uint8_t key;
 	} __packed;
 

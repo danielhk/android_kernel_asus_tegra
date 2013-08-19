@@ -21,14 +21,14 @@
 struct athome_bt_known_remote {
 	struct athome_bt_known_remote *next;
 	uint8_t bind_mode;
-	uint8_t MAC[AAH_BT_MAC_SZ];
+	bdaddr_t MAC;
 	uint8_t LTK[AAH_BT_LTK_SZ];
 };
 
 /*
  *	Given a MAC, see if we heard about such a device from the user.
  */
-struct athome_bt_known_remote *athome_bt_find_known(const uint8_t *MAC);
+struct athome_bt_known_remote *athome_bt_find_known(const bdaddr_t *macP);
 
 /*
  *	Init the user-facind devnode & structures

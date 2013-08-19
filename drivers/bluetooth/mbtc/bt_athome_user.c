@@ -49,14 +49,14 @@ static bool usr_data_inited = false;
 
 /* only to be called with state lock held */
 static struct athome_bt_known_remote *athome_bt_find_known_l(
-				const uint8_t *MAC,
+				const bdaddr_t *macP,
 				struct athome_bt_known_remote **prevP)
 {
 	struct athome_bt_known_remote *cur, *prev = NULL;
 
 	cur = known;
 
-	while (cur && memcmp(cur->MAC, MAC, sizeof(cur->MAC))) {
+	while (cur && bacmp(&cur->MAC, macP)) {
 		prev = cur;
 		cur = cur->next;
 	}
@@ -65,13 +65,13 @@ static struct athome_bt_known_remote *athome_bt_find_known_l(
 	return cur;
 }
 
-struct athome_bt_known_remote *athome_bt_find_known(const uint8_t *MAC)
+struct athome_bt_known_remote *athome_bt_find_known(const bdaddr_t *macP)
 {
 	struct athome_bt_known_remote *ret;
 	unsigned long flags;
 
 	spin_lock_irqsave(&device_list_lock, flags);
-	ret = athome_bt_find_known_l(MAC, NULL);
+	ret = athome_bt_find_known_l(macP, NULL);
 	spin_unlock_irqrestore(&device_list_lock, flags);
 
 	return ret;
@@ -139,7 +139,7 @@ static ssize_t athome_bt_read(struct file *file, char __user *userbuf,
 	}
 }
 
-static int athome_bt_add_dev(const uint8_t *MAC, const uint8_t *LTK)
+static int athome_bt_add_dev(const bdaddr_t *macP, const uint8_t *LTK)
 {	/* if LTK == NULL -> bind mode addition */
 
 	unsigned long flags;
@@ -151,12 +151,12 @@ static int athome_bt_add_dev(const uint8_t *MAC, const uint8_t *LTK)
 
 	spin_lock_irqsave(&device_list_lock, flags);
 
-	cur = athome_bt_find_known_l(MAC, NULL);
+	cur = athome_bt_find_known_l(macP, NULL);
 	if (cur) {
 		kfree(item);
 		item = cur;
 	} else {
-		memcpy(item->MAC, MAC, sizeof(item->MAC));
+		bacpy(&item->MAC, macP);
 		item->next = known;
 		known = item;
 	}
@@ -170,13 +170,13 @@ static int athome_bt_add_dev(const uint8_t *MAC, const uint8_t *LTK)
 	return 0;
 }
 
-static void athome_bt_del_dev(uint8_t *MAC, bool bind_mode)
+static void athome_bt_del_dev(const bdaddr_t *macP, bool bind_mode)
 {
 	unsigned long flags;
 	struct athome_bt_known_remote *cur, *prev;
 
 	spin_lock_irqsave(&device_list_lock, flags);
-	cur = athome_bt_find_known_l(MAC, &prev);
+	cur = athome_bt_find_known_l(macP, &prev);
 	if (cur && (!cur->bind_mode == !bind_mode)) {
 
 		if (prev)
@@ -186,7 +186,7 @@ static void athome_bt_del_dev(uint8_t *MAC, bool bind_mode)
 		kfree(cur);
 	}
 
-	athome_bt_disc_from_mac(MAC);
+	athome_bt_disc_from_mac(macP);
 	spin_unlock_irqrestore(&device_list_lock, flags);
 }
 
@@ -227,7 +227,7 @@ static ssize_t athome_bt_write(struct file *file, const char __user *userbuf,
 	case BT_ATHOME_MSG_ADD_DEV:
 		if (bytes != sizeof(*add))
 			return -EIO;
-		ret = athome_bt_add_dev(add->MAC, add->LTK);
+		ret = athome_bt_add_dev(&add->MAC, add->LTK);
 		if (ret < 0)
 			orig_bytes = ret;
 		break;
@@ -241,7 +241,7 @@ static ssize_t athome_bt_write(struct file *file, const char __user *userbuf,
 	case BT_ATHOME_MSG_DO_BIND:
 		if (bytes != sizeof(*do_bind))
 			return -EIO;
-		ret = athome_bt_add_dev(do_bind->MAC, NULL);
+		ret = athome_bt_add_dev(&do_bind->MAC, NULL);
 		if (ret < 0)
 			orig_bytes = ret;
 		break;
@@ -249,20 +249,20 @@ static ssize_t athome_bt_write(struct file *file, const char __user *userbuf,
 	case BT_ATHOME_MSG_STOP_BIND:
 		if (bytes != sizeof(*stop_bind))
 			return -EIO;
-		athome_bt_del_dev(del->MAC, 1);
+		athome_bt_del_dev(&del->MAC, 1);
 		break;
 
 	case BT_ATHOME_MSG_ENCRYPT:
 		if (bytes != sizeof(*encr))
 			return -EIO;
-		athome_bt_start_encr_for_mac(encr->MAC);
+		athome_bt_start_encr_for_mac(&encr->MAC);
 		break;
 
 	case BT_ATHOME_MSG_DEL_DEV:
 		if (bytes != sizeof(*del))
 			return -EIO;
 
-		athome_bt_del_dev(del->MAC, 0);
+		athome_bt_del_dev(&del->MAC, 0);
 		break;
 
 	case BT_ATHOME_MSG_GET_STATE:
@@ -278,15 +278,15 @@ static ssize_t athome_bt_write(struct file *file, const char __user *userbuf,
 		if (bytes < sizeof(*data))
 			return -EIO;
 
-		athome_bt_send_data(data->MAC, data->pkt_typ, data->pkt_data,
+		athome_bt_send_data(&data->MAC, data->pkt_typ, data->pkt_data,
 						bytes - sizeof(*data), true);
 		break;
 
 	case BT_ATHOME_MSG_DEV_STATS:
 		if (bytes < sizeof(*get_stats))
 			return -EIO;
-		memcpy(stats->MAC, get_stats->MAC, sizeof(get_stats->MAC));
-		if (athome_bt_get_stats(&stats->stats, stats->MAC))
+		bacpy(&stats->MAC, &get_stats->MAC);
+		if (athome_bt_get_stats(&stats->stats, &stats->MAC))
 			athome_bt_usr_enqueue(BT_ATHOME_EVT_DEV_STATS,
 							stats, sizeof(*stats));
 		break;
