@@ -427,8 +427,8 @@ static void athome_bt_start_encr(const bdaddr_t *macP, int i)
 					CONN_STATE_REENCRYPT_SETUP;
 
 	memcpy(conns[i].entropy, enc_pkt.entropy, AAH_BT_ENTROPY_SZ);
-	mod_timer((struct timer_list*)&conns[i].timer,
-			jiffies + msecs_to_jiffies(ENCRYPT_DAT_TIMEOUT));
+	mod_timer(&conns[i].timer,
+		  jiffies + msecs_to_jiffies(ENCRYPT_DAT_TIMEOUT));
 
 	spin_unlock_irqrestore(&stack_state_lock, flags);
 
@@ -854,8 +854,8 @@ static int athome_bt_data_rx(int which, uint8_t *in_data, uint32_t len)
 			break;
 		}
 		aahlog("entropy echo ok - encryption approved\n");
-		mod_timer((struct timer_list*)&conns[which].timer,
-				jiffies + msecs_to_jiffies(ENCRYPT_TIMEOUT));
+		mod_timer(&conns[which].timer,
+			  jiffies + msecs_to_jiffies(ENCRYPT_TIMEOUT));
 		conns[which].timeout = false;
 		spin_unlock_irqrestore(&stack_state_lock, flags);
 		return athome_bt_do_encrypt(which, conns[which].LTK, initial);
@@ -1653,20 +1653,22 @@ static int athome_bt_thread(void *unusedData)
 		aahlog("devices_created\n");
 		if (athome_bt_user_init()) {
 			aahlog("failed to register misc device\n");
-			ret = -1;
-			goto err_return;
+			return -1;
 		}
 
 		if (athome_bt_input_init()) {
 			aahlog("failed to register input device\n");
-			ret = -2;
-			goto err_deregister_misc;
+			athome_bt_user_deinit();
+			return -2;
 		}
 		devices_exist = true;
 	}
 
-	if (athome_bt_host_setup())
-		goto err_deregister_input;
+	if (athome_bt_host_setup()) {
+		/* we don't unwind the one-time creation of the devices */
+		aahlog("host setup failed\n");
+		return -3;
+	}
 
 	skb_queue_head_init(&rx_dat);
 	skb_queue_head_init(&rx_evt);
@@ -1694,7 +1696,7 @@ static int athome_bt_thread(void *unusedData)
 						parP - buf, buf,
 						sizeof(buf), buf);
 			if (ret)
-				goto exit_return;
+				break; /* exit while loop */
 			parP = cmd_cmpl_data;
 			sta = get8LE(&parP);
 			if (sta)	/* check status */
@@ -1733,7 +1735,7 @@ static int athome_bt_thread(void *unusedData)
 				ret = athome_bt_data_rx(i, skb->data,
 								skb->len);
 				if (ret)
-					goto exit_return;
+					break; /* exit while loop */
 			}
 			else
 				aahlog("data for unknown conection dropped\n");
@@ -1750,7 +1752,7 @@ static int athome_bt_thread(void *unusedData)
 					HCI_LE_Create_Connection_Cancel,
 					0, NULL, 0, NULL);
 			if (ret)
-				goto exit_return;
+				break; /* exit while loop */
 		}
 
 		/* maybe something timed out ? */
@@ -1820,7 +1822,7 @@ static int athome_bt_thread(void *unusedData)
 			athome_bt_led_show_event(HACK_LED_EVENT_DISCONNECT);
 
 		if (ret)
-			goto exit_return;
+			break; /* exit while loop */
 
 		if (!did_something)
 			wait_event_interruptible(rx_wait,
@@ -1833,19 +1835,11 @@ static int athome_bt_thread(void *unusedData)
 		if (kthread_should_stop() || atomic_read(&in_shutdown)) {
 			aahlog("thread exiting normally\n");
 			ret = 1;
-			goto exit_return;
+			break; /* exit while loop */
 		}
 	}
 
-err_deregister_input:
-	devices_exist = false;
-	athome_bt_input_deinit();
-
-err_deregister_misc:
-	athome_bt_user_deinit();
-
-err_return:
-exit_return:
+	del_timer(&timeout);
 	aahlog("thread exiting with sta %d\n", ret);
 	return ret;
 }
