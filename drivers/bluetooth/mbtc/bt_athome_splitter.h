@@ -48,8 +48,10 @@ int athome_bt_pkt_send_req(void *priv, struct sk_buff *skb);
 
 /*  ========== functions provided to external LE driver ========== */
 
-void athome_bt_send_to_user(uint32_t pkt_type, uint8_t *data, uint32_t len);
-void athome_bt_send_to_chip(uint32_t pkt_type, uint8_t *data, uint32_t len);
+void athome_bt_send_to_user(uint32_t pkt_type,
+			    const uint8_t *data, uint32_t len);
+void athome_bt_send_to_chip(uint32_t pkt_type,
+			    const uint8_t *data, uint32_t len);
 
 
 /*  ========== functions needed in external BT driver ========== */
@@ -57,12 +59,14 @@ void athome_bt_send_to_chip(uint32_t pkt_type, uint8_t *data, uint32_t len);
 /*
  *	Send packet to user, as if it came from the chip
  */
-void athome_bt_pkt_to_user(void *priv, uint32_t pkt_type, uint8_t *data, uint32_t len);
+void athome_bt_pkt_to_user(void *priv, uint32_t pkt_type,
+			   const uint8_t *data, uint32_t len);
 
 /*
  *	Send packet to chip, as if it came from the user
  */
-void athome_bt_pkt_to_chip(void *priv, uint32_t pkt_type, uint8_t *data, uint32_t len);
+void athome_bt_pkt_to_chip(void *priv, uint32_t pkt_type,
+			   const uint8_t *data, uint32_t len);
 
 
 

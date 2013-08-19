@@ -303,7 +303,8 @@ static int athome_bt_filter_num_comp_pkt(void *dataP, uint32_t *rx_len)
 	return !evt->num_hndl;
 }
 
-void athome_bt_send_to_user(uint32_t pkt_type, uint8_t *data, uint32_t len)
+void athome_bt_send_to_user(uint32_t pkt_type,
+			    const uint8_t *data, uint32_t len)
 {
 	smp_rmb();
 	if (!drv_priv)
@@ -312,7 +313,8 @@ void athome_bt_send_to_user(uint32_t pkt_type, uint8_t *data, uint32_t len)
 		athome_bt_pkt_to_user(drv_priv, pkt_type, data, len);
 }
 
-void athome_bt_send_to_chip(uint32_t pkt_type, uint8_t *data, uint32_t len)
+void athome_bt_send_to_chip(uint32_t pkt_type,
+			    const uint8_t *data, uint32_t len)
 {
 	smp_rmb();
 	if (!drv_priv)

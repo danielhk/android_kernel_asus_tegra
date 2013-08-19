@@ -772,7 +772,7 @@ sd_download_firmware_w_helper(bt_private * priv)
 
 #ifdef CONFIG_ATHOME_BT_REMOTE
 void athome_bt_pkt_to_user(void *_priv, uint32_t pkt_type,
-			   uint8_t *data, uint32_t len)
+			   const uint8_t *data, uint32_t len)
 {
 	bt_private *priv = (bt_private *) _priv;
 	struct sk_buff *skb;
@@ -798,7 +798,8 @@ void athome_bt_pkt_to_user(void *_priv, uint32_t pkt_type,
 }
 
 /* we can use sbi_host_to_card because it is thread safe */
-void athome_bt_pkt_to_chip(void *_priv, uint32_t pkt_type, uint8_t *data, uint32_t len)
+void athome_bt_pkt_to_chip(void *_priv, uint32_t pkt_type,
+			   const uint8_t *data, uint32_t len)
 {
 	/* make the buffer DMA friendly so sbi_host_to_card() doesn't
 	 * have to do a copy
