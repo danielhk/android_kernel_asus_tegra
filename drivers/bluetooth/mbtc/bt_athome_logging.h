@@ -27,6 +27,7 @@
 #define LOG_INPUT_SPEW  		0
 #define LOG_BT_SEM			0
 #define LOG_DISCOVERY			0
+#define LOG_DISCOVERY_KNOWN		1
 #define LOG_MODESWITCH			1
 
 

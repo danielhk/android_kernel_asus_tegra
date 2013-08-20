@@ -76,7 +76,6 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 	uint32_t ver_val = 0;
 	int8_t rssi;
 
-
 	/*
 	 * This code here parses a BTLE Advertising Report event as defined by
 	 * BT 4.0 spec section 2.E.7.7.65.2. There is not an easy way to
@@ -115,7 +114,14 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 	rssi = *buf++;
 	(*remain_bytes)--;
 
-	if (LOG_DISCOVERY) {
+	/* It may be a device we know about. Check that. */
+	item = athome_bt_find_known(&mac);
+	if (item) {
+		found = true;
+		want_bind = item->bind_mode;
+	}
+
+	if (LOG_DISCOVERY || (found && LOG_DISCOVERY_KNOWN)) {
 		aahlog("DEV %02X:%02X:%02X:%02X:%02X:%02X(%c) "
 			"%s: RSSI %d (%u):", mac.b[5], mac.b[4],
 			mac.b[3], mac.b[2], mac.b[1], mac.b[0],
@@ -132,13 +138,13 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 
 		uint8_t t, L = *data++;
 		if (end - data < L) {
-			if (LOG_DISCOVERY)
+			if (LOG_DISCOVERY || (found && LOG_DISCOVERY_KNOWN))
 				aahlog_continue("ERR(want %d have %d)",
 								L, end - data);
 			break;
 		}
 		if (!L) {
-			if (LOG_DISCOVERY)
+			if (LOG_DISCOVERY || (found && LOG_DISCOVERY_KNOWN))
 				aahlog_continue("ERR(ZLP)");
 			continue;
 		}
@@ -156,7 +162,7 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 			if (needflags && t == 0x06)
 				needflags = 0;
 
-			if (!LOG_DISCOVERY)
+			if (!LOG_DISCOVERY && !(found && LOG_DISCOVERY_KNOWN))
 				break;
 
 			aahlog_continue(" FLAGS(");
@@ -175,7 +181,7 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 
 		case ADV_DATA_UUID16S_INCOMPLETE:  //16-bit uuids (more)
 		case ADV_DATA_UUID16S_COMPLETE:    //16-bit uuids (complete)
-			if (!LOG_DISCOVERY)
+			if (!LOG_DISCOVERY && !(found && LOG_DISCOVERY_KNOWN))
 				break;
 
 			aahlog_continue(" UUID16(%scomplete)(",
@@ -186,7 +192,7 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 
 		case ADV_DATA_UUID32S_INCOMPLETE:  //32-bit uuids (more)
 		case ADV_DATA_UUID32S_COMPLETE:    //32-bit uuids (complete)
-			if (!LOG_DISCOVERY)
+			if (!LOG_DISCOVERY || LOG_DISCOVERY_KNOWN)
 				break;
 
 			aahlog_continue(" UUID32(%scomplete)(",
@@ -197,7 +203,7 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 
 		case ADV_DATA_UUID128S_INCOMPLETE: //128-bit uuids (more)
 		case ADV_DATA_UUID128S_COMPLETE:   //128-bit uuids (complete)
-			if (!LOG_DISCOVERY)
+			if (!LOG_DISCOVERY && !(found && LOG_DISCOVERY_KNOWN))
 				break;
 
 			aahlog_continue(" UUID(%scomplete)(",
@@ -208,7 +214,7 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 
 		case ADV_DATA_NAME_SHORT:	//shortened name
 		case ADV_DATA_NAME_COMPLETE:	//complete
-			if (!LOG_DISCOVERY)
+			if (!LOG_DISCOVERY && !(found && LOG_DISCOVERY_KNOWN))
 				break;
 
 			aahlog_continue(" NAME(%s)(",
@@ -220,7 +226,7 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 			break;
 
 		case ADV_DATA_TX_POWER: //tx power
-			if (!LOG_DISCOVERY)
+			if (!LOG_DISCOVERY && !(found && LOG_DISCOVERY_KNOWN))
 				break;
 
 			aahlog_continue(" TXPOWER(");
@@ -245,7 +251,8 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 				ver_val = (ver_val << 8) | ver[2];
 				ver_val = (ver_val << 8) | ver[3];
 
-				if (LOG_DISCOVERY)
+				if (LOG_DISCOVERY ||
+				    (found && LOG_DISCOVERY_KNOWN))
 					aahlog_continue(" AAH(v%08X)",
 							ver_val);
 				if (ver_val >= MIN_PROTO_VERSION)
@@ -258,7 +265,8 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 
 				slen = L - 10;
 				snum = manuf->snum;
-				if (LOG_DISCOVERY) {
+				if (LOG_DISCOVERY ||
+				    (found && LOG_DISCOVERY_KNOWN)) {
 
 					aahlog_continue(" SN(");
 					for(j = 0 ;j < slen; j++)
@@ -267,7 +275,7 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 				}
 			} while (0);
 
-			if (!LOG_DISCOVERY)
+			if (!LOG_DISCOVERY && !(found && LOG_DISCOVERY_KNOWN))
 				break;
 
 			aahlog_continue(" MANUF_DATA(");
@@ -277,7 +285,7 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 			break;
 
 		default:
-			if (!LOG_DISCOVERY)
+			if (!LOG_DISCOVERY && !(found && LOG_DISCOVERY_KNOWN))
 				break;
 
 			aahlog_continue(" UNKNOWN(%u)(", t);
@@ -289,37 +297,30 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 		/* consume all unconsumed chunk data */
 		data += L;
 	}
-	if (LOG_DISCOVERY)
+	if (LOG_DISCOVERY || (found && LOG_DISCOVERY_KNOWN))
 		aahlog_continue("\n");
-
-	/* It may be a device we know about. Check that. */
-	item = athome_bt_find_known(&mac);
-	if (item) {
-		found = true;
-		want_bind = item->bind_mode;
-	}
 
 	if (!needmanuf && !needflags && is_addr_rand &&
 				evtType == SCAN_EVT_ADV_IND) {
 		if (found) {
 			if (snum && want_bind) {
 
-				if (LOG_DISCOVERY)
+				if (LOG_DISCOVERY || LOG_DISCOVERY_KNOWN)
 					aahlog(" -> wanted unbound remote"
 						" found\n");
 				can_connect = true;
 			} else if (snum) {
 
-				if (LOG_DISCOVERY)
+				if (LOG_DISCOVERY || LOG_DISCOVERY_KNOWN)
 					aahlog(" -> bind-like adv from slave "
 						"not expected in bind mode\n");
 			} else if (want_bind) {
 
-				if (LOG_DISCOVERY)
+				if (LOG_DISCOVERY || LOG_DISCOVERY_KNOWN)
 					aahlog(" -> non-bind adv from slave "
 						"expected in bind mode\n");
 			} else {
-				if (LOG_DISCOVERY)
+				if (LOG_DISCOVERY || LOG_DISCOVERY_KNOWN)
 					aahlog(" -> known half bound remote "
 								"found\n");
 				can_connect = true;
@@ -356,10 +357,10 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 			if (LOG_DISCOVERY)
 				aahlog(" -> unexpected direct adv\n");
 		} else if (want_bind) {
-			if (LOG_DISCOVERY)
+			if (LOG_DISCOVERY || (found && LOG_DISCOVERY_KNOWN))
 				aahlog(" -> unexpected direct, want bind\n");
 		} else {
-			if (LOG_DISCOVERY)
+			if (LOG_DISCOVERY || (found && LOG_DISCOVERY_KNOWN))
 				aahlog(" -> wanted bound remote\n");
 			can_connect = true;
 		}
