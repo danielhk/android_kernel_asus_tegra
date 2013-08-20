@@ -30,11 +30,10 @@
 #define LOG_DISCOVERY_KNOWN		1
 #define LOG_MODESWITCH			1
 
+#define aahlog(...)			printk("AahBtRemote: "  __VA_ARGS__)
 
-
-#define aahlog(...)			printk("AahBtRemote: " __VA_ARGS__)
-#define aahlog_continue(...)		printk(__VA_ARGS__)
-
+void aahlog_bytes(char *buf, size_t buf_len, const char *bytes, size_t len);
+void aahlog_uuid(char *buf, size_t buf_len, const char *bytes, size_t len);
 
 void athome_bt_logpacket(char chip, uint32_t type,
 				const u8 *data, u32 sz, uint8_t owned_by);

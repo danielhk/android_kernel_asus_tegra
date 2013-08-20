@@ -12,7 +12,7 @@
  * GNU General Public License for more details.
  */
 
-
+#include <linux/unaligned/be_byteshift.h>
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci.h>
 #include "bt_athome_le_discovery.h"
@@ -35,17 +35,6 @@
 #define ADV_DATA_TX_POWER		10
 #define ADV_DATA_MANUF_SPECIFIC		255
 
-static void athome_bt_log_uuids(const uint8_t **data, uint8_t* L, unsigned len)
-{
-	unsigned i;
-	while ((*L) > len) {
-		(*L) -= len;
-		aahlog_continue(" ");
-		for(i = 0; i < len; i++)
-			aahlog_continue("%02X", *(*data)++);
-	}
-}
-
 /*
  * If we find a device to connect to, copy its mac into macP and return
  * true. Else leave macP alone and return try_connect. This allows us to
@@ -65,7 +54,7 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 	const uint8_t *snum = NULL; /* only devices in bind mode */
 	uint8_t evtType, is_addr_rand;
 	bdaddr_t mac;
-	uint8_t len, j;
+	uint8_t len;
 	const uint8_t *data, *end;
 	struct athome_bt_known_remote *item;
 	bool found = false, want_bind = false, can_connect = false;
@@ -75,6 +64,7 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 	uint8_t ver[4] = {0,};
 	uint32_t ver_val = 0;
 	int8_t rssi;
+	char log_buf[max(adv_info->length * 3, 256)];
 
 	/*
 	 * This code here parses a BTLE Advertising Report event as defined by
@@ -122,38 +112,37 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 	}
 
 	if (LOG_DISCOVERY || (found && LOG_DISCOVERY_KNOWN)) {
+		aahlog_bytes(log_buf, sizeof(log_buf), data, len);
 		aahlog("DEV %02X:%02X:%02X:%02X:%02X:%02X(%c) "
-			"%s: RSSI %d (%u):", mac.b[5], mac.b[4],
-			mac.b[3], mac.b[2], mac.b[1], mac.b[0],
+			"%s: RSSI %d (%u):\n\t\t%s\n",
+		       mac.b[5], mac.b[4], mac.b[3],
+		       mac.b[2], mac.b[1], mac.b[0],
 			is_addr_rand ? 'R' : 'P',
-			advTypes[evtType], rssi, len);
-		for (j = 0; j < len; j++)
-			aahlog_continue(" %02X", data[j]);
-		aahlog_continue("\n");
-		aahlog("  DATA:");
+		       advTypes[evtType], rssi, len, log_buf);
 	}
 	end = data + len;
 
 	while (data < end) {
 
-		uint8_t t, L = *data++;
-		if (end - data < L) {
+		uint8_t t;
+		len = *data++;
+		if (end - data < len) {
 			if (LOG_DISCOVERY || (found && LOG_DISCOVERY_KNOWN))
-				aahlog_continue("ERR(want %d have %d)",
-								L, end - data);
+				aahlog("ERR(wanted len %d bytes, have %d)\n",
+				       len, end - data);
 			break;
 		}
-		if (!L) {
+		if (!len) {
 			if (LOG_DISCOVERY || (found && LOG_DISCOVERY_KNOWN))
-				aahlog_continue("ERR(ZLP)");
+				aahlog("ERR(zero length packet)\n");
 			continue;
 		}
 
 		t = *data++;
-		L--;
+		len--;
 		switch (t) {
 		case ADV_DATA_FLAGS: //flags
-			if (!L)
+			if (!len)
 				break;
 			t = *data;
 
@@ -165,29 +154,47 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 			if (!LOG_DISCOVERY && !(found && LOG_DISCOVERY_KNOWN))
 				break;
 
-			aahlog_continue(" FLAGS(");
+			strlcpy(log_buf, "\t\tFLAGS(", sizeof(log_buf));
 			if (t & 0x01)
-				aahlog_continue(" LimitedDisc");
+				strlcat(log_buf, " LimitedDisc",
+					sizeof(log_buf));
 			if (t & 0x02)
-				aahlog_continue(" GeneralDisc");
+				strlcat(log_buf, " GeneralDisc",
+					sizeof(log_buf));
 			if (t & 0x04)
-				aahlog_continue(" NoEDR");
+				strlcat(log_buf, " NoEDR",
+					sizeof(log_buf));
 			if (t & 0x08)
-				aahlog_continue(" SimulEDRcontroller");
+				strlcat(log_buf, " SimulEDRcontroller",
+					sizeof(log_buf));
 			if (t & 0x10)
-				aahlog_continue(" SimulEDR_Host");
-			aahlog_continue(" )");
+				strlcat(log_buf, " SimulEDR_Host",
+					sizeof(log_buf));
+			aahlog("%s )\n", log_buf);
 			break;
 
 		case ADV_DATA_UUID16S_INCOMPLETE:  //16-bit uuids (more)
 		case ADV_DATA_UUID16S_COMPLETE:    //16-bit uuids (complete)
+
 			if (!LOG_DISCOVERY && !(found && LOG_DISCOVERY_KNOWN))
 				break;
 
-			aahlog_continue(" UUID16(%scomplete)(",
-				t == ADV_DATA_UUID16S_INCOMPLETE ? "in" : "");
-			athome_bt_log_uuids(&data, &L, 2);
-			aahlog_continue(" )");
+			strlcpy(log_buf, "\t\tUUID16(", sizeof(log_buf));
+			if (t == ADV_DATA_UUID16S_INCOMPLETE)
+				strlcat(log_buf, "incomplete)(",
+					sizeof(log_buf));
+			else
+				strlcat(log_buf, "complete)(",
+					sizeof(log_buf));
+			if (*data >= 2) {
+				size_t log_buf_used = strlen(log_buf);
+				aahlog_uuid(log_buf + log_buf_used,
+					    sizeof(log_buf) - log_buf_used,
+					    data, 2);
+				data += 2;
+				len -= 2;
+			}
+			aahlog("%s)\n", log_buf);
 			break;
 
 		case ADV_DATA_UUID32S_INCOMPLETE:  //32-bit uuids (more)
@@ -195,10 +202,22 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 			if (!LOG_DISCOVERY || LOG_DISCOVERY_KNOWN)
 				break;
 
-			aahlog_continue(" UUID32(%scomplete)(",
-				t == ADV_DATA_UUID32S_INCOMPLETE ? "in" : "");
-			athome_bt_log_uuids(&data, &L, 4);
-			aahlog_continue(" )");
+			strlcpy(log_buf, "\t\tUUID32(", sizeof(log_buf));
+			if (t == ADV_DATA_UUID32S_INCOMPLETE)
+				strlcat(log_buf, "incomplete)(",
+					sizeof(log_buf));
+			else
+				strlcat(log_buf, "complete)(",
+					sizeof(log_buf));
+			if (*data >= 4) {
+				size_t log_buf_used = strlen(log_buf);
+				aahlog_uuid(log_buf + log_buf_used,
+					    sizeof(log_buf) - log_buf_used,
+					    data, 4);
+				data += 4;
+				len -= 4;
+			}
+			aahlog("%s)\n", log_buf);
 			break;
 
 		case ADV_DATA_UUID128S_INCOMPLETE: //128-bit uuids (more)
@@ -206,10 +225,22 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 			if (!LOG_DISCOVERY && !(found && LOG_DISCOVERY_KNOWN))
 				break;
 
-			aahlog_continue(" UUID(%scomplete)(",
-				t ==ADV_DATA_UUID128S_INCOMPLETE ? "in" : "");
-			athome_bt_log_uuids(&data, &L, 16);
-			aahlog_continue(" )");
+			strlcpy(log_buf, "\t\tUUID(", sizeof(log_buf));
+			if (t == ADV_DATA_UUID128S_INCOMPLETE)
+				strlcat(log_buf, "incomplete)(",
+					sizeof(log_buf));
+			else
+				strlcat(log_buf, "complete)(",
+					sizeof(log_buf));
+			if (*data >= 16) {
+				size_t log_buf_used = strlen(log_buf);
+				aahlog_uuid(log_buf + log_buf_used,
+					    sizeof(log_buf) - log_buf_used,
+					    data, 16);
+				data += 16;
+				len -= 16;
+			}
+			aahlog("%s)\n", log_buf);
 			break;
 
 		case ADV_DATA_NAME_SHORT:	//shortened name
@@ -217,28 +248,33 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 			if (!LOG_DISCOVERY && !(found && LOG_DISCOVERY_KNOWN))
 				break;
 
-			aahlog_continue(" NAME(%s)(",
+			aahlog("\t\tNAME(%s): %.*s\n",
 				t == ADV_DATA_NAME_SHORT ?
-					"shortened" : "complete");
-			while (L--)
-				aahlog_continue("%c", *data++);
-			aahlog_continue(")");
+			       "shortened" : "complete", len, data);
+			data += len;
+			len = 0;
 			break;
 
 		case ADV_DATA_TX_POWER: //tx power
 			if (!LOG_DISCOVERY && !(found && LOG_DISCOVERY_KNOWN))
 				break;
 
-			aahlog_continue(" TXPOWER(");
-			while (L--)
-				aahlog_continue("%d", (int8_t)*data++);
-			aahlog_continue(")");
+			aahlog_bytes(log_buf, sizeof(log_buf), data, len);
+			aahlog("\t\tTXPOWER(%s)\n", log_buf);
 			break;
 
 		case ADV_DATA_MANUF_SPECIFIC: //custom
-			if (needmanuf && L >= sizeof(*manuf)) do {
+			if (needmanuf && len >= sizeof(*manuf)) do {
 
+				log_buf[0] = 0;
 				manuf = (struct athome_bt_adv_manuf_data*)data;
+
+				if (LOG_DISCOVERY ||
+				    (found && LOG_DISCOVERY_KNOWN))
+					snprintf(log_buf, sizeof(log_buf),
+						 "\t\tmanuf->ident(%.*s)",
+						 sizeof(manuf->ident),
+						 manuf->ident);
 
 				if (memcmp(manuf->ident, ATHOME_BT_IDENT,
 							sizeof(manuf->ident)))
@@ -246,59 +282,60 @@ static bool athome_bt_discovered_device(const uint8_t **bufP,
 					break;
 
 				memcpy(ver, manuf->ver, sizeof(ver));
-				ver_val = ver[0];
-				ver_val = (ver_val << 8) | ver[1];
-				ver_val = (ver_val << 8) | ver[2];
-				ver_val = (ver_val << 8) | ver[3];
+				ver_val = __get_unaligned_be32(ver);
 
 				if (LOG_DISCOVERY ||
 				    (found && LOG_DISCOVERY_KNOWN))
-					aahlog_continue(" AAH(v%08X)",
-							ver_val);
+					snprintf(log_buf + strlen(log_buf),
+						 sizeof(log_buf),
+						 ", AAH proto_ver(v%08X)",
+						 ver_val);
+
 				if (ver_val >= MIN_PROTO_VERSION)
 					needmanuf = 0;
 
 				/* bind mode devices send serial number too */
-				if (L == sizeof(*manuf))
+				if (len == sizeof(*manuf)) {
 					/* breaks out of if, not of case */
+					if (log_buf[0] != 0)
+						aahlog("%s\n", log_buf);
 					break;
+				}
 
-				slen = L - 10;
+				slen = len - 10;
 				snum = manuf->snum;
 				if (LOG_DISCOVERY ||
 				    (found && LOG_DISCOVERY_KNOWN)) {
 
-					aahlog_continue(" SN(");
-					for(j = 0 ;j < slen; j++)
-						aahlog_continue("%c", snum[j]);
-					aahlog_continue(")");
+					snprintf(log_buf + strlen(log_buf),
+						 sizeof(log_buf),
+						 " SN(%.*s)\n", slen, snum);
+					aahlog("%s", log_buf);
 				}
 			} while (0);
 
 			if (!LOG_DISCOVERY && !(found && LOG_DISCOVERY_KNOWN))
 				break;
 
-			aahlog_continue(" MANUF_DATA(");
-			while (L--)
-				aahlog_continue(" %02X", *data++);
-			aahlog_continue(" )");
+			aahlog_bytes(log_buf, sizeof(log_buf), data, len);
+			aahlog("\t\tMANUF_DATA(%s)\n", log_buf);
+			data += len;
+			len = 0;
 			break;
 
 		default:
 			if (!LOG_DISCOVERY && !(found && LOG_DISCOVERY_KNOWN))
 				break;
 
-			aahlog_continue(" UNKNOWN(%u)(", t);
-			while (L--)
-				aahlog_continue(" %02X", *data++);
-			aahlog_continue(" )");
+			aahlog_bytes(log_buf, sizeof(log_buf), data, len);
+			aahlog("\t\tUNKNOWN(%u)(%s)\n", t, log_buf);
+			data += len;
+			len = 0;
 			break;
 		}
 		/* consume all unconsumed chunk data */
-		data += L;
+		data += len;
 	}
-	if (LOG_DISCOVERY || (found && LOG_DISCOVERY_KNOWN))
-		aahlog_continue("\n");
 
 	if (!needmanuf && !needflags && is_addr_rand &&
 				evtType == SCAN_EVT_ADV_IND) {

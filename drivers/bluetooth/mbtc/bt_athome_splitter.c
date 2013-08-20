@@ -217,17 +217,18 @@ static int athome_bt_filter_cmd_complete(uint8_t *rx_buf, uint32_t len,
 				w16LE(&repl->acl_max_pkt, pkts - 1);
 		}
 	} else if (ogf == HCI_OGF_LE && !forus) {
-		aahlog("LE command complete not for us (ogf=0x%x ocf=0x%x):",
-			ogf, ocf);
+		uint8_t len = ((uint8_t *)rx_buf)[-1];
+		char log_buf[len * 3];
 		/*
 		 * This is ugly and bad. This code here is for LOGGING ONLY and
 		 * it logs our userspace EDR stack doing bad things (sending LE
 		 * commands to a chip claiming no LE support). Once these bugs
 		 * in the userspace stack are fixed, this code can go away
 		 */
-		for (i = 0; i < ((uint8_t*)rx_buf)[-1]; i++)
-			aahlog_continue(" %02X", ((uint8_t*)rx_buf)[i]);
-		aahlog_continue("\n");
+		aahlog_bytes(log_buf, sizeof(log_buf), rx_buf, len);
+		aahlog("LE command complete not for us "
+		       "(ogf=0x%x ocf=0x%x):\n\t%s\n",
+		       ogf, ocf, log_buf);
 	} else if (ogf == HCI_OGF_Controller_And_Baseband &&
 						ocf == HCI_Set_Event_Mask) {
 
@@ -248,7 +249,6 @@ static int athome_bt_filter_cmd_status(uint8_t *rx_buf, uint32_t len,
 	uint16_t ogf = hci_opcode_ogf(opcode);
 	uint16_t ocf = hci_opcode_ocf(opcode);
 	bool forus = 0;
-	unsigned long i;
 
 	if (athome_bt_cmd_sta_or_compl(ogf, ocf, rx_buf, len)) {
 		forus = 1;
@@ -256,17 +256,17 @@ static int athome_bt_filter_cmd_status(uint8_t *rx_buf, uint32_t len,
 	}
 
 	if (ogf == HCI_OGF_LE && !forus) {
-		aahlog("LE command status not for us (ogf=0x%x ocf=0x%x):",
-			ogf, ocf);
 		/*
 		 * This is ugly and bad. This code here is for LOGGING ONLY and
 		 * it logs our userspace EDR stack doing bad things (sending LE
 		 * commands to a chip claiming no LE support). Once these bugs
 		 * in the userspace stack are fixed, this code can go away
 		 */
-		for (i = 0; i < ((uint8_t*)rx_buf)[-1]; i++)
-			aahlog_continue(" %02X", ((uint8_t*)rx_buf)[i]);
-		aahlog_continue("\n");
+		uint8_t len = ((uint8_t *)rx_buf)[-1];
+		char log_buf[len * 3];
+		aahlog_bytes(log_buf, sizeof(log_buf), rx_buf, len);
+		aahlog("LE command status not for us (ogf=0x%x ocf=0x%x):",
+			ogf, ocf);
 	}
 
 	return forus;

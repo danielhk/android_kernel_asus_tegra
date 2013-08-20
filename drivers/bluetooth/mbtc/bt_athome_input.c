@@ -192,15 +192,13 @@ int athome_bt_input_init(void)
 	int err;
 	size_t i;
 
-	if (athome_bt_input_init_debug()) {
-		aahlog_continue("Failed to create debugfs entries");
-	}
+	if (athome_bt_input_init_debug())
+		aahlog("Failed to create debugfs entries\n");
+
 	aahlog("touch filter, alpha = %d, beta = %d, enabled = %d\n",
 		filter_params.alpha, filter_params.beta, filter_params.enabled);
 
 	for (i = 0; i < ATHOME_RMT_MAX_CONNS; i++) {
-
-
 		scnprintf(inputs[i].uniq, sizeof(inputs[i].uniq),
 						"athome_bt_%d", i);
 

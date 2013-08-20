@@ -740,12 +740,11 @@ static int athome_bt_do_encrypt(int which, const uint8_t *LTK, bool initial)
 		return 0;
 	}
 
-	aahlog("KEY [%d]:", which);
-	for(i = 0; i < AAH_BT_LTK_SZ; i++) {
-		k[i] = get8LE(&parP);
-		aahlog_continue(" %02X", k[i]);
-	}
-	aahlog_continue("\n");
+	memcpy(k, parP, AAH_BT_LTK_SZ);
+	aahlog("KEY [%d]: %02X %02X %02X %02X %02X %02X %02X %02X"
+	       "%02X %02X %02X %02X %02X %02X %02X %02X\n", which,
+	       k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7],
+	       k[8], k[9], k[10], k[11], k[12], k[13], k[14], k[15]);
 
 	parP = buf;
 	put16LE(&parP, conns[which].handle);
@@ -978,7 +977,7 @@ static int athome_bt_data_rx(int which, uint8_t *in_data, uint32_t len)
 		}
 
 		if (LOG_INPUT_EVENTS)
-			aahlog_continue("}\n");
+			aahlog("}\n");
 		i = inp->info & ATHOME_INPUT_INFO_MASK_TIMESTAMP;
 
 		athome_bt_input_calculate_time(which,
@@ -1049,14 +1048,16 @@ static int athome_bt_data_rx(int which, uint8_t *in_data, uint32_t len)
 		athome_bt_led_show_event((msw->mode == ATHOME_MODE_ACTIVE)
 			? HACK_LED_EVENT_AWAKE : HACK_LED_EVENT_ASLEEP);
 		if (LOG_MODESWITCH) {
-			aahlog("Requested modeswitch to %d for conn %d",
-							msw->mode, which);
 			if (conns[which].pwr == ATHOME_MODE_ACTIVE) {
-				aahlog_continue(", #pkts_rx = %6llu, #pkts_input = %6llu\n",
-							conns[which].stats.pkts_rx,
-							conns[which].stats.input);
+				aahlog("Requested modeswitch to %d, conn %d, "
+				       "#pkts_rx = %6llu, "
+				       "#pkts_input = %6llu\n",
+				       msw->mode, which,
+				       conns[which].stats.pkts_rx,
+				       conns[which].stats.input);
 			} else {
-				aahlog_continue("\n");
+				aahlog("Requested modeswitch to %d, conn %d\n",
+				       msw->mode, which);
 			}
 		}
 		/* Deliberate fall-through to the default case in order to send
@@ -1467,13 +1468,13 @@ device_handled:
 			mode_settings = athome_bt_get_mode_settings(new_proto_ver, ATHOME_MODE_ACTIVE);
 			*is_scanning = false;
 			aahlog("Trying to connect to %02X:%02X"
-				":%02X:%02X:%02X:%02X (v%08X)",
-				mac.b[5], mac.b[4], mac.b[3], mac.b[2],
-				mac.b[1], mac.b[0], new_proto_ver);
-			aahlog_continue(", conn_scan interval = %d, window = %d",
-				AAH_BT_CONN_SCAN_INTERVAL, AAH_BT_SCAN_WINDOW);
-			aahlog_continue(", max event length (retries) = %d\n",
-				AAH_BT_MAX_EVENT_LENGTH);
+			       ":%02X:%02X:%02X:%02X (v%08X), "
+			       "conn_scan interval = %d, window = %d, "
+			       "max event length (retries) = %d\n",
+			       mac.b[5], mac.b[4], mac.b[3], mac.b[2],
+			       mac.b[1], mac.b[0], new_proto_ver,
+			       AAH_BT_CONN_SCAN_INTERVAL, AAH_BT_SCAN_WINDOW,
+			       AAH_BT_MAX_EVENT_LENGTH);
 			/* try to connect */
 			parP = buf;
 			put16LE(&parP, AAH_BT_CONN_SCAN_INTERVAL);   /* time between listens per channel */
