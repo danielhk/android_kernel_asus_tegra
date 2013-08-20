@@ -956,7 +956,7 @@ static int athome_bt_data_rx(int which, uint8_t *in_data, uint32_t len)
 
 	switch (type) {
 	case ATHOME_PKT_RX_INPUT:
-		if (LOG_INPUT_EVENTS)
+		if (LOG_INPUT_SPEW)
 			aahlog("[%d] input event with time %d and data: {\n",
 				which,
 				inp->info & ATHOME_INPUT_INFO_MASK_TIMESTAMP);
@@ -972,12 +972,12 @@ static int athome_bt_data_rx(int which, uint8_t *in_data, uint32_t len)
 		}
 		if (inp_btn) {
 			uint32_t buttons = r32LE(&inp_btn->btn_mask);
-			if (LOG_INPUT_EVENTS)
+			if (LOG_INPUT_SPEW)
 				aahlog(" -> buttons: 0x%08X\n", buttons);
 
 			if (!secure && (buttons & ~SECURE_BTN_MASK)) {
 				buttons &= SECURE_BTN_MASK;
-				if (LOG_INPUT_EVENTS)
+				if (LOG_INPUT_SPEW)
 					aahlog(" ->  now: 0x%08X\n", buttons);
 			}
 
@@ -1010,7 +1010,7 @@ static int athome_bt_data_rx(int which, uint8_t *in_data, uint32_t len)
 			}
 		}
 
-		if (LOG_INPUT_EVENTS)
+		if (LOG_INPUT_SPEW)
 			aahlog("}\n");
 		i = inp->info & ATHOME_INPUT_INFO_MASK_TIMESTAMP;
 
