@@ -144,11 +144,15 @@ static struct sk_buff_head rx_dat;
 static DECLARE_WAIT_QUEUE_HEAD(rx_wait); /* wait to get evt/data/chg */
 static atomic_t state_chg = ATOMIC_INIT(0);
 static atomic_t in_shutdown = ATOMIC_INIT(0);
-static DEFINE_SEMAPHORE(tx_wait); /* wait to send data */
+/* This reflects the credits we have for sending data.  We take
+ * one credit from the available pool.  The send code uses it
+ * to make sure we never send more than one data packet at a time.
+ */
+static DEFINE_SEMAPHORE(tx_credit);
 static struct task_struct *aah_thread = NULL;
-static struct semaphore cmd_wait = /* wait for command complete/status */
-					__SEMAPHORE_INITIALIZER(cmd_wait, 0);
-static DEFINE_SEMAPHORE(cmd_send); /* ensures <= 1 our cmd inflight */
+
+/* Completion for command response */
+static DECLARE_COMPLETION(cmd_response);
 
 /* protects the following data */
 static DEFINE_SPINLOCK(stack_state_lock);
@@ -158,6 +162,7 @@ static uint16_t inflight_ocf = INVALID;
 static struct athome_bt_conn conns[ATHOME_RMT_MAX_CONNS] = {{0,},};
 static uint8_t nconns = 0;
 static uint8_t *cmd_rsp_buf;
+static size_t cmd_rsp_buf_size;
 static bool devices_exist = false;
 
 /*
@@ -307,7 +312,7 @@ bool athome_bt_connection_went_down(uint16_t handle)
 	if (i >= 0) {
 		conns[i].gone = true;
 		if (conns[i].outstanding)
-			up(&tx_wait);
+			up(&tx_credit);
 		athome_bt_update_time_stats_l(i);
 		bacpy(&de.MAC, &conns[i].MAC);
 		memcpy(&de.stats, &conns[i].stats, sizeof(de.stats));
@@ -339,23 +344,26 @@ bool athome_bt_encr_refreshed(uint16_t handle)
 bool athome_bt_cmd_sta_or_compl(uint16_t ogf, uint16_t ocf,
 					const uint8_t *buf, uint32_t len)
 {
-	bool ret = false;
 	unsigned long flags;
-
+	/* Guarantee atomic update to these three globals
+	 * and that SMP access to them have fresh data.
+	 */
 	spin_lock_irqsave(&stack_state_lock, flags);
 	if (ogf == inflight_ogf && ocf == inflight_ocf) {
-
 		/* definitely a reply for us */
 		inflight_ogf = INVALID;
 		inflight_ocf = INVALID;
-		BUG_ON(!cmd_rsp_buf);
-		memcpy(cmd_rsp_buf, buf, len);
-		up(&cmd_wait);
-		ret = true;
+		if (cmd_rsp_buf_size > 0) {
+			WARN(len > cmd_rsp_buf_size,
+			     "ble response larger than rsp buf\n");
+			memcpy(cmd_rsp_buf, buf, min(cmd_rsp_buf_size, len));
+		}
+		spin_unlock_irqrestore(&stack_state_lock, flags);
+		complete(&cmd_response);
+		return true;
 	}
 	spin_unlock_irqrestore(&stack_state_lock, flags);
-
-	return ret;
+	return false;
 }
 
 bool athome_bt_compl_pkts(uint16_t handle, uint16_t num)
@@ -372,7 +380,7 @@ bool athome_bt_compl_pkts(uint16_t handle, uint16_t num)
 				aahlog("unexpected send on conn %d\n", i);
 			conns[i].outstanding = 0;
 			while(num--)
-				up(&tx_wait);
+				up(&tx_credit);
 		}
 		ret = true;
 	}
@@ -600,7 +608,7 @@ bool athome_bt_send_data(const bdaddr_t *macP, uint8_t typ,
 	packet[2] = typ | L2CAP_CHAN_ATHOME_BIT;
 
 	/* wait till we can send */
-	down(&tx_wait);
+	down(&tx_credit);
 
 	/* get handle info and record we're sending */
 	spin_lock_irqsave(&stack_state_lock, flags);
@@ -638,7 +646,7 @@ bool athome_bt_send_data(const bdaddr_t *macP, uint8_t typ,
 	if (which < 0) {
 
 		spin_unlock_irqrestore(&stack_state_lock, flags);
-		up(&tx_wait);
+		up(&tx_credit);
 
 		/* cannot send - we drop it */
 		aahlog("dropping impossible send request\n");
@@ -673,34 +681,32 @@ static int __attribute__((warn_unused_result))
 					uint8_t *dataOut)
 {
 	uint8_t cmd[255 + HCI_COMMAND_HDR_SIZE];
-	uint8_t rsp[255 + HCI_COMMAND_HDR_SIZE];
 	struct hci_command_hdr *hdr = (struct hci_command_hdr*)cmd;
 	unsigned long flags;
-	unsigned i;
 
-	for (i = 0; i < plen; i++)
-		cmd[i + HCI_COMMAND_HDR_SIZE] = dataIn[i];
-
+	memcpy(&cmd[HCI_COMMAND_HDR_SIZE], dataIn, plen);
 	hdr->plen = plen;
-	w16LE(&hdr->opcode, hci_opcode_pack(ogf, ocf));
+	hdr->opcode = cpu_to_le16(hci_opcode_pack(ogf, ocf));
 
-	/* make sure we don't send a cmd while we're also waiting */
-	down(&cmd_send);
+	/* this is only used by the le stack thread, so no locking
+	 * needed.
+	 */
+	BUG_ON(current != aah_thread);
 
+	/* Guarantee atomic update to the globals
+	 * and that SMP access to them have fresh data.
+	 */
 	spin_lock_irqsave(&stack_state_lock, flags);
 	BUG_ON(inflight_ogf != INVALID || inflight_ocf != INVALID);
 	inflight_ogf = ogf;
 	inflight_ocf = ocf;
-	cmd_rsp_buf = rsp;
+	cmd_rsp_buf = dataOut;
+	cmd_rsp_buf_size = outLen;
 	spin_unlock_irqrestore(&stack_state_lock, flags);
 
 	athome_bt_send_to_chip(HCI_COMMAND_PKT, cmd,
-						plen + HCI_COMMAND_HDR_SIZE);
-	down(&cmd_wait);
-	up(&cmd_send);
-
-	for (i = 0; i < outLen; i++)
-		dataOut[i] = rsp[i];
+			       plen + HCI_COMMAND_HDR_SIZE);
+	wait_for_completion(&cmd_response);
 
 	return atomic_read(&in_shutdown);
 }
@@ -721,6 +727,7 @@ static int athome_bt_do_encrypt(int which, const uint8_t *LTK, bool initial)
 		put8LE(&parP, LTK[i]);
 	for (i = 0; i < AAH_BT_ENTROPY_SZ; i++)
 		put8LE(&parP, conns[which].entropy[i]);
+
 	i = athome_bt_simple_cmd(HCI_OGF_LE, HCI_LE_Encrypt, parP - buf, buf,
 							sizeof(buf), buf);
 	if (i)
@@ -1162,7 +1169,6 @@ static int athome_bt_host_setup(void)
 	uint16_t aclBufSz;
 	uint8_t *parP;
 	uint err, i;
-
 
 	aahlog("host setup\n");
 	parP = buf;
@@ -1881,9 +1887,9 @@ void athome_bt_stack_shutdown(void)
 		aahlog("shutting down thread\n");
 		atomic_set(&in_shutdown, 1);
 		atomic_set(&state_chg, 1); /* force wake */
-		up(&cmd_wait);  /* make sure we're not waiting for a reply */
-		up(&cmd_send); /* make sure any waiting finishes */
-		up(&cmd_wait);  /* make sure we're not waiting for a reply */
+		/* unblock it if waiting for a cmd response */
+		complete_all(&cmd_response);
+		INIT_COMPLETION(cmd_response);
 		wake_up_interruptible(&rx_wait);
 		kthread_stop(aah_thread);
 		aahlog("thread shut down\n");
@@ -1900,12 +1906,10 @@ void athome_bt_stack_shutdown(void)
 
 	atomic_set(&state_chg, 0);
 
-	while(!down_trylock(&tx_wait));
-	up(&tx_wait);
-
-	while(!down_trylock(&cmd_wait));
-	while(!down_trylock(&cmd_send));
-	up(&cmd_send);
+	/* Reset tx_credit to a count of 1  */
+	while(!down_trylock(&tx_credit))
+		;
+	up(&tx_credit);
 
 	spin_lock_irqsave(&stack_state_lock, flags);
 	inflight_ogf = INVALID;
