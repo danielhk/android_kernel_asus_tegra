@@ -390,40 +390,23 @@ bool athome_bt_compl_pkts(uint16_t handle, uint16_t num)
 }
 
 /* pass i < 0 to do a lookup by mac */
-static void athome_bt_start_encr(const bdaddr_t *macP, int i)
+static void athome_bt_start_encr(int i)
 {
 	struct athome_tx_pkt_enc enc_pkt;
-	struct athome_bt_known_remote *K;
+	struct athome_bt_known_remote *remote;
 	unsigned long flags;
-	bool initial = false;
+	bool initial;
 
 	get_random_bytes(&enc_pkt.entropy, sizeof(enc_pkt.entropy));
 
 	spin_lock_irqsave(&stack_state_lock, flags);
-	if (i < 0) {
-		i = athome_bt_find_by_mac_l(macP);
-		if (i < 0) {
-			/* we failed to find it*/
-		} else if (conns[i].state == CONN_STATE_JUST_ESTABLISHED ||
-					conns[i].state == CONN_STATE_BINDING)
-			initial = true;
-		else if (conns[i].state != CONN_STATE_DATA)
-			i = -1;
-	} else {
+	BUG_ON(i >= ATHOME_RMT_MAX_CONNS);
+	initial = (conns[i].state == CONN_STATE_JUST_ESTABLISHED ||
+			conns[i].state == CONN_STATE_BINDING);
 
-		BUG_ON(i >= ATHOME_RMT_MAX_CONNS);
-		initial = (conns[i].state == CONN_STATE_JUST_ESTABLISHED ||
-					conns[i].state == CONN_STATE_BINDING);
-	}
-	if (i < 0) {
-		spin_unlock_irqrestore(&stack_state_lock, flags);
-		aahlog("start encr failed - no such connection\n");
-		return;
-	}
-
-	K = athome_bt_find_known(&conns[i].MAC);
-	if (K)
-		memcpy(conns[i].LTK, &K->LTK, sizeof(K->LTK));
+	remote = athome_bt_find_known(&conns[i].MAC);
+	if (remote)
+		memcpy(conns[i].LTK, &remote->LTK, sizeof(remote->LTK));
 	else {
 		spin_unlock_irqrestore(&stack_state_lock, flags);
 		aahlog("device unknown unexpectedly\n");
@@ -445,9 +428,36 @@ static void athome_bt_start_encr(const bdaddr_t *macP, int i)
 						sizeof(enc_pkt), false);
 }
 
+/* called by userland */
 void athome_bt_start_encr_for_mac(const bdaddr_t *macP)
 {
-	athome_bt_start_encr(macP, -1);
+	int i;
+	struct athome_bt_known_remote *remote;
+	unsigned long flags;
+
+	spin_lock_irqsave(&stack_state_lock, flags);
+	i = athome_bt_find_by_mac_l(macP);
+	if (i < 0) {
+		spin_unlock_irqrestore(&stack_state_lock, flags);
+		aahlog("start encr failed - no such connection\n");
+		return;
+	} else if (conns[i].state != CONN_STATE_JUST_ESTABLISHED &&
+		   conns[i].state != CONN_STATE_BINDING &&
+		   conns[i].state != CONN_STATE_DATA) {
+		spin_unlock_irqrestore(&stack_state_lock, flags);
+		aahlog("start encr failed - not in correct state,"
+		       " state is %d\n", conns[i].state);
+		return;
+	}
+	remote = athome_bt_find_known(&conns[i].MAC);
+	if (remote->bind_mode == 0) {
+		spin_unlock_irqrestore(&stack_state_lock, flags);
+		aahlog("start encr failed - half bound remote "
+		       "will be auto encrypted\n");
+		return;
+	}
+	spin_unlock_irqrestore(&stack_state_lock, flags);
+	athome_bt_start_encr(i);
 }
 
 void athome_bt_disc_from_mac(const bdaddr_t *macP)
@@ -857,6 +867,30 @@ static int athome_bt_data_rx(int which, uint8_t *in_data, uint32_t len)
 		if (i != AAH_BT_LTK_SZ) {
 			aahlog("entropy echo doesn't match(b %d) - drop\n", i);
 			conns[which].state = CONN_STATE_DISCONNECT;
+			aahlog("expected: %02x%02x%02x%02x%02x%02x%02x%02x"
+			       "%02x%02x%02x%02x%02x%02x%02x%02x\n",
+			       conns[which].entropy[0],
+			       conns[which].entropy[1],
+			       conns[which].entropy[2],
+			       conns[which].entropy[3],
+			       conns[which].entropy[4],
+			       conns[which].entropy[5],
+			       conns[which].entropy[6],
+			       conns[which].entropy[7],
+			       conns[which].entropy[8],
+			       conns[which].entropy[9],
+			       conns[which].entropy[10],
+			       conns[which].entropy[11],
+			       conns[which].entropy[12],
+			       conns[which].entropy[13],
+			       conns[which].entropy[14],
+			       conns[which].entropy[15]);
+			aahlog("received: %02x%02x%02x%02x%02x%02x%02x%02x"
+			       "%02x%02x%02x%02x%02x%02x%02x%02x\n",
+			       data[1], data[2], data[3], data[4],
+			       data[5], data[6], data[7], data[8],
+			       data[9], data[10], data[11], data[12],
+			       data[13], data[14], data[15], data[16]);
 			break;
 		}
 		aahlog("entropy echo ok - encryption approved\n");
@@ -1447,7 +1481,7 @@ device_handled:
 			spin_unlock_irqrestore( &stack_state_lock, flags);
 			return athome_bt_disconnect(handle);
 		} else if (need_encr)
-			athome_bt_start_encr(&ci->bdaddr, i);
+			athome_bt_start_encr(i);
 
 	} else if (evt->evt == HCI_EV_LE_META &&
 		meta->subevent ==

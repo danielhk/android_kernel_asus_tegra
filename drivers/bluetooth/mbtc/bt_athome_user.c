@@ -156,10 +156,21 @@ static int athome_bt_add_dev(const bdaddr_t *macP, const uint8_t *LTK)
 	}
 
 	if (LTK) {
-		item->bind_mode = 0;
 		memcpy(item->LTK, LTK, sizeof(item->LTK));
-	} else
+		aahlog("%s: MAC[%02x%02x%02x%02x%02x%02x], w/ LTK\n",
+		       __func__, macP->b[5], macP->b[4], macP->b[3],
+		       macP->b[2], macP->b[1], macP->b[0]);
+		if (cur && (cur->bind_mode == 1))
+			aahlog("adding LTK to an existing remote, "
+			       "leaving in bind_mode\n");
+		else
+			item->bind_mode = 0;
+	} else {
 		item->bind_mode = 1;
+		aahlog("%s: MAC[%02x%02x%02x%02x%02x%02x], w/o LTK\n",
+		       __func__, macP->b[5], macP->b[4], macP->b[3],
+		       macP->b[2], macP->b[1], macP->b[0]);
+	}
 	spin_unlock_irqrestore(&device_list_lock, flags);
 	return 0;
 }
