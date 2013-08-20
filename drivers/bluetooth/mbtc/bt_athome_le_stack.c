@@ -39,7 +39,7 @@
 
 /*
  * Increasing AAH_BT_ACTIVE_CONN_INTERVAL will reduce the quality of recorded audio and touch
- * but may improve WiFi bandwidth.
+ * but improves WiFi bandwidth.
  * Time interval is 1.25 msec per unit.
  *   6 =>  7.50 msec
  *   7 =>  8.75 msec
@@ -49,7 +49,7 @@
  *  11 => 13.75 msec
  *  12 => 15.00 msec
  */
-#define AAH_BT_ACTIVE_CONN_INTERVAL     7
+#define AAH_BT_ACTIVE_CONN_INTERVAL     8
 
 /*
  * The scan interval determines how often we will listen for advertising packets.
@@ -62,11 +62,11 @@
  *
  * Increasing the normal scan interval can improve WiFi bandwidth slightly.
  * But increasing it will also increase the time it takes for devices
- * to be discovered.
+ * to be discovered. But it is very quick in human time.
  */
 
 /* Scan interval while looking for the first device to connect with. */
-#define AAH_BT_NORMAL_SCAN_INTERVAL    (AAH_BT_ACTIVE_CONN_INTERVAL * 2 * 3)
+#define AAH_BT_NORMAL_SCAN_INTERVAL    (AAH_BT_ACTIVE_CONN_INTERVAL * 2 * 11)
 
 /* Scan interval while actively connecting to a remote device. */
 #define AAH_BT_CONN_SCAN_INTERVAL      (AAH_BT_ACTIVE_CONN_INTERVAL * 2 * 2)
