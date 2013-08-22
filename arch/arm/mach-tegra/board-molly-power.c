@@ -268,7 +268,7 @@ PALMAS_REGS_PDATA(ldoln, 3300, 3300, NULL, 0, 0, 1, 0,
 		  0, 0, 0, 0, 0);
 /* avdd_usb & hvdd_usb - 3.3V */
 PALMAS_REGS_PDATA(ldousb, 3300,  3300, NULL, 0, 0, 1, 0,
-		  0, PALMAS_EXT_CONTROL_NSLEEP, 0, 0, 0);
+		  0, 0, 0, 0, 0);
 
 #define PALMAS_REG_PDATA(_sname) (&reg_idata_##_sname)
 
