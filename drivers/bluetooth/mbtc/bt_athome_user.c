@@ -21,11 +21,7 @@
 #include "bt_athome_logging.h"
 #include "bt_athome_le_stack.h"
 
-
-
-
 #define MAX_USERSPACE_MSGS		128
-
 
 static struct semaphore usr_rx = /* num msgs avail to read by user */
 			__SEMAPHORE_INITIALIZER(usr_rx, 0);
@@ -44,8 +40,6 @@ static DECLARE_WAIT_QUEUE_HEAD(usr_wait_q);
 static DEFINE_SPINLOCK(device_list_lock);
 static struct athome_bt_known_remote *known = NULL;
 static bool usr_data_inited = false;
-
-
 
 /* only to be called with state lock held */
 static struct athome_bt_known_remote *athome_bt_find_known_l(
@@ -170,12 +164,10 @@ static int athome_bt_add_dev(const bdaddr_t *macP, const uint8_t *LTK)
 	return 0;
 }
 
-static void athome_bt_del_dev(const bdaddr_t *macP, bool bind_mode)
+static void athome_bt_del_dev_l(const bdaddr_t *macP, bool bind_mode)
 {
-	unsigned long flags;
 	struct athome_bt_known_remote *cur, *prev;
 
-	spin_lock_irqsave(&device_list_lock, flags);
 	cur = athome_bt_find_known_l(macP, &prev);
 	if (cur && (!cur->bind_mode == !bind_mode)) {
 
@@ -187,6 +179,14 @@ static void athome_bt_del_dev(const bdaddr_t *macP, bool bind_mode)
 	}
 
 	athome_bt_disc_from_mac(macP);
+}
+
+static void athome_bt_del_dev(const btaddr_t *macP, bool bind_mode)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&device_list_lock, flags);
+	athome_bt_del_dev_l(macP, bind_mode);
 	spin_unlock_irqrestore(&device_list_lock, flags);
 }
 
@@ -348,6 +348,7 @@ static unsigned int athome_bt_poll(struct file *file,
 
 static int athome_bt_release(struct inode *inode, struct file *file)
 {
+	unsigned long flags;
 	struct sk_buff *skb;
 
 	while (!skb_queue_empty(&usr_data)) {
@@ -355,10 +356,17 @@ static int athome_bt_release(struct inode *inode, struct file *file)
 		if (skb)
 			kfree_skb(skb);
 	}
-	while (!down_trylock(&usr_rx));
+
+	while (!down_trylock(&usr_rx))
+		;
 
 	atomic_set(&num_usr_msgs, 0);
 	atomic_set(&usr_opened, 0);
+
+	spin_lock_irqsave(&device_list_lock, flags);
+	while (known)
+		athome_bt_del_dev_l(known->MAC, known->bind_mode);
+	spin_unlock_irqrestore(&device_list_lock, flags);
 
 	return 0;
 }
