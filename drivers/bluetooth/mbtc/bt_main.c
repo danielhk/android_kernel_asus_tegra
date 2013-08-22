@@ -67,33 +67,33 @@ static char fw_version[32] = "0.0.0.p0";
 static struct class *chardev_class;
 
 /** Interface specific variables */
-static int mbtchar_minor = 0;
-static int fmchar_minor = 0;
-static int nfcchar_minor = 0;
-static int debugchar_minor = 0;
+static int mbtchar_minor;
+static int fmchar_minor;
+static int nfcchar_minor;
+static int debugchar_minor;
 
 /** Default Driver mode */
 static int drv_mode = (DRV_MODE_BT | DRV_MODE_FM | DRV_MODE_NFC);
 
 /** BT interface name */
-static char *bt_name = NULL;
+static char *bt_name;
 /** FM interface name */
-static char *fm_name = NULL;
+static char *fm_name;
 /** NFC interface name */
-static char *nfc_name = NULL;
+static char *nfc_name;
 /** BT debug interface name */
-static char *debug_name = NULL;
+static char *debug_name;
 
 /** Firmware flag */
 static int fw = 1;
 /** default powermode */
 static int psmode = 1;
 /** Init config file (MAC address, register etc.) */
-static char *init_cfg = NULL;
+static char *init_cfg;
 /** Calibration config file (MAC address, init powe etc.) */
-static char *cal_cfg = NULL;
+static char *cal_cfg;
 /** Init MAC address */
-static char *bt_mac = NULL;
+static char *bt_mac;
 
 /** Setting mbt_drvdbg value based on DEBUG level */
 #ifdef DEBUG_LEVEL1
@@ -115,7 +115,7 @@ static int debug_intf = 1;
 /** Enable minicard power-up/down */
 static int minicard_pwrup = 1;
 /** Pointer to struct with control hooks */
-struct wifi_platform_data *bt_control_data = NULL;
+static struct wifi_platform_data *bt_control_data;
 
 /**
  *  @brief Alloc bt device
@@ -211,6 +211,7 @@ free_m_dev(struct m_dev *m_dev)
 {
 	ENTER();
 	kfree(m_dev->dev_pointer);
+	m_dev->dev_pointer = NULL;
 	LEAVE();
 }
 
@@ -1029,9 +1030,9 @@ bt_load_cal_data(bt_private * priv, u8 * config_data, u8 * mac)
 	u8 ret = BT_STATUS_SUCCESS;
 	BT_CMD *pCmd;
 	int i = 0;
-	// u8 config_data[28] = {0x37 0x01 0x1c 0x00 0xFF 0xFF 0xFF 0xFF
-	// 0x01 0x7f 0x04 0x02 0x00 0x00 0xBA 0xCE
-	// 0xC0 0xC6 0x2D 0x00 0x00 0x00 0x00 0x00 0x00 0x00 0xF0};
+	/* u8 config_data[28] = {0x37 0x01 0x1c 0x00 0xFF 0xFF 0xFF 0xFF 0x01
+	   0x7f 0x04 0x02 0x00 0x00 0xBA 0xCE 0xC0 0xC6 0x2D 0x00 0x00 0x00
+	   0x00 0x00 0x00 0x00 0xF0}; */
 
 	ENTER();
 	skb = bt_skb_alloc(sizeof(BT_CMD), GFP_ATOMIC);
@@ -1047,12 +1048,12 @@ bt_load_cal_data(bt_private * priv, u8 * config_data, u8 * mac)
 	pCmd->data[1] = 0x00;
 	pCmd->data[2] = 0x00;
 	pCmd->data[3] = 0x1C;
-	// swip cal-data byte
+	/* swip cal-data byte */
 	for (i = 4; i < 32; i++) {
 		pCmd->data[i] = config_data[(i / 4) * 8 - 1 - i];
 	}
 	if (mac != NULL) {
-		pCmd->data[2] = 0x01;	// skip checksum
+		pCmd->data[2] = 0x01;	/* skip checksum */
 		for (i = 24; i < 30; i++)
 			pCmd->data[i] = mac[29 - i];
 	}
@@ -1239,6 +1240,40 @@ SendSinglePacket(bt_private * priv, struct sk_buff *skb)
 	ret = sbi_host_to_card(priv, skb->data, skb->len);
 	LEAVE();
 	return ret;
+}
+
+void
+update_stat_byte_tx(bt_private * priv, struct sk_buff *skb)
+{
+	if (((priv->bt_dev.m_dev[FM_SEQ].dev_pointer) &&
+	     (!strcmp
+	      (((struct m_dev *)skb->dev)->name,
+	       priv->bt_dev.m_dev[FM_SEQ].name))) ||
+	    ((priv->bt_dev.m_dev[NFC_SEQ].dev_pointer) &&
+	     (!strcmp
+	      (((struct m_dev *)skb->dev)->name,
+	       priv->bt_dev.m_dev[NFC_SEQ].name))))
+		((struct m_dev *)skb->dev)->stat.byte_tx += skb->len;
+	else
+		((struct hci_dev *)priv->bt_dev.m_dev[BT_SEQ].dev_pointer)->
+			stat.byte_tx += skb->len;
+}
+
+void
+update_stat_err_tx(bt_private * priv, struct sk_buff *skb)
+{
+	if (((priv->bt_dev.m_dev[FM_SEQ].dev_pointer) &&
+	     (!strcmp
+	      (((struct m_dev *)skb->dev)->name,
+	       priv->bt_dev.m_dev[FM_SEQ].name))) ||
+	    ((priv->bt_dev.m_dev[NFC_SEQ].dev_pointer) &&
+	     (!strcmp
+	      (((struct m_dev *)skb->dev)->name,
+	       priv->bt_dev.m_dev[NFC_SEQ].name))))
+		((struct m_dev *)skb->dev)->stat.err_tx++;
+	else
+		((struct hci_dev *)priv->bt_dev.m_dev[BT_SEQ].dev_pointer)->
+			stat.err_tx++;
 }
 
 /**
@@ -1755,6 +1790,11 @@ sbi_register_conf_dpc(bt_private * priv)
 				 "mbtchar%d", mbtchar_minor);
 		snprintf(dev_file, sizeof(dev_file), "/dev/%s", mbt_dev->name);
 		mbtchar_minor++;
+		PRINTM(MSG, "BT: Create %s\n", dev_file);
+
+		/** register m_dev to BT char device */
+		priv->bt_dev.m_dev[BT_SEQ].index = char_dev->minor;
+		char_dev->m_dev = &(priv->bt_dev.m_dev[BT_SEQ]);
 
 		/** create BT char device node */
 		register_char_dev(char_dev, chardev_class, MODULE_NAME,
@@ -1763,10 +1803,6 @@ sbi_register_conf_dpc(bt_private * priv)
 		/** chmod & chown for BT char device */
 		mbtchar_chown(dev_file, AID_SYSTEM, AID_BLUETOOTH);
 		mbtchar_chmod(dev_file, 0666);
-
-		/** register m_dev to BT char device */
-		priv->bt_dev.m_dev[BT_SEQ].index = char_dev->minor;
-		char_dev->m_dev = &(priv->bt_dev.m_dev[BT_SEQ]);
 
 		/** create proc device */
 		snprintf(priv->bt_dev.m_dev[BT_SEQ].name,
@@ -1812,7 +1848,12 @@ sbi_register_conf_dpc(bt_private * priv)
 			snprintf(fm_dev->name, sizeof(fm_dev->name),
 				 "mfmchar%d", fmchar_minor);
 		snprintf(dev_file, sizeof(dev_file), "/dev/%s", fm_dev->name);
+		PRINTM(MSG, "BT: Create %s\n", dev_file);
 		fmchar_minor++;
+
+		/** register m_dev to FM char device */
+		priv->bt_dev.m_dev[FM_SEQ].index = char_dev->minor;
+		char_dev->m_dev = &(priv->bt_dev.m_dev[FM_SEQ]);
 
 		/** register char dev */
 		register_char_dev(char_dev, chardev_class,
@@ -1820,10 +1861,6 @@ sbi_register_conf_dpc(bt_private * priv)
 
 		/** chmod for FM char device */
 		mbtchar_chmod(dev_file, 0666);
-
-		/** register m_dev to FM char device */
-		priv->bt_dev.m_dev[FM_SEQ].index = char_dev->minor;
-		char_dev->m_dev = &(priv->bt_dev.m_dev[FM_SEQ]);
 
 		/** create proc device */
 		snprintf(priv->bt_dev.m_dev[FM_SEQ].name,
@@ -1867,7 +1904,12 @@ sbi_register_conf_dpc(bt_private * priv)
 			snprintf(nfc_dev->name, sizeof(nfc_dev->name),
 				 "mnfcchar%d", nfcchar_minor);
 		snprintf(dev_file, sizeof(dev_file), "/dev/%s", nfc_dev->name);
+		PRINTM(MSG, "BT: Create %s\n", dev_file);
 		nfcchar_minor++;
+
+		/** register m_dev to NFC char device */
+		priv->bt_dev.m_dev[NFC_SEQ].index = char_dev->minor;
+		char_dev->m_dev = &(priv->bt_dev.m_dev[NFC_SEQ]);
 
 		/** register char dev */
 		register_char_dev(char_dev, chardev_class, MODULE_NAME,
@@ -1875,10 +1917,6 @@ sbi_register_conf_dpc(bt_private * priv)
 
 		/** chmod for NFC char device */
 		mbtchar_chmod(dev_file, 0666);
-
-		/** register m_dev to NFC char device */
-		priv->bt_dev.m_dev[NFC_SEQ].index = char_dev->minor;
-		char_dev->m_dev = &(priv->bt_dev.m_dev[NFC_SEQ]);
 
 		/** create proc device */
 		snprintf(priv->bt_dev.m_dev[NFC_SEQ].name,
@@ -2021,7 +2059,8 @@ bt_add_card(void *card)
 	}
 
 	/* allocate buffer for bt_adapter */
-	if (!(priv->adapter = kzalloc(sizeof(bt_adapter), GFP_KERNEL))) {
+	priv->adapter = kzalloc(sizeof(bt_adapter), GFP_KERNEL);
+	if (!priv->adapter) {
 		PRINTM(FATAL, "Allocate buffer for bt_adapter failed!\n");
 		goto err_kmalloc;
 	}
@@ -2060,6 +2099,7 @@ bt_add_card(void *card)
 	return priv;
 
 err_init_fw:
+	bt_proc_remove(priv);
 	PRINTM(INFO, "Unregister device\n");
 	sbi_unregister_dev(priv);
 err_registerdev:
@@ -2120,6 +2160,7 @@ bt_remove_card(void *card)
 		if (m_dev->spec_type == IANYWHERE_SPEC) {
 			if ((drv_mode & DRV_MODE_BT) && (mbtchar_minor > 0))
 				mbtchar_minor--;
+			m_dev->close(m_dev);
 			for (i = 0; i < 3; i++)
 				kfree_skb(((struct mbt_dev *)
 					   (m_dev->dev_pointer))->
@@ -2134,7 +2175,8 @@ bt_remove_card(void *card)
 		m_dev = &(priv->bt_dev.m_dev[FM_SEQ]);
 		if ((drv_mode & DRV_MODE_FM) && (fmchar_minor > 0))
 			fmchar_minor--;
-			/** unregister m_dev to char_dev */
+		m_dev->close(m_dev);
+		/** unregister m_dev to char_dev */
 		if (chardev_class)
 			chardev_cleanup_one(m_dev, chardev_class);
 		free_m_dev(m_dev);
@@ -2143,6 +2185,7 @@ bt_remove_card(void *card)
 		m_dev = &(priv->bt_dev.m_dev[NFC_SEQ]);
 		if ((drv_mode & DRV_MODE_NFC) && (nfcchar_minor > 0))
 			nfcchar_minor--;
+		m_dev->close(m_dev);
 		/** unregister m_dev to char_dev */
 		if (chardev_class)
 			chardev_cleanup_one(m_dev, chardev_class);
@@ -2296,11 +2339,11 @@ bt_init_module(void)
 {
 	int ret = BT_STATUS_SUCCESS;
 	ENTER();
-	bt_root_proc_init();
-	if (ret)
-		goto done;
+	PRINTM(MSG, "BT: Loading driver\n");
 
-		/** create char device class */
+	bt_root_proc_init();
+
+	/** create char device class */
 	chardev_class = class_create(THIS_MODULE, MODULE_NAME);
 	if (IS_ERR(chardev_class)) {
 		PRINTM(ERROR, "Unable to allocate class\n");
@@ -2311,10 +2354,16 @@ bt_init_module(void)
 
 	bt_add_dev();
 	if (sbi_register() == NULL) {
+		bt_root_proc_remove();
 		ret = BT_STATUS_FAILURE;
 		goto done;
 	}
 done:
+	if (ret)
+		PRINTM(MSG, "BT: Driver loading failed\n");
+	else
+		PRINTM(MSG, "BT: Driver loaded successfully\n");
+
 	LEAVE();
 	return ret;
 }
@@ -2328,13 +2377,13 @@ static void
 bt_exit_module(void)
 {
 	ENTER();
-	printk(KERN_ERR "+++++ enter func bt_exit_module() +++++\n");
-
+	PRINTM(MSG, "BT: Unloading driver\n");
 	sbi_unregister();
 
 	bt_root_proc_remove();
 	bt_del_dev();
 	class_destroy(chardev_class);
+	PRINTM(MSG, "BT: Driver unloaded\n");
 	LEAVE();
 }
 

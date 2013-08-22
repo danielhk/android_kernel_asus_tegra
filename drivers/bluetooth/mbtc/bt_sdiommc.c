@@ -33,9 +33,9 @@
 /** Max retry number of CMD53 write */
 #define MAX_WRITE_IOMEM_RETRY	2
 /** Firmware name */
-static char *fw_name = NULL;
+static char *fw_name;
 /** request firmware nowait */
-static int req_fw_nowait = 0;
+static int req_fw_nowait;
 static int multi_fn = BIT(2);
 /** Default firmware name */
 #define DEFAULT_FW_NAME "mrvl/sd8797_uapsta.bin"
@@ -59,7 +59,7 @@ MODULE_DEVICE_TABLE(sdio, bt_ids);
 		Global Variables
 ********************************************************/
 /** unregiser bus driver flag */
-static u8 unregister = 0;
+static u8 unregister;
 #ifdef SDIO_SUSPEND_RESUME
 /** PM keep power */
 extern int mbt_pm_keep_power;
@@ -345,7 +345,7 @@ sd_probe_card(struct sdio_func *func, const struct sdio_device_id *id)
 		goto done;
 	}
 	card->func = func;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,27)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)
 	/* wait for chip fully wake up */
 	if (!func->enable_timeout)
 		func->enable_timeout = 200;
@@ -385,7 +385,7 @@ done:
 int
 sd_verify_fw_download(bt_private * priv, int pollnum)
 {
-	int ret = BT_STATUS_SUCCESS;
+	int ret = BT_STATUS_FAILURE;
 	u16 firmwarestat;
 	int tries;
 
@@ -399,16 +399,10 @@ sd_verify_fw_download(bt_private * priv, int pollnum)
 			PRINTM(MSG, "BT FW is active(%d)\n", tries);
 			ret = BT_STATUS_SUCCESS;
 			break;
-		} else {
-			mdelay(100);
-			ret = BT_STATUS_FAILURE;
 		}
+		mdelay(100);
 	}
-	if (ret < 0)
-		goto done;
 
-	ret = BT_STATUS_SUCCESS;
-done:
 	LEAVE();
 	return ret;
 }
@@ -642,6 +636,7 @@ sd_request_fw_dpc(const struct firmware *fw_firmware, void *context)
 		PRINTM(ERROR,
 		       "BT: sd_init_fw_dpc failed (download fw with nowait: %d). Terminating download\n",
 		       req_fw_nowait);
+		sdio_release_host(card->func);
 		ret = BT_STATUS_FAILURE;
 		goto done;
 	}
@@ -650,6 +645,7 @@ sd_request_fw_dpc(const struct firmware *fw_firmware, void *context)
 	if (sd_verify_fw_download(priv, MAX_FIRMWARE_POLL_TRIES)) {
 		PRINTM(ERROR, "BT: FW failed to be active in time!\n");
 		ret = BT_STATUS_FAILURE;
+		sdio_release_host(card->func);
 		goto done;
 	}
 	sdio_release_host(card->func);
@@ -661,7 +657,7 @@ sd_request_fw_dpc(const struct firmware *fw_firmware, void *context)
 		goto done;
 	}
 	if (fw_firmware) {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,32)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 32)
 		if (!req_fw_nowait)
 #endif
 			release_firmware(fw_firmware);
@@ -671,7 +667,7 @@ sd_request_fw_dpc(const struct firmware *fw_firmware, void *context)
 
 done:
 	if (fw_firmware) {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,32)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 32)
 		if (!req_fw_nowait)
 #endif
 			release_firmware(fw_firmware);
@@ -679,7 +675,6 @@ done:
 	/* For synchronous download cleanup will be done in add_card */
 	if (!req_fw_nowait)
 		return ret;
-	sdio_release_host(card->func);
 	PRINTM(INFO, "unregister device\n");
 	sbi_unregister_dev(priv);
 	((struct sdio_mmc_card *)card)->priv = NULL;
@@ -739,25 +734,24 @@ sd_download_firmware_w_helper(bt_private * priv)
 	cur_fw_name = fw_name;
 
 	if (req_fw_nowait) {
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,32)
-		if ((ret =
-		     request_firmware_nowait(THIS_MODULE, FW_ACTION_HOTPLUG,
-					     cur_fw_name, priv->hotplug_device,
-					     GFP_KERNEL, priv,
-					     sd_request_fw_callback)) < 0)
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 32)
+		ret = request_firmware_nowait(THIS_MODULE, FW_ACTION_HOTPLUG,
+					      cur_fw_name, priv->hotplug_device,
+					      GFP_KERNEL, priv,
+					      sd_request_fw_callback);
 #else
-		if ((ret =
-		     request_firmware_nowait(THIS_MODULE, FW_ACTION_HOTPLUG,
-					     cur_fw_name, priv->hotplug_device,
-					     priv, sd_request_fw_callback)) < 0)
+		ret = request_firmware_nowait(THIS_MODULE, FW_ACTION_HOTPLUG,
+					      cur_fw_name, priv->hotplug_device,
+					      priv, sd_request_fw_callback);
 #endif
+		if (ret < 0)
 			PRINTM(FATAL,
 			       "BT: request_firmware_nowait() failed, error code = %#x\n",
 			       ret);
 	} else {
-		if ((err =
-		     request_firmware(&priv->firmware, cur_fw_name,
-				      priv->hotplug_device)) < 0) {
+		err = request_firmware(&priv->firmware, cur_fw_name,
+				       priv->hotplug_device);
+		if (err < 0) {
 			PRINTM(FATAL,
 			       "BT: request_firmware() failed, error code = %#x\n",
 			       err);
@@ -1071,7 +1065,7 @@ sd_card_to_host(bt_private * priv)
 		}
 		break;
 	case MRVL_VENDOR_PKT:
-		// Just think here need to back compatible FM
+		/* Just think here need to back compatible FM */
 		bt_cb(skb)->pkt_type = HCI_VENDOR_PKT;
 		skb_put(skb, buf_len);
 		skb_pull(skb, BT_HEADER_LEN);
@@ -1755,7 +1749,6 @@ sbi_download_fw(bt_private * priv)
 	if (sd_download_firmware_w_helper(priv)) {
 		PRINTM(INFO, "BT: FW download failed!\n");
 		ret = BT_STATUS_FAILURE;
-		goto done;
 	}
 	goto exit;
 done:
@@ -1772,8 +1765,6 @@ err_register:
 		free_m_dev(m_dev_fm);
 	if (m_dev_nfc->dev_pointer)
 		free_m_dev(m_dev_nfc);
-	if (priv->adapter)
-		bt_free_adapter(priv);
 	LEAVE();
 	return ret;
 }

@@ -30,7 +30,7 @@
 			 || ('A' <= (c) && (c) <= 'F'))
 
 #define isdigit(c)	(('0' <= (c) && (c) <= '9'))
-#define isspace(c)  (c <= ' ' && (c == ' ' || (c <= 13 && c >=9)))
+#define isspace(c)  (c <= ' ' && (c == ' ' || (c <= 13 && c >= 9)))
 /**
  *  @brief Returns hex value of a give character
  *
@@ -116,7 +116,7 @@ bt_strsep(char **s, char delim, char esc)
  *  @return	hex value
  */
 static int
-bt_atox(char *a)
+bt_atox(const char *a)
 {
 	int i = 0;
 	ENTER();
@@ -199,35 +199,43 @@ bt_atoi(int *data, char *a)
  *
  *  @return        BT_STATUS_SUCCESS or BT_STATUS_FAILURE
  */
-static u32
-bt_parse_cal_cfg(u8 * src, u32 len, u8 * dst, u32 dst_size)
+static int
+bt_parse_cal_cfg(const u8 * src, u32 len, u8 * dst, u32 dst_size)
 {
-	u8 *ptr;
+	const u8 *ptr;
 	u8 *dptr;
+	int ret = BT_STATUS_FAILURE;
 
 	ENTER();
 	ptr = src;
 	dptr = dst;
 
-	while (ptr - src < len) {
-		if (*ptr && (isspace(*ptr) || *ptr == '\t')) {
+	while ((ptr - src) < len) {
+		if (*ptr && isspace(*ptr)) {
 			ptr++;
 			continue;
 		}
 
 		if (isxdigit(*ptr)) {
+			if ((dptr - dst) >= dst_size) {
+				PRINTM(ERROR, "cal_file size too big!!!\n");
+				goto done;
+			}
 			*dptr++ = bt_atox(ptr);
 			ptr += 2;
 		} else {
 			ptr++;
 		}
-		if ((dptr - dst) > dst_size) {
-			PRINTM(ERROR, "cal_file size too big!!!\n");
-			break;
-		}
 	}
+	if (dptr == dst) {
+		ret = BT_STATUS_FAILURE;
+		goto done;
+	}
+
+	ret = BT_STATUS_SUCCESS;
+done:
 	LEAVE();
-	return (dptr - dst);
+	return ret;
 }
 
 /**
@@ -241,7 +249,7 @@ bt_parse_cal_cfg(u8 * src, u32 len, u8 * dst, u32 dst_size)
 int
 parse_cfg_get_line(u8 * data, u32 size, u8 * line_pos)
 {
-	static s32 pos = 0;
+	static s32 pos;
 	u8 *src, *dest;
 
 	if (pos >= size) {	/* reach the end */
@@ -490,10 +498,14 @@ bt_process_cal_cfg(bt_private * priv, u8 * data, u32 size, char *mac)
 {
 	u8 bt_mac[ETH_ALEN];
 	u8 cal_data[32];
+	u8 *mac_data = NULL;
 	int ret = BT_STATUS_FAILURE;
 
 	memset(bt_mac, 0, sizeof(bt_mac));
-	bt_parse_cal_cfg(data, size, cal_data, sizeof(cal_data));
+	if (BT_STATUS_SUCCESS !=
+	    bt_parse_cal_cfg(data, size, cal_data, sizeof(cal_data))) {
+		goto done;
+	}
 	if (mac != NULL) {
 		/* Convert MAC format */
 		bt_mac2u8(bt_mac, mac);
@@ -501,18 +513,12 @@ bt_process_cal_cfg(bt_private * priv, u8 * data, u32 size, char *mac)
 		       "HCI: new BT Address %02x:%02x:%02x:%02x:%02x:%02x\n",
 		       bt_mac[0], bt_mac[1], bt_mac[2], bt_mac[3], bt_mac[4],
 		       bt_mac[5]);
-		if (BT_STATUS_SUCCESS !=
-		    bt_load_cal_data(priv, cal_data, bt_mac)) {
-			PRINTM(FATAL, "BT: Fail to load calibrate data\n");
-			goto done;
-		}
-	} else {
-		if (BT_STATUS_SUCCESS != bt_load_cal_data(priv, cal_data, NULL)) {
-			PRINTM(FATAL, "BT: Fail to load calibrate data\n");
-			goto done;
-		}
+		mac_data = bt_mac;
 	}
-
+	if (BT_STATUS_SUCCESS != bt_load_cal_data(priv, cal_data, mac_data)) {
+		PRINTM(FATAL, "BT: Fail to load calibrate data\n");
+		goto done;
+	}
 	ret = BT_STATUS_SUCCESS;
 
 done:

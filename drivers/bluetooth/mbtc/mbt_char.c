@@ -178,6 +178,10 @@ chardev_write(struct file * filp, const char *buf, size_t count, loff_t * f_pos)
 		LEAVE();
 		return -ENXIO;
 	}
+	if (!test_bit(HCI_UP, &m_dev->flags)) {
+		LEAVE();
+		return -EBUSY;
+	}
 	nwrite = count;
 	skb = bt_skb_alloc(count, GFP_ATOMIC);
 	if (!skb) {
@@ -364,8 +368,8 @@ chardev_open(struct inode *inode, struct file *filp)
 
 	dev = container_of(inode->i_cdev, struct char_dev, cdev);
 	if (!dev->m_dev) {
-		ret = -ENXIO;
-		goto done;
+		LEAVE();
+		return -ENXIO;
 	}
 	filp->private_data = dev;	/* for other methods */
 	m_dev = dev->m_dev;
