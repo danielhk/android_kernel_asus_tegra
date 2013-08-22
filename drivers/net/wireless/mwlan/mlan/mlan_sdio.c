@@ -512,22 +512,18 @@ wlan_prog_fw_w_helper(IN pmlan_adapter pmadapter, IN pmlan_fw_image pmfw)
 			break;
 
 		for (tries = 0; tries < MAX_POLL_TRIES; tries++) {
-			if ((ret = pcb->moal_read_reg(pmadapter->pmoal_handle,
-						      READ_BASE_0_REG,
-						      &base0)) !=
-			    MLAN_STATUS_SUCCESS) {
-				PRINTM(MERROR,
-				       "Dev BASE0 register read failed:"
+			ret = pcb->moal_read_reg(pmadapter->pmoal_handle,
+						 READ_BASE_0_REG, &base0);
+			if (ret != MLAN_STATUS_SUCCESS) {
+				PRINTM(MERROR, "Dev BASE0 register read failed:"
 				       " base0=0x%04X(%d). Terminating download\n",
 				       base0, base0);
 				goto done;
 			}
-			if ((ret = pcb->moal_read_reg(pmadapter->pmoal_handle,
-						      READ_BASE_1_REG,
-						      &base1)) !=
-			    MLAN_STATUS_SUCCESS) {
-				PRINTM(MERROR,
-				       "Dev BASE1 register read failed:"
+			ret = pcb->moal_read_reg(pmadapter->pmoal_handle,
+						 READ_BASE_1_REG, &base1);
+			if (ret != MLAN_STATUS_SUCCESS) {
+				PRINTM(MERROR, "Dev BASE1 register read failed:"
 				       " base1=0x%04X(%d). Terminating download\n",
 				       base1, base1);
 				goto done;
@@ -1146,8 +1142,8 @@ wlan_check_fw_status(mlan_adapter * pmadapter, t_u32 pollnum)
 
 	/* Wait for firmware initialization event */
 	for (tries = 0; tries < pollnum; tries++) {
-		if (MLAN_STATUS_SUCCESS !=
-		    (ret = wlan_sdio_read_fw_status(pmadapter, &firmwarestat)))
+		ret = wlan_sdio_read_fw_status(pmadapter, &firmwarestat);
+		if (MLAN_STATUS_SUCCESS != ret)
 			continue;
 		if (firmwarestat == FIRMWARE_READY) {
 			ret = MLAN_STATUS_SUCCESS;

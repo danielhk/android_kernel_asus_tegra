@@ -29,22 +29,23 @@ Change log:
 #ifdef STA_SUPPORT
 /** Approximate amount of data needed to pass a scan result back to iwlist */
 #define MAX_SCAN_CELL_SIZE  (IW_EV_ADDR_LEN             \
-                             + MLAN_MAX_SSID_LENGTH   \
-                             + IW_EV_UINT_LEN           \
-                             + IW_EV_FREQ_LEN           \
-                             + IW_EV_QUAL_LEN           \
-                             + MLAN_MAX_SSID_LENGTH    \
-                             + IW_EV_PARAM_LEN          \
-                             + 40)	/* 40 for WPAIE */
+							+ MLAN_MAX_SSID_LENGTH      \
+							+ IW_EV_UINT_LEN            \
+							+ IW_EV_FREQ_LEN            \
+							+ IW_EV_QUAL_LEN            \
+							+ MLAN_MAX_SSID_LENGTH      \
+							+ IW_EV_PARAM_LEN           \
+							+ 40)	/* 40 for WPAIE
+								 */
 /** Macro for minimum size of scan buffer */
 #define MIN_ACCEPTED_GET_SCAN_BUF 8000
 
 /********************************************************
-                Global Variables
+			Global Variables
 ********************************************************/
 extern int hw_test;
 /********************************************************
-                Local Functions
+			Local Functions
 ********************************************************/
 
 /**
@@ -712,7 +713,8 @@ woal_set_power(struct net_device *dev, struct iw_request_info *info,
 	if (MLAN_STATUS_SUCCESS != woal_set_get_power_mgmt(priv,
 							   MLAN_ACT_SET,
 							   &disabled,
-							   vwrq->flags)) {
+							   vwrq->flags,
+							   MOAL_IOCTL_WAIT)) {
 		ret = -EFAULT;
 	}
 
@@ -741,7 +743,8 @@ woal_get_power(struct net_device *dev, struct iw_request_info *info,
 
 	if (MLAN_STATUS_SUCCESS != woal_set_get_power_mgmt(priv,
 							   MLAN_ACT_GET,
-							   &ps_mode, 0)) {
+							   &ps_mode, 0,
+							   MOAL_IOCTL_WAIT)) {
 		ret = -EFAULT;
 	}
 
@@ -1605,7 +1608,7 @@ woal_set_auth(struct net_device *dev, struct iw_request_info *info,
 		    woal_set_wpa_enable(priv, MOAL_IOCTL_WAIT, vwrq->value))
 			ret = -EFAULT;
 		break;
-#define IW_AUTH_WAPI_ENABLED    0x20
+#define IW_AUTH_WAPI_ENABLED	0x20
 	case IW_AUTH_WAPI_ENABLED:
 		if (MLAN_STATUS_SUCCESS !=
 		    woal_set_wapi_enable(priv, MOAL_IOCTL_WAIT, vwrq->value))
@@ -1624,7 +1627,7 @@ woal_set_auth(struct net_device *dev, struct iw_request_info *info,
 	case IW_AUTH_RX_UNENCRYPTED_EAPOL:
 	case IW_AUTH_ROAMING_CONTROL:
 	case IW_AUTH_PRIVACY_INVOKED:
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,29)
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 29)
 	case IW_AUTH_MFP:
 #endif
 		break;
@@ -1743,7 +1746,7 @@ woal_set_pmksa(struct net_device *dev, struct iw_request_info *info,
  *  Infra       G(12)           A(8)    B(4)    G(12)
  *  Adhoc       A+B(12)         A(8)    B(4)    B(4)
  *      non-MULTI_BANDS:
-                                        b       b/g
+										b       b/g
  *  Infra                               B(4)    G(12)
  *  Adhoc                               B(4)    B(4)
  */
@@ -1770,7 +1773,8 @@ woal_get_range(struct net_device *dev, struct iw_request_info *info,
 
 	ENTER();
 
-	if (!(pchan_list = kmalloc(sizeof(mlan_chan_list), GFP_KERNEL))) {
+	pchan_list = kmalloc(sizeof(mlan_chan_list), GFP_KERNEL);
+	if (!pchan_list) {
 		LEAVE();
 		return -ENOMEM;
 	}
@@ -1981,11 +1985,17 @@ woal_set_priv(struct net_device *dev, struct iw_request_info *info,
 	mlan_bss_info bss_info;
 	mlan_ds_get_signal signal;
 	mlan_rate_cfg_t rate;
-	char *pdata;
+	char *pdata = NULL;
 	t_u8 country_code[COUNTRY_CODE_LEN];
 	int len = 0;
 	ENTER();
-	if (!(buf = kmalloc(dwrq->length + 1, GFP_KERNEL))) {
+	if (!priv || !priv->phandle) {
+		PRINTM(MERROR, "priv or handle is NULL\n");
+		ret = -EFAULT;
+		goto done;
+	}
+	buf = kmalloc(dwrq->length + 1, GFP_KERNEL);
+	if (!buf) {
 		ret = -ENOMEM;
 		goto done;
 	}
@@ -2143,16 +2153,16 @@ woal_set_priv(struct net_device *dev, struct iw_request_info *info,
 	} else if (strncmp(buf, "RXFILTER-START", strlen("RXFILTER-START")) ==
 		   0) {
 #ifdef MEF_CFG_RX_FILTER
-		if ((ret = woal_set_rxfilter(priv, MTRUE))) {
+		ret = woal_set_rxfilter(priv, MTRUE);
+		if (ret)
 			goto done;
-		}
 #endif
 		len = sprintf(buf, "OK\n") + 1;
 	} else if (strncmp(buf, "RXFILTER-STOP", strlen("RXFILTER-STOP")) == 0) {
 #ifdef MEF_CFG_RX_FILTER
-		if ((ret = woal_set_rxfilter(priv, MFALSE))) {
+		ret = woal_set_rxfilter(priv, MFALSE);
+		if (ret)
 			goto done;
-		}
 #endif
 		len = sprintf(buf, "OK\n") + 1;
 	} else if (strncmp(buf, "RXFILTER-ADD", strlen("RXFILTER-ADD")) == 0) {
@@ -2528,7 +2538,8 @@ woal_get_scan(struct net_device *dev, struct iw_request_info *info,
 		return -EAGAIN;
 	}
 
-	if (!(buf = kmalloc((buf_size), GFP_KERNEL))) {
+	buf = kmalloc((buf_size), GFP_KERNEL);
+	if (!buf) {
 		PRINTM(MERROR, "Cannot allocate buffer!\n");
 		ret = -EFAULT;
 		goto done;
@@ -2932,7 +2943,7 @@ static const iw_handler woal_private_handler[] = {
 #endif /* STA_SUPPORT */
 
 /********************************************************
-                Global Functions
+			Global Functions
 ********************************************************/
 
 #if WIRELESS_EXT > 14
@@ -3005,47 +3016,6 @@ woal_send_mic_error_event(moal_private * priv, t_u32 event)
 #endif
 
 #ifdef STA_SUPPORT
-/**
- *  @brief Set Radio On/OFF
- *
- *  @param priv                 A pointer to moal_private structure
- *  @param option               Radio Option
- *
- *  @return                     0 --success, otherwise fail
- */
-int
-woal_set_radio(moal_private * priv, t_u8 option)
-{
-	int ret = 0;
-	mlan_ds_radio_cfg *radio = NULL;
-	mlan_ioctl_req *req = NULL;
-	ENTER();
-	if ((option != 0) && (option != 1)) {
-		ret = -EINVAL;
-		goto done;
-	}
-	req = woal_alloc_mlan_ioctl_req(sizeof(mlan_ds_radio_cfg));
-	if (req == NULL) {
-		ret = -ENOMEM;
-		goto done;
-	}
-	radio = (mlan_ds_radio_cfg *) req->pbuf;
-	radio->sub_command = MLAN_OID_RADIO_CTRL;
-	req->req_id = MLAN_IOCTL_RADIO_CFG;
-	req->action = MLAN_ACT_SET;
-	radio->param.radio_on_off = option;
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
-		ret = -EFAULT;
-		goto done;
-	}
-done:
-	if (req)
-		kfree(req);
-	LEAVE();
-	return ret;
-}
-
 /** wlan_handler_def */
 struct iw_handler_def woal_handler_def = {
 num_standard:sizeof(woal_handler) / sizeof(iw_handler),

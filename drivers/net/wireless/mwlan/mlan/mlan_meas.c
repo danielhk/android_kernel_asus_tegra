@@ -50,7 +50,7 @@ static const char *meas_type_str[WLAN_MEAS_NUM_TYPES] = {
 };
 
 /********************************************************
-                Local Functions
+			Local Functions
 ********************************************************/
 
 /**
@@ -78,7 +78,8 @@ wlan_meas_get_meas_type_str(MeasType_t meas_type)
  *
  *  @return          N/A
  */
-static void
+static
+	void
 wlan_meas_dump_meas_req(const HostCmd_DS_MEASUREMENT_REQUEST * pmeas_req)
 {
 	ENTER();
@@ -128,7 +129,8 @@ wlan_meas_dump_meas_req(const HostCmd_DS_MEASUREMENT_REQUEST * pmeas_req)
  *
  *  @return          N/A
  */
-static void
+static
+	void
 wlan_meas_dump_meas_rpt(const HostCmd_DS_MEASUREMENT_REPORT * pmeas_rpt)
 {
 	ENTER();
@@ -312,7 +314,7 @@ wlan_meas_cmd_get_report(mlan_private * pmpriv, HostCmd_DS_COMMAND * pcmd_ptr)
 }
 
 /********************************************************
-                Global functions
+			Global functions
 ********************************************************/
 
 /**
@@ -346,7 +348,7 @@ wlan_meas_util_send_req(mlan_private * pmpriv,
 			t_u32 wait_for_resp_timeout, pmlan_ioctl_req pioctl_req,
 			HostCmd_DS_MEASUREMENT_REPORT * pmeas_rpt)
 {
-	static t_u8 auto_dialog_tok = 0;
+	static t_u8 auto_dialog_tok;
 	wlan_meas_state_t *pmeas_state = &pmpriv->adapter->state_meas;
 	int ret;
 

@@ -23,6 +23,9 @@
 Change log:
     01/05/2012: initial version
 ********************************************************/
+#if defined(STA_CFG80211) || defined(UAP_CFG80211)
+#include    "moal_cfg80211.h"
+#endif
 
 #ifndef _WOAL_ETH_PRIV_H_
 #define _WOAL_ETH_PRIV_H_
@@ -182,6 +185,8 @@ Change log:
 #define PRIV_CMD_PORT_CTRL      "port_ctrl"
 #define PRIV_CMD_PB_BYPASS      "pb_bypass"
 #define PRIV_CMD_SD_CMD53_RW        "sdcmd53rw"
+#if defined(WIFI_DIRECT_SUPPORT)
+#endif
 
 /** Private command ID for Android default commands */
 #define	WOAL_ANDROID_DEF_CMD        (SIOCDEVPRIVATE + 1)
@@ -208,8 +213,7 @@ int woal_do_ioctl(struct net_device *dev, struct ifreq *req, int cmd);
  * kernel updates "used_len" during copy_to_user
  */
 /** Private command structure from app */
-typedef struct _android_wifi_priv_cmd
-{
+typedef struct _android_wifi_priv_cmd {
     /** Buffer pointer */
 	char *buf;
     /** buffer updated by driver */
@@ -267,8 +271,7 @@ typedef struct _android_wifi_priv_cmd
 #define MW_AUTH_ALG_LEAP    0x00000004
 
 /* Generic format for most parameters that fit in an int */
-struct mw_param
-{
+struct mw_param {
 	t_s32 value;		/* The value of the parameter itself */
 	t_u8 fixed;		/* Hardware should not use auto select */
 	t_u8 disabled;		/* Disable the feature */
@@ -279,8 +282,7 @@ struct mw_param
  *  For all data larger than 16 octets, we need to use a
  *  pointer to memory allocated in user space.
  */
-struct mw_point
-{
+struct mw_point {
 	t_u8 *pointer;		/* Pointer to the data (in user space) */
 	t_u16 length;		/* number of fields or size in bytes */
 	t_u16 flags;		/* Optional params */
@@ -290,8 +292,7 @@ struct mw_point
  * This structure defines the payload of an ioctl, and is used
  * below.
  */
-union mwreq_data
-{
+union mwreq_data {
 	/* Config - generic */
 	char name[IFNAMSIZ];
 
@@ -304,10 +305,8 @@ union mwreq_data
 };
 
  /* The structure to exchange data for ioctl */
-struct mwreq
-{
-	union
-	{
+struct mwreq {
+	union {
 		char ifrn_name[IFNAMSIZ];	/* if name, e.g. "eth0" */
 	} ifr_ifrn;
 
@@ -315,14 +314,12 @@ struct mwreq
 	union mwreq_data u;
 };
 
-typedef struct woal_priv_ht_cap_info
-{
+typedef struct woal_priv_ht_cap_info {
 	t_u32 ht_cap_info_bg;
 	t_u32 ht_cap_info_a;
 } woal_ht_cap_info;
 
-typedef struct woal_priv_addba
-{
+typedef struct woal_priv_addba {
 	t_u32 time_out;
 	t_u32 tx_win_size;
 	t_u32 rx_win_size;
@@ -331,16 +328,14 @@ typedef struct woal_priv_addba
 } woal_addba;
 
 /** data structure for cmd txratecfg */
-typedef struct woal_priv_tx_rate_cfg
-{
+typedef struct woal_priv_tx_rate_cfg {
 	/* LG rate: 0, HT rate: 1, VHT rate: 2 */
 	t_u32 rate_format;
     /** Rate/MCS index (0xFF: auto) */
 	t_u32 rate_index;
 } woal_tx_rate_cfg;
 
-typedef struct woal_priv_esuppmode_cfg
-{
+typedef struct woal_priv_esuppmode_cfg {
 	/* RSN mode */
 	t_u16 rsn_mode;
 	/* Pairwise cipher */

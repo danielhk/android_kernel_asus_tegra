@@ -35,7 +35,7 @@ Change log:
 #include "mlan_11h.h"
 
 /********************************************************
-                Local Constants
+			Local Constants
 ********************************************************/
 
 /** The maximum number of channels the firmware can scan per command */
@@ -51,36 +51,37 @@ Change log:
 
 /** Memory needed to store a max sized Channel List TLV for a firmware scan */
 #define CHAN_TLV_MAX_SIZE  (sizeof(MrvlIEtypesHeader_t)                  \
-                            + (MRVDRV_MAX_CHANNELS_PER_SPECIFIC_SCAN     \
-                               * sizeof(ChanScanParamSet_t)))
+				+ (MRVDRV_MAX_CHANNELS_PER_SPECIFIC_SCAN \
+				* sizeof(ChanScanParamSet_t)))
 
 /** Memory needed to store supported rate */
 #define RATE_TLV_MAX_SIZE   (sizeof(MrvlIEtypes_RatesParamSet_t) + HOSTCMD_SUPPORTED_RATES)
 
 /** Memory needed to store a max number/size WildCard SSID TLV for a firmware scan */
-#define WILDCARD_SSID_TLV_MAX_SIZE  \
-            (MRVDRV_MAX_SSID_LIST_LENGTH  * (sizeof(MrvlIEtypes_WildCardSsIdParamSet_t) + MRVDRV_MAX_SSID_LENGTH))
+#define WILDCARD_SSID_TLV_MAX_SIZE                     \
+		(MRVDRV_MAX_SSID_LIST_LENGTH  *                \
+		 (sizeof(MrvlIEtypes_WildCardSsIdParamSet_t) + \
+		  MRVDRV_MAX_SSID_LENGTH))
 
 /** WPS TLV MAX size is MAX IE size plus 2 bytes for t_u16 MRVL TLV extension */
 #define WPS_TLV_MAX_SIZE   (sizeof(IEEEtypes_VendorSpecific_t) + 2)
 /** Maximum memory needed for a wlan_scan_cmd_config with all TLVs at max */
 #define MAX_SCAN_CFG_ALLOC (sizeof(wlan_scan_cmd_config)        \
-                            + sizeof(MrvlIEtypes_NumProbes_t)   \
-                            + sizeof(MrvlIETypes_HTCap_t)       \
-                            + CHAN_TLV_MAX_SIZE                 \
-                            + RATE_TLV_MAX_SIZE                 \
-                            + WILDCARD_SSID_TLV_MAX_SIZE        \
-                            + WPS_TLV_MAX_SIZE)
+				+ sizeof(MrvlIEtypes_NumProbes_t)   \
+				+ sizeof(MrvlIETypes_HTCap_t)       \
+				+ CHAN_TLV_MAX_SIZE                 \
+				+ RATE_TLV_MAX_SIZE                 \
+				+ WILDCARD_SSID_TLV_MAX_SIZE        \
+				+ WPS_TLV_MAX_SIZE)
 
 /********************************************************
-                Local Variables
+			Local Variables
 ********************************************************/
 
 /**
  * Interally used to send a configured scan cmd between driver routines
  */
-typedef union
-{
+typedef union {
     /** Scan configuration (variable length) */
 	wlan_scan_cmd_config config;
     /** Max allocated block */
@@ -88,15 +89,14 @@ typedef union
 } wlan_scan_cmd_config_tlv;
 
 /********************************************************
-                Global Variables
+			Global Variables
 ********************************************************/
 
 /********************************************************
-                Local Functions
+			Local Functions
 ********************************************************/
 /** Cipher suite definition */
-enum cipher_suite
-{
+enum cipher_suite {
 	CIPHER_SUITE_WEP40,
 	CIPHER_SUITE_TKIP,
 	CIPHER_SUITE_CCMP,
@@ -183,7 +183,8 @@ is_rsn_oui_present(mlan_adapter * pmadapter, BSSDescriptor_t * pbss_desc,
 			(IEBody *) (((t_u8 *) pbss_desc->prsn_ie->data) +
 				    RSN_GTK_OUI_OFFSET);
 		oui = &rsn_oui[cipher_suite][0];
-		if ((ret = search_oui_in_ie(pmadapter, ie_body, oui))) {
+		ret = search_oui_in_ie(pmadapter, ie_body, oui);
+		if (ret) {
 			LEAVE();
 			return ret;
 		}
@@ -214,7 +215,8 @@ is_wpa_oui_present(mlan_adapter * pmadapter, BSSDescriptor_t * pbss_desc,
 	     ((*(pbss_desc->pwpa_ie)).vend_hdr.element_id == WPA_IE))) {
 		ie_body = (IEBody *) pbss_desc->pwpa_ie->data;
 		oui = &wpa_oui[cipher_suite][0];
-		if ((ret = search_oui_in_ie(pmadapter, ie_body, oui))) {
+		ret = search_oui_in_ie(pmadapter, ie_body, oui);
+		if (ret) {
 			LEAVE();
 			return ret;
 		}
@@ -436,6 +438,9 @@ wlan_scan_create_channel_list(IN mlan_private * pmpriv,
 						scan_type =
 							MLAN_SCAN_TYPE_PASSIVE;
 					}
+				pscan_chan_list[chan_idx].radio_type =
+					HostCmd_SCAN_RADIO_TYPE_BG;
+				break;
 			default:
 				pscan_chan_list[chan_idx].radio_type =
 					HostCmd_SCAN_RADIO_TYPE_BG;
@@ -1294,8 +1299,8 @@ wlan_ret_802_11_scan_get_tlv_ptrs(IN pmlan_adapter pmadapter,
 		}
 
 		if (*pptlv) {
-			// HEXDUMP("SCAN_RESP: TLV Buf", (t_u8 *)*pptlv+4,
-			// tlv_len);
+			/* HEXDUMP("SCAN_RESP: TLV Buf", (t_u8 *)*pptlv+4,
+			   tlv_len); */
 			break;
 		}
 
@@ -1773,6 +1778,8 @@ wlan_interpret_bss_desc_with_ie(IN pmlan_adapter pmadapter,
 				(*(pbss_entry->poverlap_bss_scan_param)).
 				ieee_hdr.len + sizeof(IEEEtypes_Header_t));
 			break;
+		default:
+			break;
 		}
 
 		pcurrent_ptr += element_len + 2;
@@ -2127,14 +2134,21 @@ wlan_ret_802_11_scan_store_beacon(IN mlan_private * pmpriv,
 					      pmadapter->bcn_buf_size)) &&
 		    (pmadapter->bcn_buf_size < MAX_SCAN_BEACON_BUFFER)) {
 			/* no space for this entry, realloc bcn buffer */
-			ret = pmadapter->callbacks.moal_malloc(pmadapter->
-							       pmoal_handle,
-							       pmadapter->
-							       bcn_buf_size +
-							       DEFAULT_SCAN_BEACON_BUFFER,
-							       MLAN_MEM_DEF,
-							       (t_u8 **) &
-							       tmp_buf);
+			if (pmadapter->callbacks.moal_vmalloc &&
+			    pmadapter->callbacks.moal_vfree)
+				ret = pmadapter->callbacks.
+					moal_vmalloc(pmadapter->pmoal_handle,
+						     pmadapter->bcn_buf_size +
+						     DEFAULT_SCAN_BEACON_BUFFER,
+						     (t_u8 **) & tmp_buf);
+			else
+				ret = pmadapter->callbacks.
+					moal_malloc(pmadapter->pmoal_handle,
+						    pmadapter->bcn_buf_size +
+						    DEFAULT_SCAN_BEACON_BUFFER,
+						    MLAN_MEM_DEF,
+						    (t_u8 **) & tmp_buf);
+
 			if ((ret == MLAN_STATUS_SUCCESS) && (tmp_buf)) {
 				PRINTM(MCMND,
 				       "Realloc Beacon buffer, old size=%d, new_size=%d\n",
@@ -2163,11 +2177,19 @@ wlan_ret_802_11_scan_store_beacon(IN mlan_private * pmpriv,
 								    [adj_idx]);
 				}
 				pmadapter->pbcn_buf_end = tmp_buf + bcn_size;
-				pmadapter->callbacks.moal_mfree(pmadapter->
-								pmoal_handle,
-								(t_u8 *)
-								pmadapter->
-								bcn_buf);
+				if (pmadapter->callbacks.moal_vmalloc &&
+				    pmadapter->callbacks.moal_vfree)
+					pmadapter->callbacks.
+						moal_vfree(pmadapter->
+							   pmoal_handle,
+							   (t_u8 *) pmadapter->
+							   bcn_buf);
+				else
+					pmadapter->callbacks.
+						moal_mfree(pmadapter->
+							   pmoal_handle,
+							   (t_u8 *) pmadapter->
+							   bcn_buf);
 				pmadapter->bcn_buf = tmp_buf;
 				pmadapter->bcn_buf_size +=
 					DEFAULT_SCAN_BEACON_BUFFER;
@@ -2418,7 +2440,8 @@ wlan_scan_process_results(IN mlan_private * pmpriv)
 	 *   domain info command to the FW.
 	 */
 	wlan_11d_prepare_dnld_domain_info_cmd(pmpriv);
-
+	PRINTM(MMSG, "wlan: SCAN COMPLETED: scanned AP count=%d\n",
+	       pmadapter->num_in_scan_table);
 	LEAVE();
 }
 
@@ -2646,7 +2669,7 @@ wlan_scan_delete_ssid_table_entry(IN mlan_private * pmpriv,
 }
 
 /********************************************************
-                Global Functions
+			Global Functions
 ********************************************************/
 
 /**
@@ -3265,6 +3288,10 @@ wlan_ret_802_11_scan(IN mlan_private * pmpriv,
 					 + sizeof(pscan_rsp->bss_descript_size)
 					 + sizeof(pscan_rsp->number_of_sets)
 					 + S_DS_GEN);
+	if (is_bgscan_resp)
+		tlv_buf_size -=
+			sizeof(resp->params.bg_scan_query_resp.
+			       report_condition);
 
 	ptlv = (MrvlIEtypes_Data_t *) (pscan_rsp->bss_desc_and_tlv_buffer +
 				       bytes_left);
@@ -4145,6 +4172,9 @@ wlan_bgscan_create_channel_list(IN mlan_private * pmpriv,
 					    (pmpriv, (t_u8) cfp->channel))
 						scan_type =
 							MLAN_SCAN_TYPE_PASSIVE;
+				tlv_chan_list->chan_scan_param[chan_idx].
+					radio_type = HostCmd_SCAN_RADIO_TYPE_BG;
+				break;
 			default:
 				tlv_chan_list->chan_scan_param[chan_idx].
 					radio_type = HostCmd_SCAN_RADIO_TYPE_BG;

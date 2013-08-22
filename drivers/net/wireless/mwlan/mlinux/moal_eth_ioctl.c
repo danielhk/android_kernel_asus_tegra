@@ -3470,8 +3470,8 @@ woal_priv_set_power(moal_private * priv, t_u8 * respbuf, t_u32 respbuflen)
 	if (MLAN_STATUS_SUCCESS != woal_set_get_power_mgmt(priv,
 							   MLAN_ACT_SET,
 							   &disabled,
-							   mwr->u.power.
-							   flags)) {
+							   mwr->u.power.flags,
+							   MOAL_IOCTL_WAIT)) {
 		return -EFAULT;
 	}
 	LEAVE();
@@ -3797,7 +3797,8 @@ woal_priv_get_power(moal_private * priv, t_u8 * respbuf, t_u32 respbuflen)
 
 	if (MLAN_STATUS_SUCCESS != woal_set_get_power_mgmt(priv,
 							   MLAN_ACT_GET,
-							   &ps_mode, 0)) {
+							   &ps_mode, 0,
+							   MOAL_IOCTL_WAIT)) {
 		return -EFAULT;
 	}
 
@@ -3855,7 +3856,7 @@ woal_priv_set_get_psmode(moal_private * priv, t_u8 * respbuf, t_u32 respbuflen)
 	data = !data;
 
 	if (MLAN_STATUS_SUCCESS !=
-	    woal_set_get_power_mgmt(priv, action, &data, 0)) {
+	    woal_set_get_power_mgmt(priv, action, &data, 0, MOAL_IOCTL_WAIT)) {
 		ret = -EFAULT;
 		goto done;
 	}
@@ -4942,7 +4943,7 @@ woal_priv_wmm_addts_req_ioctl(moal_private * priv, t_u8 * respbuf,
 	memcpy((t_u8 *) & addts_ioctl, data_ptr, sizeof(addts_ioctl));
 
 	cfg->param.addts.timeout = addts_ioctl.timeout_ms;
-	cfg->param.addts.ie_data_len = (t_u8) addts_ioctl.ie_data_len;
+	cfg->param.addts.ie_data_len = addts_ioctl.ie_data_len;
 
 	memcpy(cfg->param.addts.ie_data,
 	       addts_ioctl.ie_data, cfg->param.addts.ie_data_len);
@@ -7063,8 +7064,8 @@ woal_priv_sdio_mpa_ctrl(moal_private * priv, t_u8 * respbuf, t_u32 respbuflen)
 	/* Get the values first, then modify these values if user had modified
 	   them */
 
-	if ((ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) !=
-	    MLAN_STATUS_SUCCESS) {
+	ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (ret != MLAN_STATUS_SUCCESS) {
 		PRINTM(MERROR, "woal_request_ioctl returned %d\n", ret);
 		ret = -EFAULT;
 		goto done;
@@ -8419,6 +8420,9 @@ woal_priv_bypassed_packet(moal_private * priv, t_u8 * respbuf, t_u32 respbuflen)
 	return ret;
 }
 
+#if defined(WIFI_DIRECT_SUPPORT)
+#endif
+
 /**
  *  @brief Set priv command for Android
  *  @param dev          A pointer to net_device structure
@@ -8447,6 +8451,11 @@ woal_android_priv_cmd(struct net_device *dev, struct ifreq *req)
 	int buf_len = 0;
 
 	ENTER();
+	if (!priv || !priv->phandle) {
+		PRINTM(MERROR, "priv or handle is NULL\n");
+		ret = -EFAULT;
+		goto done;
+	}
 	if (copy_from_user(&priv_cmd, req->ifr_data,
 			   sizeof(android_wifi_priv_cmd))) {
 		ret = -EFAULT;
@@ -9203,6 +9212,8 @@ woal_android_priv_cmd(struct net_device *dev, struct ifreq *req)
 			len = woal_priv_bypassed_packet(priv, buf,
 							priv_cmd.total_len);
 			goto handled;
+#if defined(WIFI_DIRECT_SUPPORT)
+#endif
 		} else {
 			/* Fall through, after stripping off the custom header */
 			buf += strlen(CMD_MARVELL);

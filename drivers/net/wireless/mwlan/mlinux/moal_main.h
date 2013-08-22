@@ -125,8 +125,7 @@ typedef struct _moal_private moal_private;
 typedef struct _moal_handle moal_handle;
 
 /** Hardware status codes */
-typedef enum _MOAL_HARDWARE_STATUS
-{
+typedef enum _MOAL_HARDWARE_STATUS {
 	HardwareStatusReady,
 	HardwareStatusInitializing,
 	HardwareStatusFwReady,
@@ -136,8 +135,7 @@ typedef enum _MOAL_HARDWARE_STATUS
 } MOAL_HARDWARE_STATUS;
 
 /** moal_wait_option */
-enum
-{
+enum {
 	MOAL_NO_WAIT,
 	MOAL_IOCTL_WAIT,
 	MOAL_CMD_WAIT,
@@ -149,8 +147,7 @@ enum
 };
 
 /** moal_main_state */
-enum
-{
+enum {
 	MOAL_STATE_IDLE,
 	MOAL_RECV_INT,
 	MOAL_ENTER_WORK_QUEUE,
@@ -159,8 +156,7 @@ enum
 };
 
 /** HostCmd_Header */
-typedef struct _HostCmd_Header
-{
+typedef struct _HostCmd_Header {
     /** Command */
 	t_u16 command;
     /** Size */
@@ -169,12 +165,12 @@ typedef struct _HostCmd_Header
 
 #ifndef MIN
 /** Find minimum */
-#define MIN(a,b)		((a) < (b) ? (a) : (b))
+#define MIN(a, b)		((a) < (b) ? (a) : (b))
 #endif
 
 /** Find maximum */
 #ifndef MAX
-#define MAX(a,b)                ((a) > (b) ? (a) : (b))
+#define MAX(a, b)                ((a) > (b) ? (a) : (b))
 #endif
 
 /*
@@ -182,8 +178,7 @@ typedef struct _HostCmd_Header
  */
 
 /** Timer structure */
-typedef struct _moal_drv_timer
-{
+typedef struct _moal_drv_timer {
 	/** Timer list */
 	struct timer_list tl;
 	/** Timer function */
@@ -290,8 +285,7 @@ woal_cancel_timer(moal_drv_timer * timer)
 #include	<linux/kthread.h>
 
 /** Kernel thread structure */
-typedef struct _moal_thread
-{
+typedef struct _moal_thread {
     /** Task control structrue */
 	struct task_struct *task;
     /** Pointer to wait_queue_head */
@@ -524,9 +518,6 @@ out:
 /* IOCTL Timeout */
 #define MOAL_IOCTL_TIMEOUT                    (20 * HZ)
 
-/* MLAN WAIT Timeout */
-#define MLAN_WAIT_TIMEOUT                     (1 * HZ)
-
 /** Threshold value of number of times the Tx timeout happened */
 #define NUM_TX_TIMEOUT_THRESHOLD      5
 
@@ -653,8 +644,7 @@ out:
 #define DSCP_OFFSET 2
 
 /** wait_queue structure */
-typedef struct _wait_queue
-{
+typedef struct _wait_queue {
 	/** Pointer to wait_queue_head */
 	wait_queue_head_t *wait;
 	/** Wait condition */
@@ -737,8 +727,7 @@ typedef struct _wait_queue
  **/
 #define MAX_MLAN_ADAPTER    2
 
-typedef struct _moal_drv_mode
-{
+typedef struct _moal_drv_mode {
     /** driver mode */
 	t_u16 drv_mode;
     /** total number of interfaces */
@@ -751,8 +740,7 @@ typedef struct _moal_drv_mode
 
 #ifdef PROC_DEBUG
 /** Debug data */
-struct debug_data
-{
+struct debug_data {
     /** Name */
 	char name[32];
     /** Size */
@@ -762,8 +750,7 @@ struct debug_data
 };
 
 /** Private debug data */
-struct debug_data_priv
-{
+struct debug_data_priv {
     /** moal_private handle */
 	moal_private *priv;
     /** Debug items */
@@ -778,8 +765,7 @@ struct debug_data_priv
 /** IP address operation: Remove */
 #define IPADDR_OP_REMOVE        0
 
-struct tcp_sess
-{
+struct tcp_sess {
 	struct list_head link;
     /** tcp session info */
 	t_u32 src_ip_addr;
@@ -797,8 +783,7 @@ struct tcp_sess
 };
 
 /** Private structure for MOAL */
-struct _moal_private
-{
+struct _moal_private {
 	/** Handle structure */
 	moal_handle *phandle;
 	/** Tx timeout count */
@@ -893,6 +878,8 @@ struct _moal_private
 #ifdef STA_SUPPORT
 	/** CFG80211 scan request description */
 	struct cfg80211_scan_request *scan_request;
+	/** lock for scan_request */
+	spinlock_t scan_req_lock;
 	/** CFG80211 association description */
 	t_u8 cfg_bssid[ETH_ALEN];
 	/** Disconnect request from CFG80211 */
@@ -913,6 +900,7 @@ struct _moal_private
 	u8 mrvl_rssi_low;
 	/** last event */
 	u32 last_event;
+
 #endif				/* STA_SUPPORT */
 #endif				/* STA_CFG80211 */
 	/** IOCTL wait queue */
@@ -994,8 +982,7 @@ struct _moal_private
 };
 
 /** Handle data structure for MOAL */
-struct _moal_handle
-{
+struct _moal_handle {
 	/** MLAN adapter structure */
 	t_void *pmlan_adapter;
 	/** Private pointer */
@@ -1030,10 +1017,6 @@ struct _moal_handle
 	t_u16 init_wait_q_woken;
 	/** Init wait queue */
 	wait_queue_head_t init_wait_q __ATTRIB_ALIGN__;
-	/** mlan wait queue token */
-	t_u16 mlan_wait_q_woken;
-	/** mlan wait queue */
-	wait_queue_head_t mlan_wait_q __ATTRIB_ALIGN__;
 #if defined(SDIO_SUSPEND_RESUME)
 	/** Device suspend flag */
 	BOOLEAN is_suspended;
@@ -1117,6 +1100,10 @@ struct _moal_handle
 	BOOLEAN is_go_timer_set;
 	/** GO timer */
 	moal_drv_timer go_timer __ATTRIB_ALIGN__;
+	/** remain_on_channel timer set flag */
+	BOOLEAN is_remain_timer_set;
+	/** remani_on_channel_timer */
+	moal_drv_timer remain_timer __ATTRIB_ALIGN__;
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0) || defined(COMPAT_WIRELESS)
 	/** cfg80211_suspend status */
@@ -1272,72 +1259,72 @@ extern t_u32 drvdbg;
 #define LOG_CTRL(level)     (0)
 
 #ifdef	DEBUG_LEVEL2
-#define	PRINTM_MINFO(level,msg...)  do {woal_print(level,msg); \
-		if (drvdbg & MINFO) printk(KERN_DEBUG msg);} while(0)
-#define	PRINTM_MWARN(level,msg...)  do {woal_print(level,msg); \
-		if (drvdbg & MWARN) printk(KERN_DEBUG msg);} while(0)
-#define	PRINTM_MENTRY(level,msg...) do {woal_print(level,msg); \
-		if (drvdbg & MENTRY) printk(KERN_DEBUG msg);} while(0)
+#define	PRINTM_MINFO(level, msg...)  do {woal_print(level, msg); \
+		if (drvdbg & MINFO) printk(KERN_DEBUG msg); } while (0)
+#define	PRINTM_MWARN(level, msg...)  do {woal_print(level, msg); \
+		if (drvdbg & MWARN) printk(KERN_DEBUG msg); } while (0)
+#define	PRINTM_MENTRY(level, msg...) do {woal_print(level, msg); \
+		if (drvdbg & MENTRY) printk(KERN_DEBUG msg); } while (0)
 #else
-#define	PRINTM_MINFO(level,msg...)  do {} while (0)
-#define	PRINTM_MWARN(level,msg...)  do {} while (0)
-#define	PRINTM_MENTRY(level,msg...) do {} while (0)
+#define	PRINTM_MINFO(level, msg...)  do {} while (0)
+#define	PRINTM_MWARN(level, msg...)  do {} while (0)
+#define	PRINTM_MENTRY(level, msg...) do {} while (0)
 #endif /* DEBUG_LEVEL2 */
 
-#define	PRINTM_MFW_D(level,msg...)  do {woal_print(level,msg); \
-		if (drvdbg & MFW_D) printk(KERN_DEBUG msg);} while(0)
-#define	PRINTM_MCMD_D(level,msg...) do {woal_print(level,msg); \
-		if (drvdbg & MCMD_D) printk(KERN_DEBUG msg);} while(0)
-#define	PRINTM_MDAT_D(level,msg...) do {woal_print(level,msg); \
-		if (drvdbg & MDAT_D) printk(KERN_DEBUG msg);} while(0)
-#define	PRINTM_MIF_D(level,msg...)  do {woal_print(level,msg); \
-		if (drvdbg & MIF_D) printk(KERN_DEBUG msg);} while(0)
+#define	PRINTM_MFW_D(level, msg...)  do {woal_print(level, msg); \
+		if (drvdbg & MFW_D) printk(KERN_DEBUG msg); } while (0)
+#define	PRINTM_MCMD_D(level, msg...) do {woal_print(level, msg); \
+		if (drvdbg & MCMD_D) printk(KERN_DEBUG msg); } while (0)
+#define	PRINTM_MDAT_D(level, msg...) do {woal_print(level, msg); \
+		if (drvdbg & MDAT_D) printk(KERN_DEBUG msg); } while (0)
+#define	PRINTM_MIF_D(level, msg...)  do {woal_print(level, msg); \
+		if (drvdbg & MIF_D) printk(KERN_DEBUG msg); } while (0)
 
-#define	PRINTM_MIOCTL(level,msg...) do {woal_print(level,msg); \
-		if (drvdbg & MIOCTL) printk(KERN_DEBUG msg);} while(0)
-#define	PRINTM_MINTR(level,msg...)  do {woal_print(level,msg); \
-		if (drvdbg & MINTR) printk(KERN_DEBUG msg);} while(0)
-#define	PRINTM_MEVENT(level,msg...) do {woal_print(level,msg); \
-		if (drvdbg & MEVENT) printk(msg);} while(0)
-#define	PRINTM_MCMND(level,msg...)  do {woal_print(level,msg); \
-		if (drvdbg & MCMND) printk(KERN_DEBUG msg);} while(0)
-#define	PRINTM_MDATA(level,msg...)  do {woal_print(level,msg); \
-		if (drvdbg & MDATA) printk(KERN_DEBUG msg);} while(0)
-#define	PRINTM_MERROR(level,msg...) do {woal_print(level,msg); \
-		if (drvdbg & MERROR) printk(KERN_ERR msg);} while(0)
-#define	PRINTM_MFATAL(level,msg...) do {woal_print(level,msg); \
-		if (drvdbg & MFATAL) printk(KERN_ERR msg);} while(0)
-#define	PRINTM_MMSG(level,msg...)   do {woal_print(level,msg); \
-		if (drvdbg & MMSG) printk(KERN_ALERT msg);} while(0)
+#define	PRINTM_MIOCTL(level, msg...) do {woal_print(level, msg); \
+		if (drvdbg & MIOCTL) printk(KERN_DEBUG msg); } while (0)
+#define	PRINTM_MINTR(level, msg...)  do {woal_print(level, msg); \
+		if (drvdbg & MINTR) printk(KERN_DEBUG msg); } while (0)
+#define	PRINTM_MEVENT(level, msg...) do {woal_print(level, msg); \
+		if (drvdbg & MEVENT) printk(msg); } while (0)
+#define	PRINTM_MCMND(level, msg...)  do {woal_print(level, msg); \
+		if (drvdbg & MCMND) printk(KERN_DEBUG msg); } while (0)
+#define	PRINTM_MDATA(level, msg...)  do {woal_print(level, msg); \
+		if (drvdbg & MDATA) printk(KERN_DEBUG msg); } while (0)
+#define	PRINTM_MERROR(level, msg...) do {woal_print(level, msg); \
+		if (drvdbg & MERROR) printk(KERN_ERR msg); } while (0)
+#define	PRINTM_MFATAL(level, msg...) do {woal_print(level, msg); \
+		if (drvdbg & MFATAL) printk(KERN_ERR msg); } while (0)
+#define	PRINTM_MMSG(level, msg...)   do {woal_print(level, msg); \
+		if (drvdbg & MMSG) printk(KERN_ALERT msg); } while (0)
 
 static inline void
 woal_print(t_u32 level, char *fmt, ...)
 {
 }
 
-#define	PRINTM(level,msg...) PRINTM_##level(level,msg)
+#define	PRINTM(level, msg...) PRINTM_##level(level, msg)
 
 #else
 
-#define	PRINTM(level,msg...) do {} while (0)
+#define	PRINTM(level, msg...) do {} while (0)
 
 #endif /* DEBUG_LEVEL1 */
 
 /** Wait until a condition becomes true */
 #define MASSERT(cond)                   \
 do {                                    \
-    if (!(cond)) {                      \
-        PRINTM(MFATAL, "ASSERT: %s: %i\n", __FUNCTION__, __LINE__); \
-        panic("Assert failed: Panic!"); \
-    }                                   \
-} while(0)
+	if (!(cond)) {                      \
+	    PRINTM(MFATAL, "ASSERT: %s: %i\n", __FUNCTION__, __LINE__); \
+	    panic("Assert failed: Panic!"); \
+	}                                   \
+} while (0)
 
 /** Log entry point for debugging */
 #define	ENTER()			PRINTM(MENTRY, "Enter: %s\n", \
-                                    __FUNCTION__)
+									__FUNCTION__)
 /** Log exit point for debugging */
 #define	LEAVE()			PRINTM(MENTRY, "Leave: %s\n", \
-                                    __FUNCTION__)
+									__FUNCTION__)
 
 #ifdef DEBUG_LEVEL1
 #define DBG_DUMP_BUF_LEN 	64
@@ -1370,17 +1357,17 @@ hexdump(t_u32 level, char *prompt, t_u8 * buf, int len)
 }
 
 #define DBG_HEXDUMP_MERROR(x, y, z)  do {if ((drvdbg & MERROR) || \
-		LOG_CTRL(MERROR)) hexdump(MERROR, x, y, z);} while(0)
+		LOG_CTRL(MERROR)) hexdump(MERROR, x, y, z); } while (0)
 #define DBG_HEXDUMP_MCMD_D(x, y, z)  do {if ((drvdbg & MCMD_D) || \
-		LOG_CTRL(MCMD_D)) hexdump(MCMD_D, x, y, z);} while(0)
+		LOG_CTRL(MCMD_D)) hexdump(MCMD_D, x, y, z); } while (0)
 #define DBG_HEXDUMP_MDAT_D(x, y, z)  do {if ((drvdbg & MDAT_D) || \
-		LOG_CTRL(MDAT_D)) hexdump(MDAT_D, x, y, z);} while(0)
+		LOG_CTRL(MDAT_D)) hexdump(MDAT_D, x, y, z); } while (0)
 #define DBG_HEXDUMP_MIF_D(x, y, z)   do {if ((drvdbg & MIF_D)  || \
-		LOG_CTRL(MIF_D))  hexdump(MIF_D, x, y, z);} while(0)
+		LOG_CTRL(MIF_D))  hexdump(MIF_D, x, y, z); } while (0)
 #define DBG_HEXDUMP_MEVT_D(x, y, z)  do {if ((drvdbg & MEVT_D) || \
-		LOG_CTRL(MEVT_D)) hexdump(MEVT_D, x, y, z);} while(0)
+		LOG_CTRL(MEVT_D)) hexdump(MEVT_D, x, y, z); } while (0)
 #define DBG_HEXDUMP_MFW_D(x, y, z)   do {if ((drvdbg & MFW_D)  || \
-		LOG_CTRL(MFW_D))  hexdump(MFW_D, x, y, z);} while(0)
+		LOG_CTRL(MFW_D))  hexdump(MFW_D, x, y, z); } while (0)
 #define	DBG_HEXDUMP(level, x, y, z)    DBG_HEXDUMP_##level(x, y, z)
 
 #else
@@ -1390,7 +1377,7 @@ hexdump(t_u32 level, char *prompt, t_u8 * buf, int len)
 
 #ifdef DEBUG_LEVEL2
 #define HEXDUMP(x, y, z)            do {if ((drvdbg & MINFO) || \
-		LOG_CTRL(MINFO)) hexdump(MINFO, x, y, z);} while(0)
+		LOG_CTRL(MINFO)) hexdump(MINFO, x, y, z); } while (0)
 #else
 /** Do nothing since debugging is not turned on */
 #define HEXDUMP(x, y, z)            do {} while (0)
@@ -1442,7 +1429,7 @@ woal_get_priv(moal_handle * handle, mlan_bss_role bss_role)
 		if (handle->priv[i]) {
 			if (bss_role == MLAN_BSS_ROLE_ANY ||
 			    GET_BSS_ROLE(handle->priv[i]) == bss_role)
-				return (handle->priv[i]);
+				return handle->priv[i];
 		}
 	}
 	return NULL;
@@ -1466,7 +1453,7 @@ woal_get_priv_bss_type(moal_handle * handle, mlan_bss_type bss_type)
 		if (handle->priv[i]) {
 			if (bss_type == MLAN_BSS_TYPE_ANY ||
 			    handle->priv[i]->bss_type == bss_type)
-				return (handle->priv[i]);
+				return handle->priv[i];
 		}
 	}
 	return NULL;
@@ -1486,16 +1473,14 @@ woal_get_priv_bss_type(moal_handle * handle, mlan_bss_type bss_type)
 /** HostCmd CAL data header length */
 #define CFG_DATA_HEADER_LEN	6
 
-typedef struct _HostCmd_DS_GEN
-{
+typedef struct _HostCmd_DS_GEN {
 	t_u16 command;
 	t_u16 size;
 	t_u16 seq_num;
 	t_u16 result;
 } HostCmd_DS_GEN;
 
-typedef struct _HostCmd_DS_802_11_CFG_DATA
-{
+typedef struct _HostCmd_DS_802_11_CFG_DATA {
     /** Action */
 	t_u16 action;
     /** Type */
@@ -1574,6 +1559,8 @@ typedef struct _HostCmd_DS_802_11_CFG_DATA
 
 /**  Convert ASCII string to hex value */
 int woal_ascii2hex(t_u8 * d, char *s, t_u32 dlen);
+/** parse ie */
+const t_u8 *woal_parse_ie_tlv(const t_u8 * ie, int len, t_u8 id);
 /**  Convert mac address from string to t_u8 buffer */
 void woal_mac2u8(t_u8 * mac_addr, char *buf);
 /**  Extract token from string */
@@ -1716,7 +1703,7 @@ mlan_status woal_set_get_tx_power(moal_private * priv, t_u32 action,
 				  mlan_power_cfg_t * pwr);
 /** Set/Get power IEEE management */
 mlan_status woal_set_get_power_mgmt(moal_private * priv, t_u32 action,
-				    int *disabled, int type);
+				    int *disabled, int type, t_u8 wait_option);
 /** Get data rate */
 mlan_status woal_set_get_data_rate(moal_private * priv, t_u8 action,
 				   mlan_rate_cfg_t * datarate);
@@ -1798,6 +1785,9 @@ mlan_status woal_set_remain_channel_ioctl(moal_private * priv, t_u8 wait_option,
 					  mlan_ds_remain_chan * pchan);
 mlan_status woal_wifi_direct_mode_cfg(moal_private * priv, t_u16 action,
 				      t_u16 * mode);
+mlan_status woal_p2p_config(moal_private * priv, t_u32 action,
+			    mlan_ds_wifi_direct_config * p2p_config);
+void woal_remain_timer_func(void *context);
 #endif /* WIFI_DIRECT_SUPPORT */
 
 #ifdef CONFIG_PROC_FS
@@ -1867,8 +1857,9 @@ mlan_status woal_set_band(moal_private * priv, char *pband);
 mlan_status woal_add_rxfilter(moal_private * priv, char *rxfilter);
 mlan_status woal_remove_rxfilter(moal_private * priv, char *rxfilter);
 mlan_status woal_priv_qos_cfg(moal_private * priv, t_u32 action, char *qos_cfg);
-int woal_set_sleeppd(moal_private * priv, char *psleeppd);
+mlan_status woal_set_sleeppd(moal_private * priv, char *psleeppd);
 int woal_set_scan_cfg(moal_private * priv, char *buf, int length);
+
 /* EVENT: BCN_RSSI_LOW */
 #define EVENT_BCN_RSSI_LOW 		   0x0001
 /* EVENT: PRE_BCN_LOST */
@@ -1901,4 +1892,5 @@ int wlan_get_scan_table_ret_entry(BSSDescriptor_t * pbss_desc, t_u8 ** ppbuffer,
 BOOLEAN woal_ssid_valid(mlan_802_11_ssid * pssid);
 int woal_is_connected(moal_private * priv, mlan_ssid_bssid * ssid_bssid);
 void wifi_enable_hostwake_irq(int flag);
+int woal_priv_hostcmd(moal_private * priv, t_u8 * respbuf, t_u32 respbuflen);
 #endif /* _MOAL_MAIN_H */

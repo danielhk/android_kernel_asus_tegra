@@ -37,19 +37,19 @@ Change log:
 #include "mlan_11h.h"
 
 /********************************************************
-                Local Constants
+			Local Constants
 ********************************************************/
 
 /********************************************************
-                Local Variables
+			Local Variables
 ********************************************************/
 
 /********************************************************
-                Global Variables
+			Global Variables
 ********************************************************/
 
 /********************************************************
-                Local Functions
+			Local Functions
 ********************************************************/
 /**
  *  @brief Append a generic IE as a pass through TLV to a TLV buffer.
@@ -181,7 +181,7 @@ wlan_cmd_append_tsf_tlv(mlan_private * pmriv, t_u8 ** ppbuffer,
 	*ppbuffer += sizeof(tsf_val);
 
 	LEAVE();
-	return (sizeof(tsf_tlv.header) + (2 * sizeof(tsf_val)));
+	return sizeof(tsf_tlv.header) + (2 * sizeof(tsf_val));
 }
 
 /**
@@ -418,7 +418,7 @@ wlan_cmd_append_wapi_ie(mlan_private * priv, t_u8 ** ppBuffer)
 }
 
 /********************************************************
-                Global Functions
+				Global Functions
 ********************************************************/
 /**
  *  @brief This function updates RSN IE in the association request.
@@ -1337,9 +1337,10 @@ wlan_cmd_802_11_ad_hoc_start(IN mlan_private * pmpriv,
 		}
 	}
 	/* Find the last non zero */
-	for (i = 0;
-	     i < sizeof(padhoc_start->DataRate) && padhoc_start->DataRate[i];
-	     i++) ;
+	for (i = 0; i < sizeof(padhoc_start->DataRate)
+	     && padhoc_start->DataRate[i]; i++)
+		/* XXX Do not delete no-operation line */
+		;
 
 	pmpriv->curr_bss_params.num_of_rates = i;
 
@@ -1604,7 +1605,9 @@ wlan_cmd_802_11_ad_hoc_join(IN mlan_private * pmpriv,
 	       padhoc_join->bss_descriptor.ssid);
 
 	for (i = 0; i < WLAN_SUPPORTED_RATES && pbss_desc->supported_rates[i];
-	     i++) ;
+	     i++)
+		/* XXX Do not delete no-operation line */
+		;
 	rates_size = i;
 
 	/* Copy Data Rates from the Rates recorded in scan response */

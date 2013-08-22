@@ -713,8 +713,7 @@ static const struct iw_priv_args woal_private_args[] = {
 };
 
 /** moal_802_11_rates  */
-typedef struct _moal_802_11_rates
-{
+typedef struct _moal_802_11_rates {
 	/** Num of rates */
 	t_u8 num_of_rates;
 	/** Rates */

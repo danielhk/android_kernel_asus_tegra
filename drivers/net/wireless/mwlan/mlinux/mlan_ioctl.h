@@ -27,8 +27,7 @@ Change log:
 #define _MLAN_IOCTL_H_
 
 /** Enumeration for IOCTL request ID */
-enum _mlan_ioctl_req_id
-{
+enum _mlan_ioctl_req_id {
 	/* Scan Group */
 	MLAN_IOCTL_SCAN = 0x00010000,
 	MLAN_OID_SCAN_NORMAL = 0x00010001,
@@ -229,29 +228,29 @@ enum _mlan_ioctl_req_id
 #if defined(STA_SUPPORT)
 	MLAN_OID_MISC_PMFCFG = 0x00200022,
 #endif
+#ifdef WIFI_DIRECT_SUPPORT
+	MLAN_OID_MISC_WIFI_DIRECT_CONFIG = 0x00200025,
+#endif
 };
 
 /** Sub command size */
 #define MLAN_SUB_COMMAND_SIZE	4
 
 /** Enumeration for the action of IOCTL request */
-enum _mlan_act_ioctl
-{
+enum _mlan_act_ioctl {
 	MLAN_ACT_SET = 1,
 	MLAN_ACT_GET,
 	MLAN_ACT_CANCEL
 };
 
 /** Enumeration for generic enable/disable */
-enum _mlan_act_generic
-{
+enum _mlan_act_generic {
 	MLAN_ACT_DISABLE = 0,
 	MLAN_ACT_ENABLE = 1
 };
 
 /** Enumeration for scan mode */
-enum _mlan_scan_mode
-{
+enum _mlan_scan_mode {
 	MLAN_SCAN_MODE_UNCHANGED = 0,
 	MLAN_SCAN_MODE_BSS,
 	MLAN_SCAN_MODE_IBSS,
@@ -259,8 +258,7 @@ enum _mlan_scan_mode
 };
 
 /** Enumeration for scan type */
-enum _mlan_scan_type
-{
+enum _mlan_scan_type {
 	MLAN_SCAN_TYPE_UNCHANGED = 0,
 	MLAN_SCAN_TYPE_ACTIVE,
 	MLAN_SCAN_TYPE_PASSIVE
@@ -290,8 +288,7 @@ enum _mlan_scan_type
  *  Fixed field information returned for the scan response in the IOCTL
  *    response.
  */
-typedef struct _wlan_get_scan_table_fixed
-{
+typedef struct _wlan_get_scan_table_fixed {
     /** BSSID of this network */
 	t_u8 bssid[MLAN_MAC_ADDR_LENGTH];
     /** Channel this beacon/probe response was detected */
@@ -303,8 +300,7 @@ typedef struct _wlan_get_scan_table_fixed
 } wlan_get_scan_table_fixed;
 
 /** mlan_802_11_ssid data structure */
-typedef struct _mlan_802_11_ssid
-{
+typedef struct _mlan_802_11_ssid {
     /** SSID Length */
 	t_u32 ssid_len;
     /** SSID information field */
@@ -314,8 +310,7 @@ typedef struct _mlan_802_11_ssid
 /**
  *  Sructure to retrieve the scan table
  */
-typedef struct
-{
+typedef struct {
     /**
      *  - Zero based scan entry to start retrieval in command request
      *  - Number of scans entries returned in command response
@@ -332,8 +327,7 @@ typedef struct
  *  Structure passed in the wlan_ioctl_get_scan_table_info for each
  *    BSS returned in the WLAN_GET_SCAN_RESP IOCTL
  */
-typedef struct _wlan_ioctl_get_scan_table_entry
-{
+typedef struct _wlan_ioctl_get_scan_table_entry {
     /**
      *  Fixed field length included in the response.
      *
@@ -368,8 +362,7 @@ typedef struct _wlan_ioctl_get_scan_table_entry
 } wlan_ioctl_get_scan_table_entry;
 
 /** Type definition of mlan_scan_time_params */
-typedef struct _mlan_scan_time_params
-{
+typedef struct _mlan_scan_time_params {
     /** Scan channel time for specific scan in milliseconds */
 	t_u32 specific_scan_time;
     /** Scan channel time for active scan in milliseconds */
@@ -379,8 +372,7 @@ typedef struct _mlan_scan_time_params
 } mlan_scan_time_params, *pmlan_scan_time_params;
 
 /** Type definition of mlan_user_scan */
-typedef struct _mlan_user_scan
-{
+typedef struct _mlan_user_scan {
     /** Length of scan_cfg_buf */
 	t_u32 scan_cfg_len;
     /** Buffer of scan config */
@@ -388,8 +380,7 @@ typedef struct _mlan_user_scan
 } mlan_user_scan, *pmlan_user_scan;
 
 /** Type definition of mlan_scan_req */
-typedef struct _mlan_scan_req
-{
+typedef struct _mlan_scan_req {
     /** BSS mode for scanning */
 	t_u32 scan_mode;
     /** Scan type */
@@ -403,8 +394,7 @@ typedef struct _mlan_scan_req
 } mlan_scan_req, *pmlan_scan_req;
 
 /** Type defnition of mlan_scan_resp */
-typedef struct _mlan_scan_resp
-{
+typedef struct _mlan_scan_resp {
     /** Number of scan result */
 	t_u32 num_in_scan_table;
     /** Scan table */
@@ -414,8 +404,7 @@ typedef struct _mlan_scan_resp
 } mlan_scan_resp, *pmlan_scan_resp;
 
 /** Type definition of mlan_scan_cfg */
-typedef struct _mlan_scan_cfg
-{
+typedef struct _mlan_scan_cfg {
     /** Scan type */
 	t_u32 scan_type;
     /** BSS mode for scanning */
@@ -429,13 +418,11 @@ typedef struct _mlan_scan_cfg
 } mlan_scan_cfg, *pmlan_scan_cfg;
 
 /** Type defnition of mlan_ds_scan for MLAN_IOCTL_SCAN */
-typedef struct _mlan_ds_scan
-{
+typedef struct _mlan_ds_scan {
     /** Sub-command */
 	t_u32 sub_command;
     /** Scan request/response */
-	union
-	{
+	union {
 	/** Scan request */
 		mlan_scan_req scan_req;
 	/** Scan response */
@@ -451,8 +438,7 @@ typedef struct _mlan_ds_scan
 /** BSS Configuration Group */
 /*-----------------------------------------------------------------*/
 /** Enumeration for BSS mode */
-enum _mlan_bss_mode
-{
+enum _mlan_bss_mode {
 	MLAN_BSS_MODE_INFRA = 1,
 	MLAN_BSS_MODE_IBSS,
 	MLAN_BSS_MODE_AUTO
@@ -485,8 +471,7 @@ enum _mlan_bss_mode
 #define MLAN_MAX_MULTICAST_LIST_SIZE	32
 
 /** mlan_multicast_list data structure for MLAN_OID_BSS_MULTICAST_LIST */
-typedef struct _mlan_multicast_list
-{
+typedef struct _mlan_multicast_list {
     /** Multicast mode */
 	t_u32 mode;
     /** Number of multicast addresses in the list */
@@ -502,8 +487,7 @@ typedef struct _mlan_multicast_list
 #define MLAN_MAX_CHANNEL_NUM	128
 
 /** Channel/frequence for MLAN_OID_BSS_CHANNEL */
-typedef struct _chan_freq
-{
+typedef struct _chan_freq {
     /** Channel Number */
 	t_u32 channel;
     /** Frequency of this Channel */
@@ -511,8 +495,7 @@ typedef struct _chan_freq
 } chan_freq;
 
 /** mlan_chan_list data structure for MLAN_OID_BSS_CHANNEL_LIST */
-typedef struct _mlan_chan_list
-{
+typedef struct _mlan_chan_list {
     /** Number of channel */
 	t_u32 num_of_chan;
     /** Channel-Frequency table */
@@ -520,8 +503,7 @@ typedef struct _mlan_chan_list
 } mlan_chan_list;
 
 /** mlan_ssid_bssid  data structure for MLAN_OID_BSS_START and MLAN_OID_BSS_FIND_BSS */
-typedef struct _mlan_ssid_bssid
-{
+typedef struct _mlan_ssid_bssid {
     /** SSID */
 	mlan_802_11_ssid ssid;
     /** BSSID */
@@ -632,8 +614,7 @@ typedef struct _mlan_ssid_bssid
 #define VALID_CIPHER_BITMAP         0x0c
 
 /** Channel List Entry */
-typedef struct _channel_list
-{
+typedef struct _channel_list {
     /** Channel Number */
 	t_u8 chan_number;
     /** Band Config */
@@ -641,8 +622,7 @@ typedef struct _channel_list
 } scan_chan_list;
 
 /** mac_filter data structure */
-typedef struct _mac_filter
-{
+typedef struct _mac_filter {
     /** mac filter mode */
 	t_u16 filter_mode;
     /** mac adress count */
@@ -652,8 +632,7 @@ typedef struct _mac_filter
 } mac_filter;
 
 /** wpa parameter */
-typedef struct _wpa_param
-{
+typedef struct _wpa_param {
     /** Pairwise cipher WPA */
 	t_u8 pairwise_cipher_wpa;
     /** Pairwise cipher WPA2 */
@@ -671,8 +650,7 @@ typedef struct _wpa_param
 } wpa_param;
 
 /** wep key */
-typedef struct _wep_key
-{
+typedef struct _wep_key {
     /** key index 0-3 */
 	t_u8 key_index;
     /** is default */
@@ -684,8 +662,7 @@ typedef struct _wep_key
 } wep_key;
 
 /** wep param */
-typedef struct _wep_param
-{
+typedef struct _wep_param {
     /** key 0 */
 	wep_key key0;
     /** key 1 */
@@ -697,8 +674,7 @@ typedef struct _wep_param
 } wep_param;
 
 /** Data structure of WMM QoS information */
-typedef struct _wmm_qos_info_t
-{
+typedef struct _wmm_qos_info_t {
 #ifdef BIG_ENDIAN_SUPPORT
     /** QoS UAPSD */
 	t_u8 qos_uapsd:1;
@@ -717,8 +693,7 @@ typedef struct _wmm_qos_info_t
 } wmm_qos_info_t, *pwmm_qos_info_t;
 
 /** Data structure of WMM ECW */
-typedef struct _wmm_ecw_t
-{
+typedef struct _wmm_ecw_t {
 #ifdef BIG_ENDIAN_SUPPORT
     /** Maximum Ecw */
 	t_u8 ecw_max:4;
@@ -733,8 +708,7 @@ typedef struct _wmm_ecw_t
 } wmm_ecw_t, *pwmm_ecw_t;
 
 /** Data structure of WMM Aci/Aifsn */
-typedef struct _wmm_aci_aifsn_t
-{
+typedef struct _wmm_aci_aifsn_t {
 #ifdef BIG_ENDIAN_SUPPORT
     /** Reserved */
 	t_u8 reserved:1;
@@ -757,16 +731,14 @@ typedef struct _wmm_aci_aifsn_t
 } wmm_aci_aifsn_t, *pwmm_aci_aifsn_t;
 
 /** Data structure of WMM AC parameters  */
-typedef struct _wmm_ac_parameters_t
-{
+typedef struct _wmm_ac_parameters_t {
 	wmm_aci_aifsn_t aci_aifsn;   /**< AciAifSn */
 	wmm_ecw_t ecw;		   /**< Ecw */
 	t_u16 tx_op_limit;		      /**< Tx op limit */
 } wmm_ac_parameters_t, *pwmm_ac_parameters_t;
 
 /** Data structure of WMM parameter IE  */
-typedef struct _wmm_parameter_t
-{
+typedef struct _wmm_parameter_t {
     /** OuiType:  00:50:f2:02 */
 	t_u8 ouitype[4];
     /** Oui subtype: 01 */
@@ -793,8 +765,7 @@ typedef struct _wmm_parameter_t
  * Otherwise for a valid data an unwanted TLV will be
  * added to that command.
  */
-typedef struct _mlan_uap_bss_param
-{
+typedef struct _mlan_uap_bss_param {
     /** AP mac addr */
 	mlan_802_11_mac_addr mac_addr;
     /** SSID */
@@ -895,8 +866,7 @@ typedef struct _mlan_uap_bss_param
 } mlan_uap_bss_param;
 
 /** mlan_deauth_param */
-typedef struct _mlan_deauth_param
-{
+typedef struct _mlan_deauth_param {
     /** STA mac addr */
 	t_u8 mac_addr[MLAN_MAC_ADDR_LENGTH];
     /** deauth reason */
@@ -920,13 +890,11 @@ typedef struct _mlan_deauth_param
 #endif
 
 /** Type definition of mlan_ds_bss for MLAN_IOCTL_BSS */
-typedef struct _mlan_ds_bss
-{
+typedef struct _mlan_ds_bss {
     /** Sub-command */
 	t_u32 sub_command;
     /** BSS parameter */
-	union
-	{
+	union {
 	/** SSID-BSSID for MLAN_OID_BSS_START */
 		mlan_ssid_bssid ssid_bssid;
 	/** BSSID for MLAN_OID_BSS_STOP */
@@ -970,8 +938,7 @@ typedef struct _mlan_ds_bss
 /** Radio Control Group */
 /*-----------------------------------------------------------------*/
 /** Enumeration for band */
-enum _mlan_band_def
-{
+enum _mlan_band_def {
 	BAND_B = 1,
 	BAND_G = 2,
 	BAND_A = 4,
@@ -996,8 +963,7 @@ enum _mlan_band_def
 #define RF_ANTENNA_AUTO		0xFFFF
 
 /** Type definition of mlan_ds_band_cfg for MLAN_OID_BAND_CFG */
-typedef struct _mlan_ds_band_cfg
-{
+typedef struct _mlan_ds_band_cfg {
     /** Infra band */
 	t_u32 config_bands;
     /** Ad-hoc start band */
@@ -1011,8 +977,7 @@ typedef struct _mlan_ds_band_cfg
 } mlan_ds_band_cfg;
 
 /** Type definition of mlan_ds_ant_cfg for MLAN_OID_ANT_CFG */
-typedef struct _mlan_ds_ant_cfg
-{
+typedef struct _mlan_ds_ant_cfg {
     /** Tx antenna mode */
 	t_u32 tx_antenna;
     /** Rx antenna mode */
@@ -1021,8 +986,7 @@ typedef struct _mlan_ds_ant_cfg
 
 #ifdef WIFI_DIRECT_SUPPORT
 /** Type definition of mlan_ds_remain_chan for MLAN_OID_REMAIN_CHAN_CFG */
-typedef struct _mlan_ds_remain_chan
-{
+typedef struct _mlan_ds_remain_chan {
     /** remove flag */
 	t_u16 remove;
     /** status */
@@ -1037,13 +1001,11 @@ typedef struct _mlan_ds_remain_chan
 #endif
 
 /** Type definition of mlan_ds_radio_cfg for MLAN_IOCTL_RADIO_CFG */
-typedef struct _mlan_ds_radio_cfg
-{
+typedef struct _mlan_ds_radio_cfg {
     /** Sub-command */
 	t_u32 sub_command;
     /** Radio control parameter */
-	union
-	{
+	union {
 	/** Radio on/off for MLAN_OID_RADIO_CTRL */
 		t_u32 radio_on_off;
 	/** Band info for MLAN_OID_BAND_CFG */
@@ -1063,13 +1025,11 @@ typedef struct _mlan_ds_radio_cfg
 /** SNMP MIB Group */
 /*-----------------------------------------------------------------*/
 /** Type definition of mlan_ds_snmp_mib for MLAN_IOCTL_SNMP_MIB */
-typedef struct _mlan_ds_snmp_mib
-{
+typedef struct _mlan_ds_snmp_mib {
     /** Sub-command */
 	t_u32 sub_command;
     /** SNMP MIB parameter */
-	union
-	{
+	union {
 	/** RTS threshold for MLAN_OID_SNMP_MIB_RTS_THRESHOLD */
 		t_u32 rts_threshold;
 	/** Fragment threshold for MLAN_OID_SNMP_MIB_FRAG_THRESHOLD */
@@ -1089,8 +1049,7 @@ typedef struct _mlan_ds_snmp_mib
 /** Status Information Group */
 /*-----------------------------------------------------------------*/
 /** Enumeration for ad-hoc status */
-enum _mlan_adhoc_status
-{
+enum _mlan_adhoc_status {
 	ADHOC_IDLE,
 	ADHOC_STARTED,
 	ADHOC_JOINED,
@@ -1098,8 +1057,7 @@ enum _mlan_adhoc_status
 };
 
 /** Type definition of mlan_ds_get_stats for MLAN_OID_GET_STATS */
-typedef struct _mlan_ds_get_stats
-{
+typedef struct _mlan_ds_get_stats {
     /** Statistics counter */
     /** Multicast transmitted frame count */
 	t_u32 mcast_tx_frame;
@@ -1134,8 +1092,7 @@ typedef struct _mlan_ds_get_stats
 } mlan_ds_get_stats, *pmlan_ds_get_stats;
 
 /** Type definition of mlan_ds_uap_stats for MLAN_OID_GET_STATS */
-typedef struct _mlan_ds_uap_stats
-{
+typedef struct _mlan_ds_uap_stats {
     /** tkip mic failures */
 	t_u32 tkip_mic_failures;
     /** ccmp decrypt errors */
@@ -1204,8 +1161,7 @@ typedef struct _mlan_ds_uap_stats
 #define ALL_RSSI_INFO_MASK              0x00000fff
 
 /** Type definition of mlan_ds_get_signal for MLAN_OID_GET_SIGNAL */
-typedef struct _mlan_ds_get_signal
-{
+typedef struct _mlan_ds_get_signal {
     /** Selector of get operation */
 	/*
 	 * Bit0:  Last Beacon RSSI,  Bit1:  Average Beacon RSSI,
@@ -1249,8 +1205,7 @@ typedef struct _mlan_ds_get_signal
 } mlan_ds_get_signal, *pmlan_ds_get_signal;
 
 /** mlan_fw_info data structure for MLAN_OID_GET_FW_INFO */
-typedef struct _mlan_fw_info
-{
+typedef struct _mlan_fw_info {
     /** Firmware version */
 	t_u32 fw_ver;
     /** MAC address */
@@ -1267,8 +1222,7 @@ typedef struct _mlan_fw_info
 #define MLAN_MAX_VER_STR_LEN    128
 
 /** mlan_ver_ext data structure for MLAN_OID_GET_VER_EXT */
-typedef struct _mlan_ver_ext
-{
+typedef struct _mlan_ver_ext {
     /** Selected version string */
 	t_u32 version_str_sel;
     /** Version string */
@@ -1276,8 +1230,7 @@ typedef struct _mlan_ver_ext
 } mlan_ver_ext, *pmlan_ver_ext;
 
 /** mlan_bss_info data structure for MLAN_OID_GET_BSS_INFO */
-typedef struct _mlan_bss_info
-{
+typedef struct _mlan_bss_info {
     /** BSS mode */
 	t_u32 bss_mode;
     /** SSID */
@@ -1333,8 +1286,7 @@ typedef struct _mlan_bss_info
 #define MAX_RX_WINSIZE 		64
 
 /** rx_reorder_tbl */
-typedef struct
-{
+typedef struct {
     /** TID */
 	t_u16 tid;
     /** TA */
@@ -1350,8 +1302,7 @@ typedef struct
 } rx_reorder_tbl;
 
 /** tx_ba_stream_tbl */
-typedef struct
-{
+typedef struct {
     /** TID */
 	t_u16 tid;
     /** RA */
@@ -1364,8 +1315,7 @@ typedef struct
 #define DBG_CMD_NUM	10
 
 /** mlan_debug_info data structure for MLAN_OID_GET_DEBUG_INFO */
-typedef struct _mlan_debug_info
-{
+typedef struct _mlan_debug_info {
 	/* WMM AC_BK count */
 	t_u32 wmm_ac_bk;
 	/* WMM AC_BE count */
@@ -1470,6 +1420,10 @@ typedef struct _mlan_debug_info
 	t_u16 last_event_index;
     /** Number of no free command node */
 	t_u16 num_no_cmd_node;
+    /** pending command id */
+	t_u16 pending_cmd;
+    /** time stamp for dnld last cmd */
+	t_u32 dnld_cmd_in_secs;
     /** Corresponds to data_sent member of mlan_adapter */
 	t_u8 data_sent;
     /** Corresponds to cmd_sent member of mlan_adapter */
@@ -1505,8 +1459,7 @@ typedef struct _mlan_debug_info
 #define MAX_NUM_CLIENTS         MAX_STA_COUNT
 
 /** station info */
-typedef struct _sta_info
-{
+typedef struct _sta_info {
     /** STA MAC address */
 	t_u8 mac_address[MLAN_MAC_ADDR_LENGTH];
     /** Power mfg status */
@@ -1516,8 +1469,7 @@ typedef struct _sta_info
 } sta_info;
 
 /** mlan_ds_sta_list structure for MLAN_OID_UAP_STA_LIST */
-typedef struct _mlan_ds_sta_list
-{
+typedef struct _mlan_ds_sta_list {
     /** station count */
 	t_u16 sta_count;
     /** station list */
@@ -1526,14 +1478,12 @@ typedef struct _mlan_ds_sta_list
 #endif
 
 /** Type definition of mlan_ds_get_info for MLAN_IOCTL_GET_INFO */
-typedef struct _mlan_ds_get_info
-{
+typedef struct _mlan_ds_get_info {
     /** Sub-command */
 	t_u32 sub_command;
 
     /** Status information parameter */
-	union
-	{
+	union {
 	/** Signal information for MLAN_OID_GET_SIGNAL */
 		mlan_ds_get_signal signal;
 	/** Statistics information for MLAN_OID_GET_STATS */
@@ -1559,8 +1509,7 @@ typedef struct _mlan_ds_get_info
 /** Security Configuration Group */
 /*-----------------------------------------------------------------*/
 /** Enumeration for authentication mode */
-enum _mlan_auth_mode
-{
+enum _mlan_auth_mode {
 	MLAN_AUTH_MODE_OPEN = 0x00,
 	MLAN_AUTH_MODE_SHARED = 0x01,
 	MLAN_AUTH_MODE_NETWORKEAP = 0x80,
@@ -1568,8 +1517,7 @@ enum _mlan_auth_mode
 };
 
 /** Enumeration for encryption mode */
-enum _mlan_encryption_mode
-{
+enum _mlan_encryption_mode {
 	MLAN_ENCRYPTION_MODE_NONE = 0,
 	MLAN_ENCRYPTION_MODE_WEP40 = 1,
 	MLAN_ENCRYPTION_MODE_TKIP = 2,
@@ -1578,8 +1526,7 @@ enum _mlan_encryption_mode
 };
 
 /** Enumeration for PSK */
-enum _mlan_psk_type
-{
+enum _mlan_psk_type {
 	MLAN_PSK_PASSPHRASE = 1,
 	MLAN_PSK_PMK,
 	MLAN_PSK_CLEAR,
@@ -1591,7 +1538,7 @@ enum _mlan_psk_type
 /** The key index to indicate default key */
 #define MLAN_KEY_INDEX_DEFAULT        0x000000ff
 /** Maximum key length */
-// #define MLAN_MAX_KEY_LENGTH        32
+/* #define MLAN_MAX_KEY_LENGTH        32 */
 /** Minimum passphrase length */
 #define MLAN_MIN_PASSPHRASE_LENGTH    8
 /** Maximum passphrase length */
@@ -1622,8 +1569,7 @@ enum _mlan_psk_type
 #define KEY_FLAG_REMOVE_KEY     0x80000000
 
 /** Type definition of mlan_ds_encrypt_key for MLAN_OID_SEC_CFG_ENCRYPT_KEY */
-typedef struct _mlan_ds_encrypt_key
-{
+typedef struct _mlan_ds_encrypt_key {
     /** Key disabled, all other fields will be ignore when this flag set to MTRUE */
 	t_u32 key_disable;
     /** key removed flag, when this flag is set to MTRUE, only key_index will be check */
@@ -1647,8 +1593,7 @@ typedef struct _mlan_ds_encrypt_key
 } mlan_ds_encrypt_key, *pmlan_ds_encrypt_key;
 
 /** Type definition of mlan_passphrase_t */
-typedef struct _mlan_passphrase_t
-{
+typedef struct _mlan_passphrase_t {
     /** Length of passphrase */
 	t_u32 passphrase_len;
     /** Passphrase */
@@ -1656,8 +1601,7 @@ typedef struct _mlan_passphrase_t
 } mlan_passphrase_t;
 
 /** Type defnition of mlan_pmk_t */
-typedef struct _mlan_pmk_t
-{
+typedef struct _mlan_pmk_t {
     /** PMK */
 	t_u8 pmk[MLAN_MAX_KEY_LENGTH];
 } mlan_pmk_t;
@@ -1681,8 +1625,7 @@ typedef struct _mlan_pmk_t
 #define EMBED_CIPHER_VALID_BITS (EMBED_CIPHER_TKIP | EMBED_CIPHER_AES)
 
 /** Type definition of mlan_ds_passphrase for MLAN_OID_SEC_CFG_PASSPHRASE */
-typedef struct _mlan_ds_passphrase
-{
+typedef struct _mlan_ds_passphrase {
     /** SSID may be used */
 	mlan_802_11_ssid ssid;
     /** BSSID may be used */
@@ -1690,8 +1633,7 @@ typedef struct _mlan_ds_passphrase
     /** Flag for passphrase or pmk used */
 	t_u16 psk_type;
     /** Passphrase or PMK */
-	union
-	{
+	union {
 	/** Passphrase */
 		mlan_passphrase_t passphrase;
 	/** PMK */
@@ -1700,8 +1642,7 @@ typedef struct _mlan_ds_passphrase
 } mlan_ds_passphrase, *pmlan_ds_passphrase;
 
 /** Type definition of mlan_ds_esupp_mode for MLAN_OID_SEC_CFG_ESUPP_MODE */
-typedef struct _mlan_ds_ewpa_mode
-{
+typedef struct _mlan_ds_ewpa_mode {
     /** RSN mode */
 	t_u32 rsn_mode;
     /** Active pairwise cipher */
@@ -1711,13 +1652,11 @@ typedef struct _mlan_ds_ewpa_mode
 } mlan_ds_esupp_mode, *pmlan_ds_esupp_mode;
 
 /** Type definition of mlan_ds_sec_cfg for MLAN_IOCTL_SEC_CFG */
-typedef struct _mlan_ds_sec_cfg
-{
+typedef struct _mlan_ds_sec_cfg {
     /** Sub-command */
 	t_u32 sub_command;
     /** Security configuration parameter */
-	union
-	{
+	union {
 	/** Authentication mode for MLAN_OID_SEC_CFG_AUTH_MODE */
 		t_u32 auth_mode;
 	/** Encryption mode for MLAN_OID_SEC_CFG_ENCRYPT_MODE */
@@ -1743,16 +1682,14 @@ typedef struct _mlan_ds_sec_cfg
 /** Rate Configuration Group */
 /*-----------------------------------------------------------------*/
 /** Enumeration for rate type */
-enum _mlan_rate_type
-{
+enum _mlan_rate_type {
 	MLAN_RATE_INDEX,
 	MLAN_RATE_VALUE,
 	MLAN_RATE_BITMAP
 };
 
 /** Enumeration for rate format */
-enum _mlan_rate_format
-{
+enum _mlan_rate_format {
 	MLAN_RATE_FORMAT_LG = 0,
 	MLAN_RATE_FORMAT_HT,
 	MLAN_RATE_FORMAT_AUTO = 0xFF,
@@ -1761,8 +1698,7 @@ enum _mlan_rate_format
 #define MAX_BITMAP_RATES_SIZE   10
 
 /** Type definition of mlan_rate_cfg_t for MLAN_OID_RATE_CFG */
-typedef struct _mlan_rate_cfg_t
-{
+typedef struct _mlan_rate_cfg_t {
     /** Fixed rate: 0, auto rate: 1 */
 	t_u32 is_rate_auto;
     /** Rate type. 0: index; 1: value; 2: bitmap */
@@ -1774,22 +1710,19 @@ typedef struct _mlan_rate_cfg_t
 } mlan_rate_cfg_t;
 
 /** HT channel bandwidth */
-typedef enum _mlan_ht_bw
-{
+typedef enum _mlan_ht_bw {
 	MLAN_HT_BW20,
 	MLAN_HT_BW40,
 } mlan_ht_bw;
 
 /** HT guard interval */
-typedef enum _mlan_ht_gi
-{
+typedef enum _mlan_ht_gi {
 	MLAN_HT_LGI,
 	MLAN_HT_SGI,
 } mlan_ht_gi;
 
 /** Band and BSS mode */
-typedef struct _mlan_band_data_rate
-{
+typedef struct _mlan_band_data_rate {
     /** Band configuration */
 	t_u8 config_bands;
     /** BSS mode (Infra or IBSS) */
@@ -1797,8 +1730,7 @@ typedef struct _mlan_band_data_rate
 } mlan_band_data_rate;
 
 /** Type definition of mlan_data_rate for MLAN_OID_GET_DATA_RATE */
-typedef struct _mlan_data_rate
-{
+typedef struct _mlan_data_rate {
     /** Tx data rate */
 	t_u32 tx_data_rate;
     /** Rx data rate */
@@ -1815,13 +1747,11 @@ typedef struct _mlan_data_rate
 } mlan_data_rate;
 
 /** Type definition of mlan_ds_rate for MLAN_IOCTL_RATE */
-typedef struct _mlan_ds_rate
-{
+typedef struct _mlan_ds_rate {
     /** Sub-command */
 	t_u32 sub_command;
     /** Rate configuration parameter */
-	union
-	{
+	union {
 	/** Rate configuration for MLAN_OID_RATE_CFG */
 		mlan_rate_cfg_t rate_cfg;
 	/** Data rate for MLAN_OID_GET_DATA_RATE */
@@ -1838,8 +1768,7 @@ typedef struct _mlan_ds_rate
 /*-----------------------------------------------------------------*/
 
 /** Type definition of mlan_power_cfg_t for MLAN_OID_POWER_CFG */
-typedef struct _mlan_power_cfg_t
-{
+typedef struct _mlan_power_cfg_t {
     /** Is power auto */
 	t_u32 is_power_auto;
     /** Power level in dBm */
@@ -1852,8 +1781,7 @@ typedef struct _mlan_power_cfg_t
 #define TX_RATE_HT_BW40_BIT 	MBIT(7)
 
 /** Type definition of mlan_power_cfg_ext for MLAN_OID_POWER_CFG_EXT */
-typedef struct _mlan_power_cfg_ext
-{
+typedef struct _mlan_power_cfg_ext {
     /** Length of power_data */
 	t_u32 len;
     /** Buffer of power configuration data */
@@ -1861,13 +1789,11 @@ typedef struct _mlan_power_cfg_ext
 } mlan_power_cfg_ext;
 
 /** Type definition of mlan_ds_power_cfg for MLAN_IOCTL_POWER_CFG */
-typedef struct _mlan_ds_power_cfg
-{
+typedef struct _mlan_ds_power_cfg {
     /** Sub-command */
 	t_u32 sub_command;
     /** Power configuration parameter */
-	union
-	{
+	union {
 	/** Power configuration for MLAN_OID_POWER_CFG */
 		mlan_power_cfg_t power_cfg;
 	/** Extended power configuration for MLAN_OID_POWER_CFG_EXT */
@@ -1902,8 +1828,7 @@ typedef struct _mlan_ds_power_cfg
 #define HOST_SLEEP_DEF_WAKE_HOLDOFF 200;
 
 /** Type definition of mlan_ds_hs_cfg for MLAN_OID_PM_CFG_HS_CFG */
-typedef struct _mlan_ds_hs_cfg
-{
+typedef struct _mlan_ds_hs_cfg {
     /** MTRUE to invoke the HostCmd, MFALSE otherwise */
 	t_u32 is_invoke_hostcmd;
     /** Host sleep config condition */
@@ -1927,8 +1852,7 @@ typedef struct _mlan_ds_hs_cfg
 /** Default idle time in milliseconds for auto deep sleep */
 #define DEEP_SLEEP_IDLE_TIME	100
 
-typedef struct _mlan_ds_auto_ds
-{
+typedef struct _mlan_ds_auto_ds {
     /** auto ds mode, 0 - disable, 1 - enable */
 	t_u16 auto_ds;
     /** auto ds idle time in milliseconds */
@@ -1936,8 +1860,7 @@ typedef struct _mlan_ds_auto_ds
 } mlan_ds_auto_ds;
 
 /** Type definition of mlan_ds_inactivity_to for MLAN_OID_PM_CFG_INACTIVITY_TO */
-typedef struct _mlan_ds_inactivity_to
-{
+typedef struct _mlan_ds_inactivity_to {
     /** Timeout unit in microsecond, 0 means 1000us (1ms) */
 	t_u32 timeout_unit;
     /** Inactivity timeout for unicast data */
@@ -2005,8 +1928,7 @@ typedef struct _mlan_ds_inactivity_to
 #define PS_MODE_NULL            3
 
 /** Type definition of mlan_ds_ps_cfg for MLAN_OID_PM_CFG_PS_CFG */
-typedef struct _mlan_ds_ps_cfg
-{
+typedef struct _mlan_ds_ps_cfg {
     /** PS null interval in seconds */
 	t_u32 ps_null_interval;
     /** Multiple DTIM interval */
@@ -2024,8 +1946,7 @@ typedef struct _mlan_ds_ps_cfg
 } mlan_ds_ps_cfg, *pmlan_ds_ps_cfg;
 
 /** Type definition of mlan_ds_sleep_params for MLAN_OID_PM_CFG_SLEEP_PARAMS */
-typedef struct _mlan_ds_sleep_params
-{
+typedef struct _mlan_ds_sleep_params {
     /** Error */
 	t_u32 error;
     /** Offset in microseconds */
@@ -2041,8 +1962,7 @@ typedef struct _mlan_ds_sleep_params
 } mlan_ds_sleep_params, *pmlan_ds_sleep_params;
 
 /** sleep_param */
-typedef struct _ps_sleep_param
-{
+typedef struct _ps_sleep_param {
     /** control bitmap */
 	t_u32 ctrl_bitmap;
     /** minimum sleep period (micro second) */
@@ -2052,8 +1972,7 @@ typedef struct _ps_sleep_param
 } ps_sleep_param;
 
 /** inactivity sleep_param */
-typedef struct _inact_sleep_param
-{
+typedef struct _inact_sleep_param {
     /** inactivity timeout (micro second) */
 	t_u32 inactivity_to;
     /** miniumu awake period (micro second) */
@@ -2077,8 +1996,7 @@ typedef struct _inact_sleep_param
 #define PS_MODE_INACTIVITY                   2
 
 /** mlan_ds_ps_mgmt */
-typedef struct _mlan_ds_ps_mgmt
-{
+typedef struct _mlan_ds_ps_mgmt {
     /** flags for valid field */
 	t_u16 flags;
     /** power mode */
@@ -2090,26 +2008,22 @@ typedef struct _mlan_ds_ps_mgmt
 } mlan_ds_ps_mgmt;
 
 /** mlan_ds_ps_info */
-typedef struct _mlan_ds_ps_info
-{
+typedef struct _mlan_ds_ps_info {
     /** suspend allowed flag */
 	t_u32 is_suspend_allowed;
 } mlan_ds_ps_info;
 
 /** Type definition of mlan_ds_wakeup_reason for MLAN_OID_PM_HS_WAKEUP_REASON */
-typedef struct _mlan_ds_hs_wakeup_reason
-{
+typedef struct _mlan_ds_hs_wakeup_reason {
 	t_u16 hs_wakeup_reason;
 } mlan_ds_hs_wakeup_reason;
 
 /** Type definition of mlan_ds_pm_cfg for MLAN_IOCTL_PM_CFG */
-typedef struct _mlan_ds_pm_cfg
-{
+typedef struct _mlan_ds_pm_cfg {
     /** Sub-command */
 	t_u32 sub_command;
     /** Power management parameter */
-	union
-	{
+	union {
 	/** Power saving mode for MLAN_OID_PM_CFG_IEEE_PS */
 		t_u32 ps_mode;
 	/** Host Sleep configuration for MLAN_OID_PM_CFG_HS_CFG */
@@ -2155,8 +2069,7 @@ typedef struct _mlan_ds_pm_cfg
  *
  *  @sa woal_wmm_addts_req_ioctl
  */
-typedef struct
-{
+typedef struct {
 	mlan_cmd_result_e cmd_result; /**< Firmware execution result */
 
 	t_u32 timeout_ms;	      /**< Timeout value in milliseconds */
@@ -2177,8 +2090,7 @@ typedef struct
  *
  *  @sa woal_wmm_delts_req_ioctl
  */
-typedef struct
-{
+typedef struct {
 	mlan_cmd_result_e cmd_result;
 				  /**< Firmware execution result */
 	t_u8 ieee_reason_code;	  /**< IEEE reason code sent, unused for WMM */
@@ -2197,8 +2109,7 @@ typedef struct
  *
  *  @sa woal_wmm_queue_config_ioctl
  */
-typedef struct
-{
+typedef struct {
 	mlan_wmm_queue_config_action_e action;/**< Set, Get, or Default */
 	mlan_wmm_ac_e access_category;	      /**< WMM_AC_BK(0) to WMM_AC_VO(3) */
 	t_u16 msdu_lifetime_expiry;	      /**< lifetime expiry in TUs */
@@ -2214,8 +2125,7 @@ typedef struct
  *
  *  @sa woal_wmm_queue_stats_ioctl
  */
-typedef struct
-{
+typedef struct {
     /** Action of Queue Config : Start, Stop, or Get */
 	mlan_wmm_queue_stats_action_e action;
     /** User Priority */
@@ -2250,8 +2160,7 @@ typedef struct
 /**
  *  @brief IOCTL sub structure for a specific WMM AC Status
  */
-typedef struct
-{
+typedef struct {
     /** WMM Acm */
 	t_u8 wmm_acm;
     /** Flow required flag */
@@ -2271,8 +2180,7 @@ typedef struct
  *
  *  @sa woal_wmm_queue_status_ioctl
  */
-typedef struct
-{
+typedef struct {
     /** WMM AC queue status */
 	wlan_ioctl_wmm_queue_status_ac_t ac_status[MLAN_WMM_MAX_AC_QUEUES];
 } wlan_ioctl_wmm_queue_status_t,
@@ -2280,8 +2188,7 @@ typedef struct
  mlan_ds_wmm_queue_status, *pmlan_ds_wmm_queue_status;
 
 /** Type definition of mlan_ds_wmm_addts for MLAN_OID_WMM_CFG_ADDTS */
-typedef struct _mlan_ds_wmm_addts
-{
+typedef struct _mlan_ds_wmm_addts {
     /** Result of ADDTS request */
 	mlan_cmd_result_e result;
     /** Timeout value in milliseconds */
@@ -2291,14 +2198,13 @@ typedef struct _mlan_ds_wmm_addts
     /** Dialog token */
 	t_u8 dialog_tok;
     /** TSPEC data length */
-	t_u8 ie_data_len;
+	t_u32 ie_data_len;
     /** TSPEC to send in the ADDTS + buffering for any extra IEs */
 	t_u8 ie_data[MLAN_WMM_TSPEC_SIZE + MLAN_WMM_ADDTS_EXTRA_IE_BYTES];
 } mlan_ds_wmm_addts, *pmlan_ds_wmm_addts;
 
 /** Type definition of mlan_ds_wmm_delts for MLAN_OID_WMM_CFG_DELTS */
-typedef struct _mlan_ds_wmm_delts
-{
+typedef struct _mlan_ds_wmm_delts {
     /** Result of DELTS request */
 	mlan_cmd_result_e result;
     /** IEEE status code */
@@ -2310,8 +2216,7 @@ typedef struct _mlan_ds_wmm_delts
 } mlan_ds_wmm_delts, *pmlan_ds_wmm_delts;
 
 /** Type definition of mlan_ds_wmm_queue_config for MLAN_OID_WMM_CFG_QUEUE_CONFIG */
-typedef struct _mlan_ds_wmm_queue_config
-{
+typedef struct _mlan_ds_wmm_queue_config {
     /** Action of Queue Config : Set, Get, or Default */
 	mlan_wmm_queue_config_action_e action;
     /** WMM Access Category: WMM_AC_BK(0) to WMM_AC_VO(3) */
@@ -2323,13 +2228,11 @@ typedef struct _mlan_ds_wmm_queue_config
 } mlan_ds_wmm_queue_config, *pmlan_ds_wmm_queue_config;
 
 /** Type definition of mlan_ds_wmm_cfg for MLAN_IOCTL_WMM_CFG */
-typedef struct _mlan_ds_wmm_cfg
-{
+typedef struct _mlan_ds_wmm_cfg {
     /** Sub-command */
 	t_u32 sub_command;
     /** WMM configuration parameter */
-	union
-	{
+	union {
 	/** WMM enable for MLAN_OID_WMM_CFG_ENABLE */
 		t_u32 wmm_enable;
 	/** QoS configuration for MLAN_OID_WMM_CFG_QOS */
@@ -2353,20 +2256,17 @@ typedef struct _mlan_ds_wmm_cfg
 /** WPS Configuration Group */
 /*-----------------------------------------------------------------*/
 /** Enumeration for WPS session */
-enum _mlan_wps_status
-{
+enum _mlan_wps_status {
 	MLAN_WPS_CFG_SESSION_START = 1,
 	MLAN_WPS_CFG_SESSION_END = 0
 };
 
 /** Type definition of mlan_ds_wps_cfg for MLAN_IOCTL_WPS_CFG */
-typedef struct _mlan_ds_wps_cfg
-{
+typedef struct _mlan_ds_wps_cfg {
     /** Sub-command */
 	t_u32 sub_command;
     /** WPS configuration parameter */
-	union
-	{
+	union {
 	/** WPS session for MLAN_OID_WPS_CFG_SESSION */
 		t_u32 wps_session;
 	} param;
@@ -2390,8 +2290,7 @@ typedef struct _mlan_ds_wps_cfg
 #define BAND_SELECT_A       2
 
 /** Type definition of mlan_ds_11n_htcap_cfg for MLAN_OID_11N_HTCAP_CFG */
-typedef struct _mlan_ds_11n_htcap_cfg
-{
+typedef struct _mlan_ds_11n_htcap_cfg {
     /** HT Capability information */
 	t_u32 htcap;
     /** Band selection */
@@ -2401,8 +2300,7 @@ typedef struct _mlan_ds_11n_htcap_cfg
 } mlan_ds_11n_htcap_cfg, *pmlan_ds_11n_htcap_cfg;
 
 /** Type definition of mlan_ds_11n_addba_param for MLAN_OID_11N_CFG_ADDBA_PARAM */
-typedef struct _mlan_ds_11n_addba_param
-{
+typedef struct _mlan_ds_11n_addba_param {
     /** Timeout */
 	t_u32 timeout;
     /** Buffer size for ADDBA request */
@@ -2416,8 +2314,7 @@ typedef struct _mlan_ds_11n_addba_param
 } mlan_ds_11n_addba_param, *pmlan_ds_11n_addba_param;
 
 /** Type definition of mlan_ds_11n_tx_cfg for MLAN_OID_11N_CFG_TX */
-typedef struct _mlan_ds_11n_tx_cfg
-{
+typedef struct _mlan_ds_11n_tx_cfg {
     /** HTTxCap */
 	t_u16 httxcap;
     /** HTTxInfo */
@@ -2443,8 +2340,7 @@ typedef struct _mlan_ds_11n_tx_cfg
 /** Any new subcommand structure should be declare here */
 
 /** bf global cfg args */
-typedef struct _mlan_bf_global_cfg_args
-{
+typedef struct _mlan_bf_global_cfg_args {
     /** Global enable/disable bf */
 	t_u8 bf_enbl;
     /** Global enable/disable sounding */
@@ -2462,8 +2358,7 @@ typedef struct _mlan_bf_global_cfg_args
 } mlan_bf_global_cfg_args;
 
 /** trigger sounding args */
-typedef struct _mlan_trigger_sound_args
-{
+typedef struct _mlan_trigger_sound_args {
     /** Peer MAC address */
 	t_u8 peer_mac[MLAN_MAC_ADDR_LENGTH];
     /** Status */
@@ -2471,8 +2366,7 @@ typedef struct _mlan_trigger_sound_args
 } mlan_trigger_sound_args;
 
 /** bf periodicity args */
-typedef struct _mlan_bf_periodicity_args
-{
+typedef struct _mlan_bf_periodicity_args {
     /** Peer MAC address */
 	t_u8 peer_mac[MLAN_MAC_ADDR_LENGTH];
     /** Current Tx BF Interval in milliseconds */
@@ -2482,8 +2376,7 @@ typedef struct _mlan_bf_periodicity_args
 } mlan_bf_periodicity_args;
 
 /** tx bf peer args */
-typedef struct _mlan_tx_bf_peer_args
-{
+typedef struct _mlan_tx_bf_peer_args {
     /** Peer MAC address */
 	t_u8 peer_mac[MLAN_MAC_ADDR_LENGTH];
     /** Reserved */
@@ -2497,8 +2390,7 @@ typedef struct _mlan_tx_bf_peer_args
 } mlan_tx_bf_peer_args;
 
 /** SNR threshold args */
-typedef struct _mlan_snr_thr_args
-{
+typedef struct _mlan_snr_thr_args {
     /** Peer MAC address */
 	t_u8 peer_mac[MLAN_MAC_ADDR_LENGTH];
     /** SNR for peer */
@@ -2506,16 +2398,14 @@ typedef struct _mlan_snr_thr_args
 } mlan_snr_thr_args;
 
 /** Type definition of mlan_ds_11n_tx_bf_cfg for MLAN_OID_11N_CFG_TX_BF_CFG */
-typedef struct _mlan_ds_11n_tx_bf_cfg
-{
+typedef struct _mlan_ds_11n_tx_bf_cfg {
     /** BF Action */
 	t_u16 bf_action;
     /** Action */
 	t_u16 action;
     /** Number of peers */
 	t_u32 no_of_peers;
-	union
-	{
+	union {
 		mlan_bf_global_cfg_args bf_global_cfg;
 		mlan_trigger_sound_args bf_sound[MAX_PEER_MAC_TUPLES];
 		mlan_bf_periodicity_args bf_periodicity[MAX_PEER_MAC_TUPLES];
@@ -2526,8 +2416,7 @@ typedef struct _mlan_ds_11n_tx_bf_cfg
 
 /** Type definition of mlan_ds_11n_amsdu_aggr_ctrl for
  * MLAN_OID_11N_AMSDU_AGGR_CTRL*/
-typedef struct _mlan_ds_11n_amsdu_aggr_ctrl
-{
+typedef struct _mlan_ds_11n_amsdu_aggr_ctrl {
     /** Enable/Disable */
 	t_u16 enable;
     /** Current AMSDU size valid */
@@ -2535,8 +2424,7 @@ typedef struct _mlan_ds_11n_amsdu_aggr_ctrl
 } mlan_ds_11n_amsdu_aggr_ctrl, *pmlan_ds_11n_amsdu_aggr_ctrl;
 
 /** Type definition of mlan_ds_11n_aggr_prio_tbl for MLAN_OID_11N_CFG_AGGR_PRIO_TBL */
-typedef struct _mlan_ds_11n_aggr_prio_tbl
-{
+typedef struct _mlan_ds_11n_aggr_prio_tbl {
     /** ampdu priority table */
 	t_u8 ampdu[MAX_NUM_TID];
     /** amsdu priority table */
@@ -2551,8 +2439,7 @@ typedef struct _mlan_ds_11n_aggr_prio_tbl
 #define DELBA_RX        MBIT(1)
 
 /** Type definition of mlan_ds_11n_delba for MLAN_OID_11N_CFG_DELBA */
-typedef struct _mlan_ds_11n_delba
-{
+typedef struct _mlan_ds_11n_delba {
     /** TID */
 	t_u8 tid;
     /** Peer MAC address */
@@ -2562,8 +2449,7 @@ typedef struct _mlan_ds_11n_delba
 } mlan_ds_11n_delba, *pmlan_ds_11n_delba;
 
 /** Type definition of mlan_ds_delba for MLAN_OID_11N_CFG_REJECT_ADDBA_REQ */
-typedef struct _mlan_ds_reject_addba_req
-{
+typedef struct _mlan_ds_reject_addba_req {
     /** Bit0    : host sleep activated
      *  Bit1    : auto reconnect enabled
      *  Others  : reserved
@@ -2572,13 +2458,11 @@ typedef struct _mlan_ds_reject_addba_req
 } mlan_ds_reject_addba_req, *pmlan_ds_reject_addba_req;
 
 /** Type definition of mlan_ds_11n_cfg for MLAN_IOCTL_11N_CFG */
-typedef struct _mlan_ds_11n_cfg
-{
+typedef struct _mlan_ds_11n_cfg {
     /** Sub-command */
 	t_u32 sub_command;
     /** 802.11n configuration parameter */
-	union
-	{
+	union {
 	/** Tx param for 11n for MLAN_OID_11N_CFG_TX */
 		mlan_ds_11n_tx_cfg tx_cfg;
 	/** Aggr priority table for MLAN_OID_11N_CFG_AGGR_PRIO_TBL */
@@ -2619,8 +2503,7 @@ typedef struct _mlan_ds_11n_cfg
 
 #ifdef STA_SUPPORT
 /** Data structure for subband set */
-typedef struct _mlan_ds_subband_set_t
-{
+typedef struct _mlan_ds_subband_set_t {
     /** First channel */
 	t_u8 first_chan;
     /** Number of channels */
@@ -2630,8 +2513,7 @@ typedef struct _mlan_ds_subband_set_t
 } mlan_ds_subband_set_t;
 
 /** Domain regulatory information */
-typedef struct _mlan_ds_11d_domain_info
-{
+typedef struct _mlan_ds_11d_domain_info {
     /** Country Code */
 	t_u8 country_code[COUNTRY_CODE_LEN];
     /** Band that channels in sub_band belong to */
@@ -2644,13 +2526,11 @@ typedef struct _mlan_ds_11d_domain_info
 #endif
 
 /** Type definition of mlan_ds_11d_cfg for MLAN_IOCTL_11D_CFG */
-typedef struct _mlan_ds_11d_cfg
-{
+typedef struct _mlan_ds_11d_cfg {
     /** Sub-command */
 	t_u32 sub_command;
     /** 802.11d configuration parameter */
-	union
-	{
+	union {
 #ifdef STA_SUPPORT
 	/** Enable for MLAN_OID_11D_CFG_ENABLE */
 		t_u32 enable_11d;
@@ -2668,8 +2548,7 @@ typedef struct _mlan_ds_11d_cfg
 /** Register Memory Access Group */
 /*-----------------------------------------------------------------*/
 /** Enumeration for register type */
-enum _mlan_reg_type
-{
+enum _mlan_reg_type {
 	MLAN_REG_MAC = 1,
 	MLAN_REG_BBP,
 	MLAN_REG_RF,
@@ -2677,8 +2556,7 @@ enum _mlan_reg_type
 };
 
 /** Type definition of mlan_ds_reg_rw for MLAN_OID_REG_RW */
-typedef struct _mlan_ds_reg_rw
-{
+typedef struct _mlan_ds_reg_rw {
     /** Register type */
 	t_u32 type;
     /** Offset */
@@ -2691,8 +2569,7 @@ typedef struct _mlan_ds_reg_rw
 #define MAX_EEPROM_DATA 256
 
 /** Type definition of mlan_ds_read_eeprom for MLAN_OID_EEPROM_RD */
-typedef struct _mlan_ds_read_eeprom
-{
+typedef struct _mlan_ds_read_eeprom {
     /** Multiples of 4 */
 	t_u16 offset;
     /** Number of bytes */
@@ -2702,8 +2579,7 @@ typedef struct _mlan_ds_read_eeprom
 } mlan_ds_read_eeprom;
 
 /** Type definition of mlan_ds_mem_rw for MLAN_OID_MEM_RW */
-typedef struct _mlan_ds_mem_rw
-{
+typedef struct _mlan_ds_mem_rw {
     /** Address */
 	t_u32 addr;
     /** Value */
@@ -2711,13 +2587,11 @@ typedef struct _mlan_ds_mem_rw
 } mlan_ds_mem_rw;
 
 /** Type definition of mlan_ds_reg_mem for MLAN_IOCTL_REG_MEM */
-typedef struct _mlan_ds_reg_mem
-{
+typedef struct _mlan_ds_reg_mem {
     /** Sub-command */
 	t_u32 sub_command;
     /** Register memory access parameter */
-	union
-	{
+	union {
 	/** Register access for MLAN_OID_REG_RW */
 		mlan_ds_reg_rw reg_rw;
 	/** EEPROM access for MLAN_OID_EEPROM_RD */
@@ -2736,8 +2610,7 @@ typedef struct _mlan_ds_reg_mem
 /*-----------------------------------------------------------------*/
 #if defined(DFS_TESTING_SUPPORT)
 /** Type definition of mlan_ds_11h_dfs_testing for MLAN_OID_11H_DFS_TESTING */
-typedef struct _mlan_ds_11h_dfs_testing
-{
+typedef struct _mlan_ds_11h_dfs_testing {
     /** User-configured CAC period in milliseconds, 0 to use default */
 	t_u16 usr_cac_period_msec;
     /** User-configured NOP period in seconds, 0 to use default */
@@ -2750,12 +2623,10 @@ typedef struct _mlan_ds_11h_dfs_testing
 #endif
 
 /** Type definition of mlan_ds_11h_cfg for MLAN_IOCTL_11H_CFG */
-typedef struct _mlan_ds_11h_cfg
-{
+typedef struct _mlan_ds_11h_cfg {
     /** Sub-command */
 	t_u32 sub_command;
-	union
-	{
+	union {
 	/** Local power constraint for MLAN_OID_11H_LOCAL_POWER_CONSTRAINT */
 		t_s8 usr_local_power_constraint;
 #if defined(DFS_TESTING_SUPPORT)
@@ -2778,8 +2649,7 @@ typedef struct _mlan_ds_11h_cfg
 #define LDO_EXTERNAL            1
 
 /** Enumeration for IE type */
-enum _mlan_ie_type
-{
+enum _mlan_ie_type {
 	MLAN_IE_TYPE_GEN_IE = 0,
 #ifdef STA_SUPPORT
 	MLAN_IE_TYPE_ARP_FILTER,
@@ -2787,8 +2657,7 @@ enum _mlan_ie_type
 };
 
 /** Type definition of mlan_ds_misc_gen_ie for MLAN_OID_MISC_GEN_IE */
-typedef struct _mlan_ds_misc_gen_ie
-{
+typedef struct _mlan_ds_misc_gen_ie {
     /** IE type */
 	t_u32 type;
     /** IE length */
@@ -2799,8 +2668,7 @@ typedef struct _mlan_ds_misc_gen_ie
 
 #if defined(SDIO_MULTI_PORT_TX_AGGR) || defined(SDIO_MULTI_PORT_RX_AGGR)
 /** Type definition of mlan_ds_misc_sdio_mpa_ctrl for MLAN_OID_MISC_SDIO_MPA_CTRL */
-typedef struct _mlan_ds_misc_sdio_mpa_ctrl
-{
+typedef struct _mlan_ds_misc_sdio_mpa_ctrl {
     /** SDIO MP-A TX enable/disable */
 	t_u16 tx_enable;
     /** SDIO MP-A RX enable/disable */
@@ -2817,8 +2685,7 @@ typedef struct _mlan_ds_misc_sdio_mpa_ctrl
 #endif
 
 /** Type definition of mlan_ds_misc_cmd for MLAN_OID_MISC_HOST_CMD */
-typedef struct _mlan_ds_misc_cmd
-{
+typedef struct _mlan_ds_misc_cmd {
     /** Command length */
 	t_u32 len;
     /** Command buffer */
@@ -2834,8 +2701,7 @@ typedef struct _mlan_ds_misc_cmd
 #define MLAN_CLK_SUPPORTED   	1
 
 /** Type definition of mlan_ds_misc_sys_clock for MLAN_OID_MISC_SYS_CLOCK */
-typedef struct _mlan_ds_misc_sys_clock
-{
+typedef struct _mlan_ds_misc_sys_clock {
     /** Current system clock */
 	t_u16 cur_sys_clk;
     /** Clock type */
@@ -2850,8 +2716,7 @@ typedef struct _mlan_ds_misc_sys_clock
 #define ASSOC_RSP_BUF_SIZE 500
 
 /** Type definition of mlan_ds_misc_assoc_rsp for MLAN_OID_MISC_ASSOC_RSP */
-typedef struct _mlan_ds_misc_assoc_rsp
-{
+typedef struct _mlan_ds_misc_assoc_rsp {
     /** Associate response buffer */
 	t_u8 assoc_resp_buf[ASSOC_RSP_BUF_SIZE];
     /** Response buffer length */
@@ -2859,15 +2724,13 @@ typedef struct _mlan_ds_misc_assoc_rsp
 } mlan_ds_misc_assoc_rsp;
 
 /** Enumeration for function init/shutdown */
-enum _mlan_func_cmd
-{
+enum _mlan_func_cmd {
 	MLAN_FUNC_INIT = 1,
 	MLAN_FUNC_SHUTDOWN,
 };
 
 /** Type definition of mlan_ds_misc_tx_datapause for MLAN_OID_MISC_TX_DATAPAUSE */
-typedef struct _mlan_ds_misc_tx_datapause
-{
+typedef struct _mlan_ds_misc_tx_datapause {
     /** Tx data pause flag */
 	t_u16 tx_pause;
     /** Max number of Tx buffers for all PS clients */
@@ -2890,8 +2753,7 @@ typedef struct _mlan_ds_misc_tx_datapause
 #define MLAN_IPADDR_OP_AUTO_ARP_RESP    MBIT(1)
 
 /** Type definition of mlan_ds_misc_ipaddr_cfg for MLAN_OID_MISC_IP_ADDR */
-typedef struct _mlan_ds_misc_ipaddr_cfg
-{
+typedef struct _mlan_ds_misc_ipaddr_cfg {
     /** Operation code */
 	t_u32 op_code;
     /** IP address type */
@@ -2912,21 +2774,18 @@ typedef struct _mlan_ds_misc_ipaddr_cfg
 #define MEF_CFG_HOSTCMD             0xFFFF
 
 /** Type definition of mlan_ds_misc_mef_cfg for MLAN_OID_MISC_MEF_CFG */
-typedef struct _mlan_ds_misc_mef_cfg
-{
+typedef struct _mlan_ds_misc_mef_cfg {
     /** Sub-ID for operation */
 	t_u32 sub_id;
     /** Parameter according to sub-ID */
-	union
-	{
+	union {
 	/** MEF command buffer for MEF_CFG_HOSTCMD */
 		mlan_ds_misc_cmd cmd_buf;
 	} param;
 } mlan_ds_misc_mef_cfg;
 
 /** Type definition of mlan_ds_misc_cfp_code for MLAN_OID_MISC_CFP_CODE */
-typedef struct _mlan_ds_misc_cfp_code
-{
+typedef struct _mlan_ds_misc_cfp_code {
     /** CFP table code for 2.4GHz */
 	t_u32 cfp_code_bg;
     /** CFP table code for 5GHz */
@@ -2934,8 +2793,7 @@ typedef struct _mlan_ds_misc_cfp_code
 } mlan_ds_misc_cfp_code;
 
 /** Type definition of mlan_ds_misc_country_code for MLAN_OID_MISC_COUNTRY_CODE */
-typedef struct _mlan_ds_misc_country_code
-{
+typedef struct _mlan_ds_misc_country_code {
     /** Country Code */
 	t_u8 country_code[COUNTRY_CODE_LEN];
 } mlan_ds_misc_country_code;
@@ -2972,8 +2830,7 @@ typedef struct _mlan_ds_misc_country_code
 #define DEFAULT_PRE_BEACON_MISS			30
 
 /** Type definition of mlan_ds_subscribe_evt for MLAN_OID_MISC_CFP_CODE */
-typedef struct _mlan_ds_subscribe_evt
-{
+typedef struct _mlan_ds_subscribe_evt {
     /** evt action */
 	t_u16 evt_action;
     /** bitmap for subscribe event */
@@ -3038,8 +2895,7 @@ typedef struct _mlan_ds_subscribe_evt
 #define MAX_OTP_USER_DATA_LEN	252
 
 /** Type definition of mlan_ds_misc_otp_user_data for MLAN_OID_MISC_OTP_USER_DATA */
-typedef struct _mlan_ds_misc_otp_user_data
-{
+typedef struct _mlan_ds_misc_otp_user_data {
     /** Reserved */
 	t_u16 reserved;
     /** OTP user data length */
@@ -3048,9 +2904,34 @@ typedef struct _mlan_ds_misc_otp_user_data
 	t_u8 user_data[MAX_OTP_USER_DATA_LEN];
 } mlan_ds_misc_otp_user_data;
 
+#ifdef WIFI_DIRECT_SUPPORT
+/** flag for NOA */
+#define WIFI_DIRECT_NOA         1
+/** flag for OPP_PS */
+#define WIFI_DIRECT_OPP_PS      2
+/** Type definition of mlan_ds_wifi_direct_config for MLAN_OID_MISC_WIFI_DIRECT_CONFIG */
+typedef struct _mlan_ds_wifi_direct_config {
+    /** flags for NOA/OPP_PS */
+	t_u8 flags;
+     /** NoA enable/disable */
+	t_u8 noa_enable;
+    /** index */
+	t_u16 index;
+    /** NoA count */
+	t_u8 noa_count;
+    /** NoA duration */
+	t_u32 noa_duration;
+    /** NoA interval */
+	t_u32 noa_interval;
+    /** opp ps enable/disable */
+	t_u8 opp_ps_enable;
+    /** CT window value */
+	t_u8 ct_window;
+} mlan_ds_wifi_direct_config;
+#endif
+
 #if defined(STA_SUPPORT)
-typedef struct _mlan_ds_misc_pmfcfg
-{
+typedef struct _mlan_ds_misc_pmfcfg {
     /** Management Frame Protection Capable */
 	t_u8 mfpc;
     /** Management Frame Protection Required */
@@ -3059,13 +2940,11 @@ typedef struct _mlan_ds_misc_pmfcfg
 #endif
 
 /** Type definition of mlan_ds_misc_cfg for MLAN_IOCTL_MISC_CFG */
-typedef struct _mlan_ds_misc_cfg
-{
+typedef struct _mlan_ds_misc_cfg {
     /** Sub-command */
 	t_u32 sub_command;
     /** Miscellaneous configuration parameter */
-	union
-	{
+	union {
 	/** Generic IE for MLAN_OID_MISC_GEN_IE */
 		mlan_ds_misc_gen_ie gen_ie;
 	/** Region code for MLAN_OID_MISC_REGION */
@@ -3116,6 +2995,9 @@ typedef struct _mlan_ds_misc_cfg
 		t_u32 tx_control;
 #if defined(STA_SUPPORT)
 		mlan_ds_misc_pmfcfg pmfcfg;
+#endif
+#ifdef WIFI_DIRECT_SUPPORT
+		mlan_ds_wifi_direct_config p2p_config;
 #endif
 	} param;
 } mlan_ds_misc_cfg, *pmlan_ds_misc_cfg;

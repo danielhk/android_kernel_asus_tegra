@@ -35,15 +35,15 @@ Change Log:
 #include "mlan_11h.h"
 #include "mlan_sdio.h"
 /********************************************************
-                Local Variables
+			Local Variables
 ********************************************************/
 
 /*******************************************************
-                Global Variables
+			Global Variables
 ********************************************************/
 
 /********************************************************
-                Local Functions
+			Local Functions
 ********************************************************/
 #ifdef STA_SUPPORT
 /**
@@ -59,14 +59,14 @@ wlan_check_scan_queue(IN pmlan_adapter pmadapter)
 	cmd_ctrl_node *pcmd_node = MNULL;
 	t_u16 num = 0;
 
-	if (!
-	    (pcmd_node =
-	     (cmd_ctrl_node *) util_peek_list(pmadapter->pmoal_handle,
-					      &pmadapter->scan_pending_q,
-					      pmadapter->callbacks.
-					      moal_spin_lock,
-					      pmadapter->callbacks.
-					      moal_spin_unlock))) {
+	pcmd_node =
+		(cmd_ctrl_node *) util_peek_list(pmadapter->pmoal_handle,
+						 &pmadapter->scan_pending_q,
+						 pmadapter->callbacks.
+						 moal_spin_lock,
+						 pmadapter->callbacks.
+						 moal_spin_unlock);
+	if (!pcmd_node) {
 		PRINTM(MERROR, "No pending scan command\n");
 		return;
 	}
@@ -93,14 +93,14 @@ wlan_dump_pending_commands(pmlan_adapter pmadapter)
 
 	ENTER();
 
-	if (!
-	    (pcmd_node =
-	     (cmd_ctrl_node *) util_peek_list(pmadapter->pmoal_handle,
-					      &pmadapter->cmd_pending_q,
-					      pmadapter->callbacks.
-					      moal_spin_lock,
-					      pmadapter->callbacks.
-					      moal_spin_unlock))) {
+	pcmd_node =
+		(cmd_ctrl_node *) util_peek_list(pmadapter->pmoal_handle,
+						 &pmadapter->cmd_pending_q,
+						 pmadapter->callbacks.
+						 moal_spin_lock,
+						 pmadapter->callbacks.
+						 moal_spin_unlock);
+	if (!pcmd_node) {
 		LEAVE();
 		return;
 	}
@@ -331,7 +331,7 @@ wlan_atox(t_u8 * a)
  *  @brief This function parse cal data from ASCII to hex
  *
  *  @param src          A pointer to source data
- *  @param len          Source dara length
+ *  @param len          Source data length
  *  @param dst          A pointer to a buf to store the parsed data
  *
  *  @return             The parsed hex data length
@@ -360,7 +360,7 @@ wlan_parse_cal_cfg(t_u8 * src, t_size len, t_u8 * dst)
 		}
 	}
 	LEAVE();
-	return (dptr - dst);
+	return dptr - dst;
 }
 
 /**
@@ -500,14 +500,14 @@ wlan_get_pending_ioctl_by_id(pmlan_adapter pmadapter, t_u32 req_id)
 
 	ENTER();
 
-	if (!
-	    (pcmd_node =
-	     (cmd_ctrl_node *) util_peek_list(pmadapter->pmoal_handle,
-					      &pmadapter->cmd_pending_q,
-					      pmadapter->callbacks.
-					      moal_spin_lock,
-					      pmadapter->callbacks.
-					      moal_spin_unlock))) {
+	pcmd_node =
+		(cmd_ctrl_node *) util_peek_list(pmadapter->pmoal_handle,
+						 &pmadapter->cmd_pending_q,
+						 pmadapter->callbacks.
+						 moal_spin_lock,
+						 pmadapter->callbacks.
+						 moal_spin_unlock);
+	if (!pcmd_node) {
 		LEAVE();
 		return MNULL;
 	}
@@ -542,14 +542,14 @@ wlan_get_pending_ioctl_cmd(pmlan_adapter pmadapter, pmlan_ioctl_req pioctl_req)
 
 	ENTER();
 
-	if (!
-	    (pcmd_node =
-	     (cmd_ctrl_node *) util_peek_list(pmadapter->pmoal_handle,
-					      &pmadapter->cmd_pending_q,
-					      pmadapter->callbacks.
-					      moal_spin_lock,
-					      pmadapter->callbacks.
-					      moal_spin_unlock))) {
+	pcmd_node =
+		(cmd_ctrl_node *) util_peek_list(pmadapter->pmoal_handle,
+						 &pmadapter->cmd_pending_q,
+						 pmadapter->callbacks.
+						 moal_spin_lock,
+						 pmadapter->callbacks.
+						 moal_spin_unlock);
+	if (!pcmd_node) {
 		LEAVE();
 		return MNULL;
 	}
@@ -581,14 +581,14 @@ wlan_get_bss_pending_ioctl_cmd(pmlan_adapter pmadapter, t_u32 bss_index)
 	mlan_ioctl_req *pioctl_buf = MNULL;
 	ENTER();
 
-	if (!
-	    (pcmd_node =
-	     (cmd_ctrl_node *) util_peek_list(pmadapter->pmoal_handle,
-					      &pmadapter->cmd_pending_q,
-					      pmadapter->callbacks.
-					      moal_spin_lock,
-					      pmadapter->callbacks.
-					      moal_spin_unlock))) {
+	pcmd_node =
+		(cmd_ctrl_node *) util_peek_list(pmadapter->pmoal_handle,
+						 &pmadapter->cmd_pending_q,
+						 pmadapter->callbacks.
+						 moal_spin_lock,
+						 pmadapter->callbacks.
+						 moal_spin_unlock);
+	if (!pcmd_node) {
 		LEAVE();
 		return MNULL;
 	}
@@ -680,6 +680,7 @@ wlan_dnld_cmd_to_fw(IN mlan_private * pmpriv, IN cmd_ctrl_node * pcmd_node)
 	mlan_ioctl_req *pioctl_buf = MNULL;
 	t_u16 cmd_code;
 	t_u16 cmd_size;
+	t_u32 age_ts_usec;
 #ifdef DEBUG_LEVEL1
 	t_u32 sec = 0, usec = 0;
 #endif
@@ -784,6 +785,9 @@ wlan_dnld_cmd_to_fw(IN mlan_private * pmpriv, IN cmd_ctrl_node * pcmd_node)
 		}
 		goto done;
 	}
+	pmadapter->callbacks.moal_get_system_time(pmadapter->pmoal_handle,
+						  &pmadapter->dnld_cmd_in_secs,
+						  &age_ts_usec);
 
 	/* Setup the timer after transmit command */
 	pcb->moal_start_timer(pmadapter->pmoal_handle,
@@ -810,7 +814,7 @@ static mlan_status
 wlan_dnld_sleep_confirm_cmd(mlan_adapter * pmadapter)
 {
 	mlan_status ret = MLAN_STATUS_SUCCESS;
-	static t_u32 i = 0;
+	static t_u32 i;
 	t_u16 cmd_len = 0;
 	opt_sleep_confirm_buffer *sleep_cfm_buf =
 		(opt_sleep_confirm_buffer *) (pmadapter->psleep_cfm->pbuf +
@@ -881,7 +885,7 @@ done:
 }
 
 /********************************************************
-                Global Functions
+			Global Functions
 ********************************************************/
 
 /**
@@ -955,11 +959,11 @@ wlan_alloc_cmd_buffer(IN mlan_adapter * pmadapter)
 
 	/* Allocate and initialize command buffers */
 	for (i = 0; i < MRVDRV_NUM_OF_CMD_BUFFER; i++) {
-		if (!(pcmd_array[i].pmbuf = wlan_alloc_mlan_buffer(pmadapter,
-								   MRVDRV_SIZE_OF_CMD_BUFFER,
-								   0,
-								   MOAL_MALLOC_BUFFER)))
-		{
+		pcmd_array[i].pmbuf = wlan_alloc_mlan_buffer(pmadapter,
+							     MRVDRV_SIZE_OF_CMD_BUFFER,
+							     0,
+							     MOAL_MALLOC_BUFFER);
+		if (!pcmd_array[i].pmbuf) {
 			PRINTM(MERROR,
 			       "ALLOC_CMD_BUF: Failed to allocate command buffer\n");
 			ret = MLAN_STATUS_FAILURE;
@@ -1727,18 +1731,6 @@ wlan_cmd_timeout_func(t_void * function_context)
 
 	if (pmadapter->hw_status == WlanHardwareStatusInitializing)
 		wlan_init_fw_complete(pmadapter);
-	else {
-		/* Signal MOAL to perform extra handling for debugging */
-		if (pmpriv) {
-			wlan_recv_event(pmpriv, MLAN_EVENT_ID_DRV_DBG_DUMP,
-					MNULL);
-		} else {
-			wlan_recv_event(wlan_get_priv
-					(pmadapter, MLAN_BSS_ROLE_ANY),
-					MLAN_EVENT_ID_DRV_DBG_DUMP, MNULL);
-		}
-	}
-
 exit:
 	LEAVE();
 	return;
@@ -3577,6 +3569,186 @@ wlan_ret_wifi_direct_mode(IN pmlan_private pmpriv,
 	LEAVE();
 	return MLAN_STATUS_SUCCESS;
 }
+
+/**
+ *  @brief This function prepares command of p2p_params_config.
+ *
+ *  @param pmpriv       A pointer to mlan_private structure
+ *  @param cmd          A pointer to HostCmd_DS_COMMAND structure
+ *  @param cmd_action   The action: GET or SET
+ *  @param pdata_buf    A pointer to data buffer
+ *
+ *  @return             MLAN_STATUS_SUCCESS
+ */
+mlan_status
+wlan_cmd_p2p_params_config(IN pmlan_private pmpriv,
+			   IN HostCmd_DS_COMMAND * cmd,
+			   IN t_u16 cmd_action, IN t_void * pdata_buf)
+{
+	HostCmd_DS_WIFI_DIRECT_PARAM_CONFIG *p2p_config =
+		&cmd->params.p2p_params_config;
+	mlan_ds_wifi_direct_config *cfg =
+		(mlan_ds_wifi_direct_config *) pdata_buf;
+	MrvlIEtypes_NoA_setting_t *pNoA_tlv = MNULL;
+	MrvlIEtypes_OPP_PS_setting_t *pOPP_PS_tlv = MNULL;
+	t_u8 *tlv = MNULL;
+	ENTER();
+
+	cmd->size = sizeof(HostCmd_DS_WIFI_DIRECT_PARAM_CONFIG) + S_DS_GEN;
+	cmd->command = wlan_cpu_to_le16(HOST_CMD_P2P_PARAMS_CONFIG);
+	p2p_config->action = wlan_cpu_to_le16(cmd_action);
+	if (cmd_action == HostCmd_ACT_GEN_SET) {
+		tlv = (t_u8 *) p2p_config +
+			sizeof(HostCmd_DS_WIFI_DIRECT_PARAM_CONFIG);
+		if (cfg->flags & WIFI_DIRECT_NOA) {
+			pNoA_tlv = (MrvlIEtypes_NoA_setting_t *) tlv;
+			pNoA_tlv->header.type =
+				wlan_cpu_to_le16(TLV_TYPE_WIFI_DIRECT_NOA);
+			pNoA_tlv->header.len =
+				wlan_cpu_to_le16(sizeof
+						 (MrvlIEtypes_NoA_setting_t) -
+						 sizeof(MrvlIEtypesHeader_t));
+			pNoA_tlv->enable = cfg->noa_enable;
+			pNoA_tlv->index = wlan_cpu_to_le16(cfg->index);
+			pNoA_tlv->noa_count = cfg->noa_count;
+			pNoA_tlv->noa_duration =
+				wlan_cpu_to_le32(cfg->noa_duration);
+			pNoA_tlv->noa_interval =
+				wlan_cpu_to_le32(cfg->noa_interval);
+			cmd->size += sizeof(MrvlIEtypes_NoA_setting_t);
+			tlv += sizeof(MrvlIEtypes_NoA_setting_t);
+			PRINTM(MCMND,
+			       "Set NOA: enable=%d index=%d, count=%d, duration=%d interval=%d\n",
+			       cfg->noa_enable, cfg->index, cfg->noa_count,
+			       (int)cfg->noa_duration, (int)cfg->noa_interval);
+		}
+		if (cfg->flags & WIFI_DIRECT_OPP_PS) {
+			pOPP_PS_tlv = (MrvlIEtypes_OPP_PS_setting_t *) tlv;
+			pOPP_PS_tlv->header.type =
+				wlan_cpu_to_le16(TLV_TYPE_WIFI_DIRECT_OPP_PS);
+			pOPP_PS_tlv->header.len =
+				wlan_cpu_to_le16(sizeof
+						 (MrvlIEtypes_OPP_PS_setting_t)
+						 - sizeof(MrvlIEtypesHeader_t));
+			pOPP_PS_tlv->enable = cfg->opp_ps_enable;
+			pOPP_PS_tlv->ct_window = cfg->ct_window;
+			cmd->size += sizeof(MrvlIEtypes_OPP_PS_setting_t);
+			PRINTM(MCMND, "Set OPP_PS: enable=%d ct_win=%d\n",
+			       cfg->opp_ps_enable, cfg->ct_window);
+		}
+	}
+	cmd->size = wlan_cpu_to_le16(cmd->size);
+	LEAVE();
+	return MLAN_STATUS_SUCCESS;
+}
+
+/**
+ *  @brief This function handles the command response of p2p_params_config
+ *
+ *  @param pmpriv       A pointer to mlan_private structure
+ *  @param resp         A pointer to HostCmd_DS_COMMAND
+ *  @param pioctl_buf   A pointer to mlan_ioctl_req structure
+ *
+ *  @return             MLAN_STATUS_SUCCESS
+ */
+mlan_status
+wlan_ret_p2p_params_config(IN pmlan_private pmpriv,
+			   IN HostCmd_DS_COMMAND * resp,
+			   IN mlan_ioctl_req * pioctl_buf)
+{
+	HostCmd_DS_WIFI_DIRECT_PARAM_CONFIG *p2p_config =
+		&resp->params.p2p_params_config;
+	mlan_ds_misc_cfg *cfg = MNULL;
+	MrvlIEtypes_NoA_setting_t *pNoA_tlv = MNULL;
+	MrvlIEtypes_OPP_PS_setting_t *pOPP_PS_tlv = MNULL;
+	MrvlIEtypesHeader_t *tlv = MNULL;
+	t_u16 tlv_buf_left = 0;
+	t_u16 tlv_type = 0;
+	t_u16 tlv_len = 0;
+
+	ENTER();
+	if (wlan_le16_to_cpu(p2p_config->action) == HostCmd_ACT_GEN_GET) {
+		if (pioctl_buf) {
+			cfg = (mlan_ds_misc_cfg *) pioctl_buf->pbuf;
+			tlv = (MrvlIEtypesHeader_t *) ((t_u8 *) p2p_config +
+						       sizeof
+						       (HostCmd_DS_WIFI_DIRECT_PARAM_CONFIG));
+			tlv_buf_left =
+				resp->size -
+				(sizeof(HostCmd_DS_WIFI_DIRECT_PARAM_CONFIG) +
+				 S_DS_GEN);
+			while (tlv_buf_left >= sizeof(MrvlIEtypesHeader_t)) {
+				tlv_type = wlan_le16_to_cpu(tlv->type);
+				tlv_len = wlan_le16_to_cpu(tlv->len);
+				if (tlv_buf_left <
+				    (tlv_len + sizeof(MrvlIEtypesHeader_t))) {
+					PRINTM(MERROR,
+					       "Error processing p2p param config TLVs, bytes left < TLV length\n");
+					break;
+				}
+				switch (tlv_type) {
+				case TLV_TYPE_WIFI_DIRECT_NOA:
+					pNoA_tlv =
+						(MrvlIEtypes_NoA_setting_t *)
+						tlv;
+					cfg->param.p2p_config.flags |=
+						WIFI_DIRECT_NOA;
+					cfg->param.p2p_config.noa_enable =
+						pNoA_tlv->enable;
+					cfg->param.p2p_config.index =
+						wlan_le16_to_cpu(pNoA_tlv->
+								 index);
+					cfg->param.p2p_config.noa_count =
+						pNoA_tlv->noa_count;
+					cfg->param.p2p_config.noa_duration =
+						wlan_le32_to_cpu(pNoA_tlv->
+								 noa_duration);
+					cfg->param.p2p_config.noa_interval =
+						wlan_le32_to_cpu(pNoA_tlv->
+								 noa_interval);
+					PRINTM(MCMND,
+					       "Get NOA: enable=%d index=%d, count=%d, duration=%d interval=%d\n",
+					       cfg->param.p2p_config.noa_enable,
+					       cfg->param.p2p_config.index,
+					       cfg->param.p2p_config.noa_count,
+					       (int)cfg->param.p2p_config.
+					       noa_duration,
+					       (int)cfg->param.p2p_config.
+					       noa_interval);
+					break;
+				case TLV_TYPE_SSID:
+					pOPP_PS_tlv =
+						(MrvlIEtypes_OPP_PS_setting_t *)
+						tlv;
+					cfg->param.p2p_config.flags |=
+						WIFI_DIRECT_OPP_PS;
+					cfg->param.p2p_config.opp_ps_enable =
+						pOPP_PS_tlv->enable;
+					cfg->param.p2p_config.ct_window =
+						pOPP_PS_tlv->ct_window;
+					PRINTM(MCMND,
+					       "Get OPP_PS: enable=%d ct_win=%d\n",
+					       cfg->param.p2p_config.
+					       opp_ps_enable,
+					       cfg->param.p2p_config.ct_window);
+					break;
+				default:
+					break;
+				}
+				tlv_buf_left -=
+					tlv_len + sizeof(MrvlIEtypesHeader_t);
+				tlv = (MrvlIEtypesHeader_t *) ((t_u8 *) tlv +
+							       tlv_len +
+							       sizeof
+							       (MrvlIEtypesHeader_t));
+			}
+			pioctl_buf->data_read_written =
+				sizeof(mlan_ds_wifi_direct_config);
+		}
+	}
+	LEAVE();
+	return MLAN_STATUS_SUCCESS;
+}
 #endif
 
 /**
@@ -3649,8 +3821,7 @@ wlan_cmd_802_11_rf_antenna(IN pmlan_private pmpriv,
 {
 	HostCmd_DS_802_11_RF_ANTENNA *pantenna = &cmd->params.antenna;
 	mlan_ds_ant_cfg *ant_cfg = (mlan_ds_ant_cfg *) pdata_buf;
-	typedef struct _HostCmd_DS_802_11_RF_ANTENNA_1X1
-	{
+	typedef struct _HostCmd_DS_802_11_RF_ANTENNA_1X1 {
 	/** Action */
 		t_u16 action;
 	/**  Antenna or 0xffff (diversity) */
@@ -3719,8 +3890,7 @@ wlan_ret_802_11_rf_antenna(IN pmlan_private pmpriv,
 	HostCmd_DS_802_11_RF_ANTENNA *pantenna = &resp->params.antenna;
 	t_u16 tx_ant_mode = wlan_le16_to_cpu(pantenna->tx_antenna_mode);
 	t_u16 rx_ant_mode = wlan_le16_to_cpu(pantenna->rx_antenna_mode);
-	typedef struct _HostCmd_DS_802_11_RF_ANTENNA_1X1
-	{
+	typedef struct _HostCmd_DS_802_11_RF_ANTENNA_1X1 {
 	    /** Action */
 		t_u16 action;
 	    /**  Antenna or 0xffff (diversity) */

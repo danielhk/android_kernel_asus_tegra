@@ -38,11 +38,11 @@ Change Log:
 #endif
 
 /********************************************************
-                Local Variables
+			Local Variables
 ********************************************************/
 
 /********************************************************
-                Global Variables
+			Global Variables
 ********************************************************/
 #if defined(STA_SUPPORT) && defined(UAP_SUPPORT)
 extern mlan_operations *mlan_ops[];
@@ -50,7 +50,7 @@ extern mlan_operations *mlan_ops[];
 extern t_u8 ac_to_tid[4][2];
 
 /********************************************************
-                Local Functions
+			Local Functions
 ********************************************************/
 
 /** Custom IE auto index and mask */
@@ -275,7 +275,7 @@ wlan_custom_ioctl_auto_delete(IN pmlan_private pmpriv,
 }
 
 /********************************************************
-                Global Functions
+			Global Functions
 ********************************************************/
 
 /**
@@ -465,7 +465,8 @@ wlan_get_info_debug_info(IN pmlan_adapter pmadapter,
 			info->param.debug_info.last_event_index;
 		pmadapter->dbg.num_no_cmd_node =
 			info->param.debug_info.num_no_cmd_node;
-
+		pmadapter->dnld_cmd_in_secs =
+			info->param.debug_info.dnld_cmd_in_secs;
 		pmadapter->data_sent = info->param.debug_info.data_sent;
 		pmadapter->cmd_sent = info->param.debug_info.cmd_sent;
 		pmadapter->mp_rd_bitmap = info->param.debug_info.mp_rd_bitmap;
@@ -591,6 +592,11 @@ wlan_get_info_debug_info(IN pmlan_adapter pmadapter,
 			pmadapter->dbg.last_event_index;
 		info->param.debug_info.num_no_cmd_node =
 			pmadapter->dbg.num_no_cmd_node;
+		info->param.debug_info.pending_cmd =
+			(pmadapter->curr_cmd) ? pmadapter->dbg.
+			last_cmd_id[pmadapter->dbg.last_cmd_index] : 0;
+		info->param.debug_info.dnld_cmd_in_secs =
+			pmadapter->dnld_cmd_in_secs;
 		info->param.debug_info.mp_rd_bitmap = pmadapter->mp_rd_bitmap;
 		info->param.debug_info.mp_wr_bitmap = pmadapter->mp_wr_bitmap;
 		info->param.debug_info.curr_rd_port = pmadapter->curr_rd_port;
@@ -1557,12 +1563,13 @@ wlan_get_station_entry(mlan_private * priv, t_u8 * mac)
 		LEAVE();
 		return MNULL;
 	}
-	if (!(sta_ptr = (sta_node *) util_peek_list(priv->adapter->pmoal_handle,
-						    &priv->sta_list,
-						    priv->adapter->callbacks.
-						    moal_spin_lock,
-						    priv->adapter->callbacks.
-						    moal_spin_unlock))) {
+	sta_ptr = (sta_node *) util_peek_list(priv->adapter->pmoal_handle,
+					      &priv->sta_list,
+					      priv->adapter->callbacks.
+					      moal_spin_lock,
+					      priv->adapter->callbacks.
+					      moal_spin_unlock);
+	if (!sta_ptr) {
 		LEAVE();
 		return MNULL;
 	}
@@ -1638,7 +1645,8 @@ wlan_delete_station_entry(mlan_private * priv, t_u8 * mac)
 	ENTER();
 	pmadapter->callbacks.moal_spin_lock(pmadapter->pmoal_handle,
 					    priv->wmm.ra_list_spinlock);
-	if ((sta_ptr = wlan_get_station_entry(priv, mac))) {
+	sta_ptr = wlan_get_station_entry(priv, mac);
+	if (sta_ptr) {
 		util_unlink_list(priv->adapter->pmoal_handle, &priv->sta_list,
 				 (pmlan_linked_list) sta_ptr,
 				 priv->adapter->callbacks.moal_spin_lock,
@@ -2812,6 +2820,45 @@ wlan_radio_ioctl_remain_chan_cfg(IN pmlan_adapter pmadapter,
 			       0,
 			       (t_void *) pioctl_req,
 			       &radio_cfg->param.remain_chan);
+
+	if (ret == MLAN_STATUS_SUCCESS)
+		ret = MLAN_STATUS_PENDING;
+
+	LEAVE();
+	return ret;
+}
+
+/**
+ *  @brief Set/Get p2p config
+ *
+ *  @param pmadapter	A pointer to mlan_adapter structure
+ *  @param pioctl_req	A pointer to ioctl request buffer
+ *
+ *  @return		MLAN_STATUS_SUCCESS --success, otherwise fail
+ */
+mlan_status
+wlan_misc_p2p_config(IN pmlan_adapter pmadapter, IN pmlan_ioctl_req pioctl_req)
+{
+	mlan_status ret = MLAN_STATUS_SUCCESS;
+	mlan_ds_misc_cfg *misc_cfg = MNULL;
+	t_u16 cmd_action = 0;
+	mlan_private *pmpriv = pmadapter->priv[pioctl_req->bss_index];
+
+	ENTER();
+
+	misc_cfg = (mlan_ds_misc_cfg *) pioctl_req->pbuf;
+	if (pioctl_req->action == MLAN_ACT_SET)
+		cmd_action = HostCmd_ACT_GEN_SET;
+	else
+		cmd_action = HostCmd_ACT_GEN_GET;
+
+	/* Send request to firmware */
+	ret = wlan_prepare_cmd(pmpriv,
+			       HOST_CMD_P2P_PARAMS_CONFIG,
+			       cmd_action,
+			       0,
+			       (t_void *) pioctl_req,
+			       &misc_cfg->param.p2p_config);
 
 	if (ret == MLAN_STATUS_SUCCESS)
 		ret = MLAN_STATUS_PENDING;

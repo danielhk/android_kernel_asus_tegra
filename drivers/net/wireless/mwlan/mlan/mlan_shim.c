@@ -38,11 +38,11 @@ Change log:
 #include "mlan_11h.h"
 
 /********************************************************
-                Local Variables
+			Local Variables
 ********************************************************/
 
 /********************************************************
-        Global Variables
+			Global Variables
 ********************************************************/
 #ifdef STA_SUPPORT
 mlan_operations mlan_sta_ops = {
@@ -119,11 +119,11 @@ t_u32 mlan_drvdbg = DEFAULT_DEBUG_MASK;
 #endif
 
 /********************************************************
-        Local Functions
+			Local Functions
 *******************************************************/
 
 /********************************************************
-        Global Functions
+			Global Functions
 ********************************************************/
 
 /**
@@ -242,7 +242,8 @@ mlan_register(IN pmlan_device pmdevice, OUT t_void ** ppmlan_adapter)
 	pmadapter->init_para.int_mode = pmdevice->int_mode;
 	pmadapter->init_para.gpio_pin = pmdevice->gpio_pin;
 	/* card specific probing has been deferred until now .. */
-	if (MLAN_STATUS_SUCCESS != (ret = wlan_sdio_probe(pmadapter))) {
+	ret = wlan_sdio_probe(pmadapter);
+	if (MLAN_STATUS_SUCCESS != ret) {
 		ret = MLAN_STATUS_FAILURE;
 		goto error;
 	}
@@ -716,23 +717,11 @@ mlan_rx_process(IN t_void * pmlan_adapter)
 					MNULL);
 		}
 		wlan_handle_rx_packet(pmadapter, pmbuf);
-		if (pmadapter->rx_lock_flag) {
-			PRINTM(MEVENT, "detect rx lock flag....\n");
-			wlan_recv_event(wlan_get_priv
-					(pmadapter, MLAN_BSS_ROLE_ANY),
-					MLAN_EVENT_ID_MLAN_WAKEUP, MNULL);
-			break;
-		}
 	}
 	pcb->moal_spin_lock(pmadapter->pmoal_handle, pmadapter->prx_proc_lock);
 	pmadapter->mlan_rx_processing = MFALSE;
 	pcb->moal_spin_unlock(pmadapter->pmoal_handle,
 			      pmadapter->prx_proc_lock);
-	if (pmadapter->rx_lock_flag) {
-		PRINTM(MEVENT, "detect rx lock flag....\n");
-		wlan_recv_event(wlan_get_priv(pmadapter, MLAN_BSS_ROLE_ANY),
-				MLAN_EVENT_ID_MLAN_WAKEUP, MNULL);
-	}
 exit_rx_proc:
 	LEAVE();
 	return ret;
@@ -796,8 +785,12 @@ process_start:
 			if (pmadapter->hs_activated == MTRUE)
 				wlan_process_hs_config(pmadapter);
 			wlan_process_int_status(pmadapter);
+			if (pmadapter->data_received)
+				wlan_recv_event(wlan_get_priv
+						(pmadapter, MLAN_BSS_ROLE_ANY),
+						MLAN_EVENT_ID_DRV_DEFER_RX_WORK,
+						MNULL);
 		}
-
 		/* Need to wake up the card ? */
 		if ((pmadapter->ps_state == PS_STATE_SLEEP) &&
 		    (pmadapter->pm_wakeup_card_req &&

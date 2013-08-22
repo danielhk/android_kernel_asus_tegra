@@ -30,10 +30,9 @@ Change log:
 #include        "moal_uap_priv.h"
 
 /********************************************************
-                Global Variables
+			Global Variables
 ********************************************************/
-typedef struct _chan_to_freq_t
-{
+typedef struct _chan_to_freq_t {
     /** Channel */
 	t_u16 channel;
     /** Frequency */
@@ -105,7 +104,7 @@ const chan_to_freq_t chan_to_freq[] = {
 #define freq_to_chan(x) ((((x) - 2412) / 5) + 1)
 
 /********************************************************
-                Local Functions
+			Local Functions
 ********************************************************/
 
 /**
@@ -545,10 +544,17 @@ woal_set_encode(struct net_device *dev, struct iw_request_info *info,
 				pkey = &sys_cfg->wep_cfg.key2;
 			if (ap_cfg->wep_cfg.key3.is_default)
 				pkey = &sys_cfg->wep_cfg.key3;
+			else {	/* Something wrong, select first key as default
+				 */
+				PRINTM(MERROR,
+				       "No default key set! Selecting first key.\n");
+				pkey = &sys_cfg->wep_cfg.key0;
+			}
 		}
 
 		sys_cfg->protocol = PROTOCOL_STATIC_WEP;
-		memcpy(pkey->key, extra, dwrq->length);
+		if (extra)
+			memcpy(pkey->key, extra, dwrq->length);
 		/* Set the length */
 		if (dwrq->length > MIN_WEP_KEY_SIZE)
 			pkey->length = MAX_WEP_KEY_SIZE;
@@ -1166,9 +1172,15 @@ woal_set_auth(struct net_device *dev, struct iw_request_info *info,
 	switch (vwrq->flags & IW_AUTH_INDEX) {
 	case IW_AUTH_CIPHER_PAIRWISE:
 		/* Rest are not supported now */
-		if (vwrq->value & IW_AUTH_CIPHER_NONE) ;
-		else if (vwrq->value & IW_AUTH_CIPHER_WEP40) ;
-		else if (vwrq->value & IW_AUTH_CIPHER_WEP104) ;
+		if (vwrq->value & IW_AUTH_CIPHER_NONE)
+			/* XXX Do not delete no-operation line */
+			;
+		else if (vwrq->value & IW_AUTH_CIPHER_WEP40)
+			/* XXX Do not delete no-operation line */
+			;
+		else if (vwrq->value & IW_AUTH_CIPHER_WEP104)
+			/* XXX Do not delete no-operation line */
+			;
 		else if (vwrq->value == IW_AUTH_CIPHER_TKIP) {
 			sys_cfg.wpa_cfg.pairwise_cipher_wpa = CIPHER_TKIP;
 			sys_cfg.wpa_cfg.pairwise_cipher_wpa2 = CIPHER_TKIP;
@@ -1197,9 +1209,15 @@ woal_set_auth(struct net_device *dev, struct iw_request_info *info,
 		break;
 	case IW_AUTH_CIPHER_GROUP:
 		/* Rest are not supported now */
-		if (vwrq->value & IW_AUTH_CIPHER_NONE) ;
-		else if (vwrq->value & IW_AUTH_CIPHER_WEP40) ;
-		else if (vwrq->value & IW_AUTH_CIPHER_WEP104) ;
+		if (vwrq->value & IW_AUTH_CIPHER_NONE)
+			/* XXX Do not delete no-operation line */
+			;
+		else if (vwrq->value & IW_AUTH_CIPHER_WEP40)
+			/* XXX Do not delete no-operation line */
+			;
+		else if (vwrq->value & IW_AUTH_CIPHER_WEP104)
+			/* XXX Do not delete no-operation line */
+			;
 		else if (vwrq->value & IW_AUTH_CIPHER_TKIP) {
 			sys_cfg.wpa_cfg.group_cipher = CIPHER_TKIP;
 			priv->group_cipher = CIPHER_TKIP;
@@ -1389,7 +1407,7 @@ woal_get_auth(struct net_device *dev, struct iw_request_info *info,
  *  Infra       G(12)           A(8)    B(4)    G(12)
  *  Adhoc       A+B(12)         A(8)    B(4)    B(4)
  *      non-MULTI_BANDS:
-                                        b       b/g
+										b       b/g
  *  Infra                               B(4)    G(12)
  *  Adhoc                               B(4)    B(4)
  */
@@ -1744,7 +1762,7 @@ static const iw_handler woal_private_handler[] = {
 };
 
 /********************************************************
-                Global Functions
+			Global Functions
 ********************************************************/
 
 /** wlan_handler_def */

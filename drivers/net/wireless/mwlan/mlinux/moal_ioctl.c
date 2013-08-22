@@ -44,8 +44,7 @@ Change log:
 /* Marvell Channel config TLV ID */
 #define MRVL_CHANNELCONFIG_TLV_ID       (0x0100 + 0x2a)	/* 0x012a */
 
-typedef struct _hostcmd_header
-{
+typedef struct _hostcmd_header {
     /** Command Header : Command */
 	t_u16 command;
     /** Command Header : Size */
@@ -60,8 +59,7 @@ typedef struct _hostcmd_header
 
 #ifdef STA_SUPPORT
 /** Region code mapping */
-typedef struct _region_code_mapping_t
-{
+typedef struct _region_code_mapping_t {
     /** Region */
 	t_u8 region[COUNTRY_CODE_LEN];
     /** Code */
@@ -133,7 +131,7 @@ region_string_2_region_code(char *region_string)
 			    region_code_mapping[i].region,
 			    strlen(region_string))) {
 			LEAVE();
-			return (region_code_mapping[i].code);
+			return region_code_mapping[i].code;
 		}
 	}
 	/* Default is US */
@@ -499,7 +497,7 @@ done:
 mlan_status
 woal_request_ioctl(moal_private * priv, mlan_ioctl_req * req, t_u8 wait_option)
 {
-	wait_queue *wait;
+	wait_queue *wait = NULL;
 	mlan_status status;
 	unsigned long flags;
 
@@ -635,6 +633,8 @@ woal_request_ioctl(moal_private * priv, mlan_ioctl_req * req, t_u8 wait_option)
 		       "IOCTL: %p id=0x%x, sub_id=0x%x wait_option=%d, action=%d status=%d\n",
 		       req, req->req_id, (*(t_u32 *) req->pbuf), wait_option,
 		       (int)req->action, status);
+		atomic_dec(&priv->phandle->ioctl_pending);
+		break;
 	default:
 		atomic_dec(&priv->phandle->ioctl_pending);
 		break;
@@ -1202,12 +1202,14 @@ done:
  *  @param action               Action set or get
  *  @param disabled             A pointer to disabled flag
  *  @param power_type           IEEE power type
+ *  @param wait_option          wait option
  *
  *  @return                     MLAN_STATUS_SUCCESS -- success, otherwise fail
  */
 mlan_status
 woal_set_get_power_mgmt(moal_private * priv,
-			t_u32 action, int *disabled, int power_type)
+			t_u32 action, int *disabled, int power_type,
+			t_u8 wait_option)
 {
 	mlan_status ret = MLAN_STATUS_SUCCESS;
 	mlan_ioctl_req *req = NULL;
@@ -1249,8 +1251,7 @@ woal_set_get_power_mgmt(moal_private * priv,
 		}
 	}
 
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
+	if (MLAN_STATUS_SUCCESS != woal_request_ioctl(priv, req, wait_option)) {
 		ret = MLAN_STATUS_FAILURE;
 		goto done;
 	}
@@ -1853,6 +1854,12 @@ woal_send_host_packet(struct net_device *dev, struct ifreq *req)
 
 	ENTER();
 
+	if (!priv || !priv->phandle) {
+		PRINTM(MERROR, "priv or handle is NULL\n");
+		ret = -EFAULT;
+		goto done;
+	}
+
 	/* Sanity check */
 	if (req->ifr_data == NULL) {
 		PRINTM(MERROR, "woal_send_host_packet() corrupt data\n");
@@ -1867,8 +1874,9 @@ woal_send_host_packet(struct net_device *dev, struct ifreq *req)
 	}
 #define PACKET_HEADER_LEN        8
 	pmbuf = woal_alloc_mlan_buffer(priv->phandle,
-				       MLAN_MIN_DATA_HEADER_LEN + packet_len +
-				       PACKET_HEADER_LEN);
+				       (int)(MLAN_MIN_DATA_HEADER_LEN +
+					     (int)packet_len +
+					     PACKET_HEADER_LEN));
 	if (!pmbuf) {
 		PRINTM(MERROR, "Fail to allocate mlan_buffer\n");
 		ret = -ENOMEM;
@@ -2349,6 +2357,10 @@ woal_enable_hs(moal_private * priv)
 	}
 #if defined(WIFI_DIRECT_SUPPORT)
 #if defined(STA_CFG80211) && defined(UAP_CFG80211)
+	if (priv->phandle->is_remain_timer_set) {
+		woal_cancel_timer(&priv->phandle->remain_timer);
+		woal_remain_timer_func(priv->phandle);
+	}
 	/* cancel pending remain on channel */
 	if (priv->phandle->remain_on_channel) {
 		t_u8 channel_status;
@@ -2536,8 +2548,7 @@ done:
 void
 woal_get_version(moal_handle * handle, char *version, int max_len)
 {
-	union
-	{
+	union {
 		t_u32 l;
 		t_u8 c[4];
 	} ver;
@@ -3162,6 +3173,53 @@ woal_set_remain_channel_ioctl(moal_private * priv, t_u8 wait_option,
 	if (ret == MLAN_STATUS_SUCCESS) {
 		memcpy(pchan, &radio_cfg->param.remain_chan,
 		       sizeof(mlan_ds_remain_chan));
+	}
+done:
+	if (req && (ret != MLAN_STATUS_PENDING))
+		kfree(req);
+	LEAVE();
+	return ret;
+}
+
+/**
+ *  @brief Set p2p config
+ *
+ *  @param priv         A pointer to moal_private structure
+ *  @param action       Action set or get
+ *  @param p2p_config   A pointer to  mlan_ds_wifi_direct_config structure
+ *
+ *  @return             MLAN_STATUS_SUCCESS -- success, otherwise fail
+ */
+mlan_status
+woal_p2p_config(moal_private * priv, t_u32 action,
+		mlan_ds_wifi_direct_config * p2p_config)
+{
+	mlan_status ret = MLAN_STATUS_SUCCESS;
+	mlan_ioctl_req *req = NULL;
+	mlan_ds_misc_cfg *misc_cfg = NULL;
+
+	ENTER();
+	if (!p2p_config) {
+		LEAVE();
+		return MLAN_STATUS_FAILURE;
+	}
+	req = woal_alloc_mlan_ioctl_req(sizeof(mlan_ds_misc_cfg));
+	if (req == NULL) {
+		ret = MLAN_STATUS_FAILURE;
+		goto done;
+	}
+	misc_cfg = (mlan_ds_misc_cfg *) req->pbuf;
+	misc_cfg->sub_command = MLAN_OID_MISC_WIFI_DIRECT_CONFIG;
+	req->req_id = MLAN_IOCTL_MISC_CFG;
+	req->action = action;
+	if (action == MLAN_ACT_SET)
+		memcpy(&misc_cfg->param.p2p_config, p2p_config,
+		       sizeof(mlan_ds_wifi_direct_config));
+	ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (ret == MLAN_STATUS_SUCCESS) {
+		if (action == MLAN_ACT_GET)
+			memcpy(p2p_config, &misc_cfg->param.p2p_config,
+			       sizeof(mlan_ds_wifi_direct_config));
 	}
 done:
 	if (req && (ret != MLAN_STATUS_PENDING))
@@ -4036,12 +4094,15 @@ woal_cancel_scan(moal_private * priv, t_u8 wait_option)
 	MOAL_REL_SEMAPHORE(&handle->async_sem);
 #ifdef STA_CFG80211
 	for (i = 0; i < handle->priv_num; i++) {
+		spin_lock(&priv->scan_req_lock);
 		if (IS_STA_CFG80211(cfg80211_wext) &&
 		    handle->priv[i]->scan_request) {
+	    /** some supplicant can not handle SCAN abort event */
 			cfg80211_scan_done(handle->priv[i]->scan_request,
-					   MTRUE);
+					   MFALSE);
 			handle->priv[i]->scan_request = NULL;
 		}
+		spin_unlock(&priv->scan_req_lock);
 	}
 #endif
 done:
@@ -4484,7 +4545,8 @@ woal_get_powermode(moal_private * priv, int *powermode)
 	ENTER();
 
 	if (MLAN_STATUS_SUCCESS !=
-	    woal_set_get_power_mgmt(priv, MLAN_ACT_GET, &ps_mode, 0)) {
+	    woal_set_get_power_mgmt(priv, MLAN_ACT_GET, &ps_mode, 0,
+				    MOAL_IOCTL_WAIT)) {
 		ret = MLAN_STATUS_FAILURE;
 		goto done;
 	}
@@ -4620,7 +4682,8 @@ woal_set_powermode(moal_private * priv, char *powermode)
 	}
 
 	if (MLAN_STATUS_SUCCESS !=
-	    woal_set_get_power_mgmt(priv, MLAN_ACT_SET, &disabled, 0))
+	    woal_set_get_power_mgmt(priv, MLAN_ACT_SET, &disabled, 0,
+				    MOAL_IOCTL_WAIT))
 		ret = MLAN_STATUS_FAILURE;
 
 done:
@@ -5036,7 +5099,7 @@ done:
  *
  * @return         MLAN_STATUS_SUCCESS -- success, otherwise fail
  */
-int
+mlan_status
 woal_set_sleeppd(moal_private * priv, char *psleeppd)
 {
 	mlan_status ret = MLAN_STATUS_SUCCESS;
@@ -5159,6 +5222,47 @@ woal_set_scan_cfg(moal_private * priv, char *buf, int length)
 		}
 	}
 
+	LEAVE();
+	return ret;
+}
+
+/**
+ *  @brief Set Radio On/OFF
+ *
+ *  @param priv                 A pointer to moal_private structure
+ *  @param option               Radio Option
+ *
+ *  @return                     0 --success, otherwise fail
+ */
+int
+woal_set_radio(moal_private * priv, t_u8 option)
+{
+	int ret = 0;
+	mlan_ds_radio_cfg *radio = NULL;
+	mlan_ioctl_req *req = NULL;
+	ENTER();
+	if ((option != 0) && (option != 1)) {
+		ret = -EINVAL;
+		goto done;
+	}
+	req = woal_alloc_mlan_ioctl_req(sizeof(mlan_ds_radio_cfg));
+	if (req == NULL) {
+		ret = -ENOMEM;
+		goto done;
+	}
+	radio = (mlan_ds_radio_cfg *) req->pbuf;
+	radio->sub_command = MLAN_OID_RADIO_CTRL;
+	req->req_id = MLAN_IOCTL_RADIO_CFG;
+	req->action = MLAN_ACT_SET;
+	radio->param.radio_on_off = option;
+	if (MLAN_STATUS_SUCCESS !=
+	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
+		ret = -EFAULT;
+		goto done;
+	}
+done:
+	if (req)
+		kfree(req);
 	LEAVE();
 	return ret;
 }

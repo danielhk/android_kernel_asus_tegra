@@ -39,11 +39,11 @@ Change log:
 #include "mlan_sdio.h"
 
 /********************************************************
-        Global Variables
+			Global Variables
 ********************************************************/
 
 /********************************************************
-        Local Functions
+			Local Functions
 ********************************************************/
 
 /**
@@ -62,11 +62,11 @@ wlan_add_bsspriotbl(pmlan_private priv)
 
 	ENTER();
 
-	if ((status =
-	     pmadapter->callbacks.moal_malloc(pmadapter->pmoal_handle,
-					      sizeof(mlan_bssprio_node),
-					      MLAN_MEM_DEF,
-					      (t_u8 **) & pbssprio))) {
+	status = pmadapter->callbacks.moal_malloc(pmadapter->pmoal_handle,
+						  sizeof(mlan_bssprio_node),
+						  MLAN_MEM_DEF,
+						  (t_u8 **) & pbssprio);
+	if (status) {
 		PRINTM(MERROR, "Failed to allocate bsspriotbl\n");
 		LEAVE();
 		return status;
@@ -157,7 +157,7 @@ wlan_delete_bsspriotbl(pmlan_private priv)
 }
 
 /********************************************************
-        Global Functions
+			Global Functions
 ********************************************************/
 
 /**
@@ -199,10 +199,18 @@ wlan_allocate_adapter(pmlan_adapter pmadapter)
 		return MLAN_STATUS_FAILURE;
 	}
 	pmadapter->pscan_table = ptemp_scan_table;
-	ret = pmadapter->callbacks.moal_malloc(pmadapter->pmoal_handle,
-					       DEFAULT_SCAN_BEACON_BUFFER,
-					       MLAN_MEM_DEF,
-					       (t_u8 **) & pmadapter->bcn_buf);
+	if (pmadapter->callbacks.moal_vmalloc &&
+	    pmadapter->callbacks.moal_vfree)
+		ret = pmadapter->callbacks.moal_vmalloc(pmadapter->pmoal_handle,
+							DEFAULT_SCAN_BEACON_BUFFER,
+							(t_u8 **) & pmadapter->
+							bcn_buf);
+	else
+		ret = pmadapter->callbacks.moal_malloc(pmadapter->pmoal_handle,
+						       DEFAULT_SCAN_BEACON_BUFFER,
+						       MLAN_MEM_DEF,
+						       (t_u8 **) & pmadapter->
+						       bcn_buf);
 	if (ret != MLAN_STATUS_SUCCESS || !pmadapter->bcn_buf) {
 		PRINTM(MERROR, "Failed to allocate bcn buf\n");
 		LEAVE();
@@ -367,6 +375,8 @@ wlan_init_priv(pmlan_private priv)
 
 	for (i = 0; i < MAX_NUM_TID; i++)
 		priv->addba_reject[i] = ADDBA_RSP_STATUS_ACCEPT;
+	priv->addba_reject[6] = ADDBA_RSP_STATUS_REJECT;
+	priv->addba_reject[7] = ADDBA_RSP_STATUS_REJECT;
 	priv->max_amsdu = 0;
 
 	if (GET_BSS_ROLE(priv) == MLAN_BSS_ROLE_STA) {
@@ -813,8 +823,7 @@ wlan_free_lock_list(IN pmlan_adapter pmadapter)
 			    &pmadapter->rx_data_queue, pcb->moal_free_lock);
 
 	util_scalar_free((t_void *) pmadapter->pmoal_handle,
-			 &pmadapter->rx_pkts_queued,
-			 priv->adapter->callbacks.moal_free_lock);
+			 &pmadapter->rx_pkts_queued, pcb->moal_free_lock);
 
 	util_free_list_head((t_void *) pmadapter->pmoal_handle,
 			    &pmadapter->cmd_free_q,
@@ -952,7 +961,8 @@ wlan_init_fw(IN pmlan_adapter pmadapter)
 			priv = pmadapter->priv[i];
 
 			/* Initialize private structure */
-			if ((ret = wlan_init_priv(priv))) {
+			ret = wlan_init_priv(priv);
+			if (ret) {
 				ret = MLAN_STATUS_FAILURE;
 				goto done;
 			}
@@ -1030,8 +1040,12 @@ wlan_free_adapter(pmlan_adapter pmadapter)
 		pmadapter->pscan_table = MNULL;
 	}
 	if (pmadapter->bcn_buf) {
-		pcb->moal_mfree(pmadapter->pmoal_handle,
-				(t_u8 *) pmadapter->bcn_buf);
+		if (pcb->moal_vmalloc && pcb->moal_vfree)
+			pcb->moal_vfree(pmadapter->pmoal_handle,
+					(t_u8 *) pmadapter->bcn_buf);
+		else
+			pcb->moal_mfree(pmadapter->pmoal_handle,
+					(t_u8 *) pmadapter->bcn_buf);
 		pmadapter->bcn_buf = MNULL;
 	}
 #endif
