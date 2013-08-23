@@ -181,7 +181,7 @@ static void athome_bt_del_dev_l(const bdaddr_t *macP, bool bind_mode)
 	athome_bt_disc_from_mac(macP);
 }
 
-static void athome_bt_del_dev(const btaddr_t *macP, bool bind_mode)
+static void athome_bt_del_dev(const bdaddr_t *macP, bool bind_mode)
 {
 	unsigned long flags;
 
@@ -365,7 +365,7 @@ static int athome_bt_release(struct inode *inode, struct file *file)
 
 	spin_lock_irqsave(&device_list_lock, flags);
 	while (known)
-		athome_bt_del_dev_l(known->MAC, known->bind_mode);
+		athome_bt_del_dev_l(&known->MAC, known->bind_mode);
 	spin_unlock_irqrestore(&device_list_lock, flags);
 
 	return 0;
