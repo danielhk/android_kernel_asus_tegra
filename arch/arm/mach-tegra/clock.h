@@ -96,9 +96,9 @@ struct clk_backup {
 struct clk_pll_freq_table {
 	unsigned long	input_rate;
 	unsigned long	output_rate;
-	u16		n;
-	u16		m;
-	u8		p;
+	u16		n; /* n = PLL_DIVN */
+	u16		m; /* m = PLL_DIVM */
+	u8		p; /* p = (2 ^ PLL_DIVP) */
 	u8		cpcon;
 };
 
