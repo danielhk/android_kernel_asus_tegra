@@ -970,6 +970,19 @@ static void tegra_dc_hdmi_suspend(struct tegra_dc *dc)
 	unsigned long flags;
 
 	tegra_nvhdcp_suspend(hdmi->nvhdcp);
+
+	if (dc->out->flags & TEGRA_DC_OUT_HOTPLUG_WAKE_LP0) {
+		int wake_irq = gpio_to_irq(dc->out->hotplug_gpio);
+		int ret;
+
+		ret = enable_irq_wake(wake_irq);
+		if (ret < 0) {
+			dev_err(&dc->ndev->dev,
+			"%s: Couldn't enable HDMI wakeup, irq=%d, error=%d\n",
+			__func__, wake_irq, ret);
+		}
+	}
+
 	spin_lock_irqsave(&hdmi->suspend_lock, flags);
 	hdmi->suspended = true;
 	spin_unlock_irqrestore(&hdmi->suspend_lock, flags);
@@ -988,6 +1001,10 @@ static void tegra_dc_hdmi_resume(struct tegra_dc *dc)
 			   msecs_to_jiffies(hpd ? 100 : 30));
 
 	spin_unlock_irqrestore(&hdmi->suspend_lock, flags);
+
+	if (dc->out->flags & TEGRA_DC_OUT_HOTPLUG_WAKE_LP0)
+		disable_irq_wake(gpio_to_irq(dc->out->hotplug_gpio));
+
 	tegra_nvhdcp_resume(hdmi->nvhdcp);
 }
 
