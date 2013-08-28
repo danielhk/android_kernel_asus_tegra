@@ -29,6 +29,7 @@
 #include <linux/time.h>
 #include <linux/wait.h>
 #include <linux/timer.h>
+#include <linux/spinlock.h>
 #include <linux/vmalloc.h>
 #include <linux/math64.h>
 #include <linux/moduleparam.h>
@@ -43,21 +44,22 @@
 
 #include "sbcdec.h"
 
+/*
+ * TODO Report underflow up to Audio HAL so it can close the driver.
+ */
+
+/* If set to 1 then spew info about the underflow
+ * watchdog and silence generator. */
+#define LOG_UNDERFLOW_TIMER    0
+/* If set to 1, occasionally print # SBC packets have been sent from BTLE. */
+#define LOG_PACKET_COUNTS    1
 
 #define btlesbc_log(...)         pr_info("mic_btle_sbc: " __VA_ARGS__)
-#define btlesbc_continue(...)    pr_info(__VA_ARGS__)
 
 MODULE_AUTHOR("Phil Burk <philburk@google.com>");
 MODULE_DESCRIPTION("BTLE SBC Mic");
 MODULE_LICENSE("GPL");
 MODULE_SUPPORTED_DEVICE("{{ALSA,RemoteMic soundcard}}");
-
-/* If set to 1, generate a sine wave instead of decoding SBC audio. */
-#define FAKE_SOUND 0
-
-/* If set to 1, occasionally print how many SBC packets
- * have been sent from BTLE. */
-#define DEBUG_COUNT_PACKETS 1
 
 /* defaults */
 #define MAX_PCM_DEVICES     1
@@ -73,10 +75,28 @@ MODULE_SUPPORTED_DEVICE("{{ALSA,RemoteMic soundcard}}");
 #define USE_PERIODS_MIN    1
 #define USE_PERIODS_MAX    1024
 
-#define MAX_BUFFER_SIZE     (MAX_FRAMES_PER_BUFFER * sizeof(int16_t))
+#define MAX_PCM_BUFFER_SIZE  (MAX_FRAMES_PER_BUFFER * sizeof(int16_t))
 #define MIN_PERIOD_SIZE      64
-#define MAX_PERIOD_SIZE      (MAX_BUFFER_SIZE / 8)
+#define MAX_PERIOD_SIZE      (MAX_PCM_BUFFER_SIZE / 8)
 #define USE_FORMATS          (SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE)
+
+struct sbc_fifo_packet {
+	uint8_t  which; /* Bemote index */
+	uint8_t  format; /* SBC encoding type, 0-3 */
+	uint8_t  new_timings;
+	uint8_t  num_bytes;
+	/* Expect no more than 25 bytes. But align struct size to power of 2. */
+	uint8_t  sbc_data[28];
+};
+
+/* Actual minimum is 40 but we want a power of 2. */
+#define MIN_SAMPLES_PER_SBC_PACKET_P2  32
+#define MAX_SBC_PACKETS_PER_BUFFER  \
+		(MAX_FRAMES_PER_BUFFER / MIN_SAMPLES_PER_SBC_PACKET_P2)
+#define MAX_SBC_BUFFER_SIZE  \
+		(MAX_SBC_PACKETS_PER_BUFFER * sizeof(struct sbc_fifo_packet))
+
+#define SND_BTLESBC_RUNNING_TIMEOUT_MSEC    (500)
 
 /* Use preprocessor trick to build name. */
 #define __PCM_RATE_NAME__(x) SNDRV_PCM_RATE_##x
@@ -86,6 +106,10 @@ MODULE_SUPPORTED_DEVICE("{{ALSA,RemoteMic soundcard}}");
 #define USE_RATE_MIN         SUPPORTED_SAMPLE_RATE
 #define USE_RATE_MAX         SUPPORTED_SAMPLE_RATE
 
+#define TIMER_STATE_BEFORE_SBC    0
+#define TIMER_STATE_DURING_SBC    1
+#define TIMER_STATE_AFTER_SBC     2
+
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;  /* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;   /* ID for this card */
 static bool enable[SNDRV_CARDS] = {true, false};
@@ -93,8 +117,6 @@ static bool enable[SNDRV_CARDS] = {true, false};
 static char *model[SNDRV_CARDS]; /* = {[0 ... (SNDRV_CARDS - 1)] = NULL}; */
 static int pcm_devs[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};
 static int pcm_substreams[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};
-
-static int sbc_packet_counter;
 
 module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for btlesbc soundcard.");
@@ -116,17 +138,39 @@ static struct platform_device *devices[SNDRV_CARDS];
  * Static substream is needed so Bluetooth can pass SBC to a running stream.
  * This also serves to enable or disable the decoding of audio in the callback.
  */
-struct snd_pcm_substream *s_current_substream;
+static struct snd_pcm_substream *s_substream_for_btle;
+static DEFINE_SPINLOCK(s_substream_lock);
+
+struct simple_atomic_fifo {
+	/* Read and write cursors are modified by different threads. */
+	uint read_cursor;
+	uint write_cursor;
+	/* Size must be a power of two. */
+	uint size;
+	/* internal mask is 2*size - 1
+	 * This allows us to tell the difference between full and empty. */
+	uint internal_mask;
+	uint external_mask;
+};
 
 struct snd_btlesbc {
 	struct snd_card *card;
 	struct snd_pcm *pcm;
 	struct snd_pcm_hardware pcm_hw;
-#if FAKE_SOUND
-	uint previous_jiffies; /* Used when faking an audio source. */
-	uint sine_phase;
-#endif
+
+	uint previous_jiffies; /* Used to detect underflows. */
+	uint timeout_jiffies;
+	struct timer_list decoding_timer;
+	uint timer_state;
+	bool timer_enabled;
+	uint timer_callback_count;
+
+	/* Decoder */
+	struct simple_atomic_fifo sbc_fifo_controller;
+	struct sbc_fifo_packet *sbc_fifo_packet_buffer;
+	int16_t sbc_output[SBC_MAX_SAMPLES_PER_PACKET];
 	int16_t peak_level;
+
 	/*
 	 * Write_index is the circular buffer position.
 	 * It is advanced by the BTLE thread after decoding SBC.
@@ -138,45 +182,121 @@ struct snd_btlesbc {
 	uint32_t frames_per_buffer;
 	/* count frames generated so far in this period */
 	uint32_t frames_in_period;
-	int16_t *buffer;
-	int16_t sbc_output[SBC_MAX_SAMPLES_PER_PACKET];
+	int16_t *pcm_buffer;
 };
 
-#if FAKE_SOUND
-static struct timer_list synth_timer;
+/***************************************************************************/
+/************* Atomic FIFO *************************************************/
+/***************************************************************************/
+/*
+ * This FIFO is atomic if used by no more than 2 threads.
+ * One thread modifies the read cursor and the other
+ * thread modifies the write_cursor.
+ * Size and mask are not modified while being used.
+ *
+ * The read and write cursors range internally from 0 to (2*size)-1.
+ * This allows us to tell the difference between full and empty.
+ * When we get the cursors for external use we mask with size-1.
+ *
+ * Memory barriers required on SMP platforms.
+ */
+static int atomic_fifo_init(struct simple_atomic_fifo *fifo_ptr, uint size)
+{
+	/* Make sure size is a power of 2. */
+	if ((size & (size-1)) != 0) {
+		pr_err("%s:%d - ERROR FIFO size = %d, not power of 2!\n",
+			__func__, __LINE__, size);
+		return -EINVAL;
+	}
+	fifo_ptr->read_cursor = 0;
+	fifo_ptr->write_cursor = 0;
+	fifo_ptr->size = size;
+	fifo_ptr->internal_mask = (size * 2) - 1;
+	fifo_ptr->external_mask = size - 1;
+	smp_wmb();
+	return 0;
+}
 
-static const int16_t s_sine_wave[100] = {
-	     0,   2057,   4106,   6139,   8148,  10125,  12062,  13951,
-	 15785,  17557,  19259,  20886,  22430,  23886,  25247,  26509,
-	 27666,  28713,  29648,  30465,  31163,  31737,  32186,  32508,
-	 32702,  32767,  32702,  32508,  32186,  31737,  31163,  30465,
-	 29648,  28713,  27666,  26509,  25247,  23886,  22430,  20886,
-	 19259,  17557,  15785,  13951,  12062,  10125,   8148,   6139,
-	  4106,   2057,      0,  -2057,  -4106,  -6139,  -8148, -10125,
-	-12062, -13951, -15785, -17557, -19259, -20886, -22430, -23886,
-	-25247, -26509, -27666, -28713, -29648, -30465, -31163, -31737,
-	-32186, -32508, -32702, -32767, -32702, -32508, -32186, -31737,
-	-31163, -30465, -29648, -28713, -27666, -26509, -25247, -23886,
-	-22430, -20886, -19259, -17557, -15785, -13951, -12062, -10125,
-	 -8148,  -6139,  -4106,  -2057
-};
 
-#endif
+static uint atomic_fifo_available_to_read(struct simple_atomic_fifo *fifo_ptr)
+{
+	smp_rmb();
+	return (fifo_ptr->write_cursor - fifo_ptr->read_cursor)
+			& fifo_ptr->internal_mask;
+}
 
+static uint atomic_fifo_available_to_write(struct simple_atomic_fifo *fifo_ptr)
+{
+	smp_rmb();
+	return fifo_ptr->size - atomic_fifo_available_to_read(fifo_ptr);
+}
+
+static void atomic_fifo_advance_read(
+		struct simple_atomic_fifo *fifo_ptr,
+		uint frames)
+{
+	smp_rmb();
+	BUG_ON(frames > atomic_fifo_available_to_read(fifo_ptr));
+	fifo_ptr->read_cursor = (fifo_ptr->read_cursor + frames)
+			& fifo_ptr->internal_mask;
+	smp_wmb();
+}
+
+static void atomic_fifo_advance_write(
+		struct simple_atomic_fifo *fifo_ptr,
+		uint frames)
+{
+	smp_rmb();
+	BUG_ON(frames > atomic_fifo_available_to_write(fifo_ptr));
+	fifo_ptr->write_cursor = (fifo_ptr->write_cursor + frames)
+		& fifo_ptr->internal_mask;
+	smp_wmb();
+}
+
+static uint atomic_fifo_get_read_index(struct simple_atomic_fifo *fifo_ptr)
+{
+	smp_rmb();
+	return fifo_ptr->read_cursor & fifo_ptr->external_mask;
+}
+
+static uint atomic_fifo_get_write_index(struct simple_atomic_fifo *fifo_ptr)
+{
+	smp_rmb();
+	return fifo_ptr->write_cursor & fifo_ptr->external_mask;
+}
+
+/****************************************************************************/
 static void btlesbc_handle_frame_advance(
 		struct snd_pcm_substream *substream, uint num_frames)
 {
 	struct snd_btlesbc *btlesbc = snd_pcm_substream_chip(substream);
 	btlesbc->frames_in_period += num_frames;
-	/* Tell ALSA if we have advanced by a period. */
-	if (btlesbc->frames_in_period > substream->runtime->period_size) {
+	/* Tell ALSA if we have advanced by one or more periods. */
+	if (btlesbc->frames_in_period >= substream->runtime->period_size) {
 		snd_pcm_period_elapsed(substream);
-		btlesbc->frames_in_period = btlesbc->frames_in_period
-			% substream->runtime->period_size;
+		btlesbc->frames_in_period %= substream->runtime->period_size;
 	}
 }
 
-/* ===================================================================== */
+static uint32_t btlesbc_bump_write_index(
+			struct snd_pcm_substream *substream,
+			uint32_t num_samples)
+{
+	struct snd_btlesbc *btlesbc = snd_pcm_substream_chip(substream);
+	uint32_t pos = btlesbc->write_index;
+
+	/* Advance write position. */
+	pos += num_samples;
+	/* Wrap around at end of the circular buffer. */
+	pos %= btlesbc->frames_per_buffer;
+	btlesbc->write_index = pos;
+
+	btlesbc_handle_frame_advance(substream, num_samples);
+
+	return pos;
+}
+
+/****************************************************************************/
 #define SBC_NUM_FORMATS         (4)
 #define SBC_MAX_FORMAT          (SBC_NUM_FORMATS - 1)
 #define SBC_SAMPLES_PER_BLOCK   (8)
@@ -192,7 +312,9 @@ const uint8_t s_num_bits_old[SBC_NUM_FORMATS]          = { 10, 14, 21, 33 };
 const uint8_t s_blocks_per_packet_new[SBC_NUM_FORMATS] = { 16, 12,  8,  6 };
 const uint8_t s_num_bits_new[SBC_NUM_FORMATS]          = { 10, 14, 21, 28 };
 
-
+/*
+ * Decode an SBC packet and write the PCM data into a circular buffer.
+ */
 static int btlesbc_decode_sbc_packet(
 			struct snd_pcm_substream *substream,
 			uint packet_type, /* describes SBC format, 0-3 */
@@ -201,7 +323,7 @@ static int btlesbc_decode_sbc_packet(
 			bool new_timings
 			)
 {
-	uint num_samples;
+	uint num_samples = 0;
 	uint remaining;
 	uint i;
 	uint32_t pos;
@@ -224,11 +346,13 @@ static int btlesbc_decode_sbc_packet(
 	pos = btlesbc->write_index;
 	if ((pos + num_samples) > btlesbc->frames_per_buffer) {
 		for (i = pos; i < btlesbc->frames_per_buffer; i++)
-			btlesbc->buffer[i] = btlesbc->sbc_output[read_index++];
+			btlesbc->pcm_buffer[i] =
+				btlesbc->sbc_output[read_index++];
 
 		remaining = (pos + num_samples) - btlesbc->frames_per_buffer;
 		for (i = 0; i < remaining; i++)
-			btlesbc->buffer[i] = btlesbc->sbc_output[read_index++];
+			btlesbc->pcm_buffer[i] =
+				btlesbc->sbc_output[read_index++];
 
 	} else {
 		for (i = 0; i < num_samples; i++) {
@@ -236,27 +360,104 @@ static int btlesbc_decode_sbc_packet(
 			if (sample > btlesbc->peak_level)
 				btlesbc->peak_level = sample;
 
-			btlesbc->buffer[i + pos] = sample;
+			btlesbc->pcm_buffer[i + pos] = sample;
 		}
 	}
 
-	/* Advance write position. */
-	pos += num_samples;
-	/* Wrap around at end of the circular buffer. */
-	if (pos >= btlesbc->frames_per_buffer)
-		pos -= btlesbc->frames_per_buffer;
-
-	btlesbc->write_index = pos;
-
-	btlesbc_handle_frame_advance(substream, num_samples);
+	btlesbc_bump_write_index(substream, num_samples);
 
 	return num_samples;
 }
 
+/***********************************************************************/
+/************ Statistics ***********************************************/
+/***********************************************************************/
+static int sbc_packet_counter;
+/*
+ * ATHOME_SBC_FORMAT_COUNT is based on the ATHOME Remote protocol for BTLE,
+ * which defines a fixed number of audio packet types.
+ */
+#define ATHOME_SBC_FORMAT_COUNT    4
+
+static int debug_decoder_callback_stats[ATHOME_SBC_FORMAT_COUNT];
+
+#define PERCENT_SBC_PACKETS(format) (100 * \
+	debug_decoder_callback_stats[format] / sbc_packet_counter)
+
+/* Print the percentage of each SBC packet type received.
+ * This gives us an indirect measure of the BTLE connection quality.
+ * When BTLE is working well, we should get all packet format 3.
+ */
+static void athome_bt_dump_sbc_stats(void)
+{
+	if (sbc_packet_counter > 0) {
+/* Ignore warning from checkpatch.pl  about string concatenation. */
+		pr_info("%d SBC packets decoded, format count (bad to good): "
+			"%2d%%, %2d%%, %2d%%, %2d%%\n",
+			sbc_packet_counter,
+			PERCENT_SBC_PACKETS(0),
+			PERCENT_SBC_PACKETS(1),
+			PERCENT_SBC_PACKETS(2),
+			PERCENT_SBC_PACKETS(3)
+			);
+		/* The code above is dependant on there being 4 formats.
+		 * I could have used a for-loop but I did not want
+		 * to spew 5 lines into the log. */
+		BUG_ON(ATHOME_SBC_FORMAT_COUNT != 4);
+	}
+}
+
+#undef PERCENT_SBC_PACKETS
+/***********************************************************************/
+
+/*
+ * Write packet into the atomic SBC FIFO.
+ * This is only called from athome_bt_audio_dec()
+ * under the s_substream_lock spinlock.
+ */
+static bool athome_bt_audio_dec_ll(
+			int which,
+			int format,
+			const uint8_t *sbc_input,
+			size_t num_bytes,
+			bool new_timings
+			)
+{
+	bool dropped_packet = false;
+	struct snd_pcm_substream *substream = s_substream_for_btle;
+	if (substream != NULL) {
+		struct snd_btlesbc *btlesbc = snd_pcm_substream_chip(substream);
+		/* Write SBC data to a FIFO for decoding by the timer task. */
+		uint writable = atomic_fifo_available_to_write(
+			&btlesbc->sbc_fifo_controller);
+		if (writable > 0) {
+			uint fifo_index = atomic_fifo_get_write_index(
+				&btlesbc->sbc_fifo_controller);
+			struct sbc_fifo_packet *packet =
+				&btlesbc->sbc_fifo_packet_buffer[fifo_index];
+			packet->which = (uint8_t)which;
+			packet->format = (uint8_t)format;
+			packet->new_timings = (uint8_t)(new_timings ? 1 : 0);
+			packet->num_bytes = (uint8_t)num_bytes;
+			memcpy(packet->sbc_data, sbc_input, num_bytes);
+			atomic_fifo_advance_write(
+				&btlesbc->sbc_fifo_controller, 1);
+		} else {
+			dropped_packet = true;
+			s_substream_for_btle = NULL; /* Stop decoding. */
+		}
+	}
+	sbc_packet_counter++;
+	if ((uint)format < ATHOME_SBC_FORMAT_COUNT)
+		debug_decoder_callback_stats[format] += 1;
+	return dropped_packet;
+}
+
 /**
  * This is called by the Android@Home Bluetooth driver when it gets an
- * SBC packet from Bemote.
- * @param which index of Bemote TODO
+ * SBC packet from Bemote. It writes the packet into a FIFO
+ * which is then read and decoded by the timer task.
+ * @param which index of Bemote NOT USED
  * @param format AAH SBC format, 0-3
  * @param sbc_input pointer to SBC data to be decoded
  * @param num_bytes how many bytes in sbc_input
@@ -271,108 +472,217 @@ void athome_bt_audio_dec(
 			bool new_timings
 			)
 {
-	smp_rmb(); /* for s_current_substream and the write_index */
+	bool dropped_packet;
 
-	sbc_packet_counter++;
-#if DEBUG_COUNT_PACKETS
-	if ((sbc_packet_counter & 0x3FF) == 1) {
-		btlesbc_log("%s called %d times, %s\n", __func__,
-			sbc_packet_counter,
-			((s_current_substream == NULL) ? "ignored" : "on"));
-	}
+	spin_lock(&s_substream_lock);
+	dropped_packet = athome_bt_audio_dec_ll(which, format, sbc_input,
+			num_bytes, new_timings);
+	spin_unlock(&s_substream_lock);
+
+	if (dropped_packet)
+			btlesbc_log("WARNING, SBC packet dropped, FIFO full\n");
+
+#if LOG_PACKET_COUNTS
+	if ((sbc_packet_counter & 0x3FF) == 1)
+		btlesbc_log("%s called %d times\n",
+			__func__, sbc_packet_counter);
 #endif
-
-	if (s_current_substream != NULL) {
-		/* TODO use array of substream pointers for 4 cards. */
-		btlesbc_decode_sbc_packet(s_current_substream,
-			format, sbc_input, num_bytes, new_timings);
-	}
-	smp_wmb(); /* so other thread will see updated write_index */
 }
 
-/* ===================================================================== */
-#if FAKE_SOUND
-static uint btlesbc_elapsed_frames_by_time(struct snd_pcm_substream *substream)
+/*
+ * Note that smp_rmb() is called by btlesbc_timer_callback()
+ * before calling this function.
+ *
+ * Reads:
+ *    jiffies
+ *    btlesbc->previous_jiffies
+ * Writes:
+ *    btlesbc->previous_jiffies
+ * Returns:
+ *    num_frames needed to catch up to the current time
+ */
+static uint btlesbc_calc_frame_advance(struct snd_btlesbc *btlesbc)
 {
-	struct snd_btlesbc *btlesbc = snd_pcm_substream_chip(substream);
-	/* Determine how much time passed and simulate the advance of
-	 * a hardware pointer. */
+	/* Determine how much time passed. */
 	uint now_jiffies = jiffies;
 	uint elapsed_jiffies = now_jiffies - btlesbc->previous_jiffies;
-	btlesbc->previous_jiffies = now_jiffies;
 	/* Convert jiffies to frames. */
-	return jiffies_to_msecs(elapsed_jiffies) * SUPPORTED_SAMPLE_RATE / 1000;
+	uint frames_by_time = jiffies_to_msecs(elapsed_jiffies)
+		* SUPPORTED_SAMPLE_RATE / 1000;
+	btlesbc->previous_jiffies = now_jiffies;
+
+	/* Don't write more than one buffer full. */
+	if (frames_by_time > (btlesbc->frames_per_buffer - 4))
+		frames_by_time  = btlesbc->frames_per_buffer - 4;
+
+	return frames_by_time;
 }
 
-void synth_timer_callback(unsigned long data)
+/* Write zeros into the PCM buffer. */
+static uint32_t btlesbc_write_silence(struct snd_btlesbc *btlesbc,
+			uint32_t pos,
+			int frames_to_advance)
+{
+	/* Does it wrap? */
+	if ((pos + frames_to_advance) > btlesbc->frames_per_buffer) {
+		/* Write to end of buffer. */
+		int16_t *destination = &btlesbc->pcm_buffer[pos];
+		size_t num_frames = btlesbc->frames_per_buffer - pos;
+		size_t num_bytes = num_frames * sizeof(int16_t);
+		memset(destination, 0, num_bytes);
+		/* Write from start of buffer to new pos. */
+		destination = &btlesbc->pcm_buffer[0];
+		num_frames = frames_to_advance - num_frames;
+		num_bytes = num_frames * sizeof(int16_t);
+		memset(destination, 0, num_bytes);
+	} else {
+		/* Write within the buffer. */
+		int16_t *destination = &btlesbc->pcm_buffer[pos];
+		size_t num_bytes = frames_to_advance * sizeof(int16_t);
+		memset(destination, 0, num_bytes);
+	}
+	/* Advance and wrap write_index */
+	pos += frames_to_advance;
+	pos %= btlesbc->frames_per_buffer;
+	return pos;
+}
+
+/*
+ * Called by timer task to decode SBC data from the FIFO into the PCM buffer.
+ * Returns the number of packets decoded.
+ */
+static uint btlesbc_decode_from_fifo(struct snd_pcm_substream *substream)
+{
+	uint i;
+	struct snd_btlesbc *btlesbc = snd_pcm_substream_chip(substream);
+	uint readable = atomic_fifo_available_to_read(
+		&btlesbc->sbc_fifo_controller);
+	for (i = 0; i < readable; i++) {
+		uint fifo_index = atomic_fifo_get_read_index(
+			&btlesbc->sbc_fifo_controller);
+		struct sbc_fifo_packet *packet =
+			&btlesbc->sbc_fifo_packet_buffer[fifo_index];
+		btlesbc_decode_sbc_packet(substream,
+				packet->format,
+				packet->sbc_data,
+				packet->num_bytes,
+				(packet->new_timings > 0));
+		atomic_fifo_advance_read(&btlesbc->sbc_fifo_controller, 1);
+	}
+	return readable;
+}
+
+static int btlesbc_schedule_timer(struct snd_pcm_substream *substream)
 {
 	int ret;
-	uint32_t frames_to_sleep;
-	uint32_t pos;
+	struct snd_btlesbc *btlesbc = snd_pcm_substream_chip(substream);
+	uint msec_to_sleep = (substream->runtime->period_size * 1000)
+			/ SUPPORTED_SAMPLE_RATE;
+	uint jiffies_to_sleep = msecs_to_jiffies(msec_to_sleep);
+	if (jiffies_to_sleep < 2)
+		jiffies_to_sleep = 2;
+	ret = mod_timer(&btlesbc->decoding_timer, jiffies + jiffies_to_sleep);
+	if (ret < 0)
+		pr_err("%s:%d - ERROR in mod_timer, ret = %d\n",
+			   __func__, __LINE__, ret);
+	return ret;
+}
+
+static void btlesbc_timer_callback(unsigned long data)
+{
+	uint readable;
+	uint packets_read;
+	bool need_silence = false;
 	struct snd_pcm_substream *substream = (struct snd_pcm_substream *)data;
 	struct snd_btlesbc *btlesbc = snd_pcm_substream_chip(substream);
-	int frames_to_advance = btlesbc_elapsed_frames_by_time(substream);
 
-	/* Simulate microphone by writing sine waves to buffer. DEBUG HACK */
-	int frames_left = frames_to_advance;
+	/* timer_enabled will be false when stopping a stream. */
 	smp_rmb();
-	uint32_t pos = btlesbc->write_index;
-	while (frames_left > 0) {
-		btlesbc->buffer[pos] = s_sine_wave[btlesbc->sine_phase];
-		/* increment and wrap indices */
-		btlesbc->sine_phase = (btlesbc->sine_phase + 1)
-			% ARRAY_SIZE(s_sine_wave);
-		pos = (pos + 1) % btlesbc->frames_per_buffer;
-		frames_left -= 1;
-	}
-	btlesbc->write_index = pos;
-	smp_wmb(); /* so other thread will see updated position */
+	if (!btlesbc->timer_enabled)
+		return;
+	btlesbc->timer_callback_count++;
 
-	btlesbc_handle_frame_advance(substream, frames_to_advance);
-
-	frames_to_sleep = substream->runtime->period_size
-				- btlesbc->frames_in_period;
-	if (frames_to_sleep > 0) {
-		uint msec_to_sleep = (frames_to_sleep * 1000)
-			/ SUPPORTED_SAMPLE_RATE;
-		uint jiffies_to_sleep = msecs_to_jiffies(msec_to_sleep);
-
-		if (jiffies_to_sleep < 2)
-			jiffies_to_sleep  = 2;
-
-		ret = mod_timer(&synth_timer, jiffies + jiffies_to_sleep);
-		if (ret) {
-			pr_err("%s:%d - ERROR in mod_timer\n",
-				__func__, __LINE__);
+	switch (btlesbc->timer_state) {
+	case TIMER_STATE_BEFORE_SBC:
+		readable = atomic_fifo_available_to_read(
+				&btlesbc->sbc_fifo_controller);
+		if (readable > 0) {
+			btlesbc->timer_state = TIMER_STATE_DURING_SBC;
+			/* Fall through into next state. */
+		} else {
+			need_silence = true;
+			break;
 		}
+
+	case TIMER_STATE_DURING_SBC:
+		packets_read = btlesbc_decode_from_fifo(substream);
+		if (packets_read > 0) {
+			btlesbc->previous_jiffies = jiffies; /* Defer timeout */
+			break;
+		} else {
+			if (s_substream_for_btle == NULL) {
+				btlesbc->timer_state = TIMER_STATE_AFTER_SBC;
+				/* Decoder died. Overflowed?
+				 * Fall through into next state. */
+			} else if ((jiffies - btlesbc->previous_jiffies) >
+					btlesbc->timeout_jiffies) {
+				btlesbc->timer_state = TIMER_STATE_AFTER_SBC;
+				/* Disable BTLE thread. */
+				s_substream_for_btle = NULL;
+				btlesbc_log("audio UNDERFLOW detected\n");
+				/* Fall through into next state. */
+			} else
+				break;
+		}
+
+	case TIMER_STATE_AFTER_SBC:
+			need_silence = true;
+		break;
 	}
+
+	/* Write silence before and after SBC. */
+	if (need_silence) {
+		uint frames_to_silence = btlesbc_calc_frame_advance(btlesbc);
+		btlesbc->write_index = btlesbc_write_silence(
+				btlesbc,
+				btlesbc->write_index,
+				frames_to_silence);
+		btlesbc_handle_frame_advance(substream, frames_to_silence);
+	}
+
+	btlesbc_schedule_timer(substream);
 }
 
-void synth_timer_start(struct snd_pcm_substream *substream)
+static void btlesbc_timer_start(struct snd_pcm_substream *substream)
 {
-	int ret;
-	int period_msec;
-	struct snd_pcm_runtime *runtime = substream->runtime;
-	/* synth_timer.function, synth_timer.data */
-	setup_timer(&synth_timer,
-		synth_timer_callback,
+	struct snd_btlesbc *btlesbc = snd_pcm_substream_chip(substream);
+	btlesbc->timer_enabled = true;
+	btlesbc->previous_jiffies = jiffies;
+	btlesbc->timeout_jiffies =
+		msecs_to_jiffies(SND_BTLESBC_RUNNING_TIMEOUT_MSEC);
+	btlesbc->timer_callback_count = 0;
+	smp_wmb();
+	setup_timer(&btlesbc->decoding_timer,
+		btlesbc_timer_callback,
 		(unsigned long)substream);
 
-	period_msec = runtime->period_size * 1000 / runtime->rate;
-	ret = mod_timer(&synth_timer, jiffies + msecs_to_jiffies(period_msec));
-	if (ret)
-		pr_err("%s:%d - ERROR in mod_timer\n", __func__, __LINE__);
+	btlesbc_schedule_timer(substream);
 }
 
-void synth_timer_stop(void)
+static void btlesbc_timer_stop(struct snd_pcm_substream *substream)
 {
-	int ret = del_timer(&synth_timer);
-	if (ret) {
-		pr_err("%s:%d - ERROR the timer is still in use.\n",
-			__func__, __LINE__);
-	}
+	int ret;
+	struct snd_btlesbc *btlesbc = snd_pcm_substream_chip(substream);
+
+	/* Tell timer function not to reschedule itself if it runs. */
+	btlesbc->timer_enabled = false;
+	smp_wmb();
+	ret = del_timer_sync(&btlesbc->decoding_timer);
+	if (ret < 0)
+		pr_err("%s:%d - ERROR del_timer_sync failed, ret = %d\n",
+			__func__, __LINE__, ret);
+
 }
-#endif  /* FAKE_SOUND */
 
 /* ===================================================================== */
 /*
@@ -385,26 +695,29 @@ static int btlesbc_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
-		/* TODO use other device ids besides zero */
 		btlesbc_log("%s starting audio\n", __func__);
+
+		memset(debug_decoder_callback_stats, 0,
+			sizeof(debug_decoder_callback_stats));
 		sbc_decoder_reset();
 		btlesbc->peak_level = 0;
+		btlesbc->previous_jiffies = jiffies;
+		btlesbc->timer_state = TIMER_STATE_BEFORE_SBC;
 		sbc_packet_counter = 0;
-		s_current_substream = substream;
-		smp_wmb(); /* so other thread will see s_current_substream */
-#if FAKE_SOUND
-		synth_timer_start(substream);
-#endif
+		btlesbc_timer_start(substream);
+		 /* Enables callback from BTLE driver. */
+		s_substream_for_btle = substream;
+		smp_wmb(); /* so other thread will see s_substream_for_btle */
 		return 0;
+
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
-		btlesbc_log("%s stopping audio, peak_level = %d, sbc packet count = %d\n",
+		btlesbc_log("%s stopping audio, peak = %d, # packets = %d\n",
 			__func__, btlesbc->peak_level, sbc_packet_counter);
-#if FAKE_SOUND
-		synth_timer_stop();
-#endif
-		s_current_substream = NULL;
-		smp_wmb(); /* so other thread will see s_current_substream */
+
+		s_substream_for_btle = NULL;
+		smp_wmb(); /* so other thread will see s_substream_for_btle */
+		btlesbc_timer_stop(substream);
 		return 0;
 	}
 	return -EINVAL;
@@ -438,7 +751,7 @@ static struct snd_pcm_hardware btlesbc_pcm_hardware = {
 	.rate_max =		USE_RATE_MAX,
 	.channels_min =		USE_CHANNELS_MIN,
 	.channels_max =		USE_CHANNELS_MAX,
-	.buffer_bytes_max =	MAX_BUFFER_SIZE,
+	.buffer_bytes_max =	MAX_PCM_BUFFER_SIZE,
 	.period_bytes_min =	MIN_PERIOD_SIZE,
 	.period_bytes_max =	MAX_PERIOD_SIZE,
 	.periods_min =		USE_PERIODS_MIN,
@@ -468,10 +781,10 @@ static int btlesbc_pcm_open(struct snd_pcm_substream *substream)
 	struct snd_btlesbc *btlesbc = snd_pcm_substream_chip(substream);
 	struct snd_pcm_runtime *runtime = substream->runtime;
 
-#if FAKE_SOUND
-	/* Initialize time for simulated signals. */
-	btlesbc->previous_jiffies = jiffies;
-#endif
+	int ret = atomic_fifo_init(&btlesbc->sbc_fifo_controller,
+			MAX_SBC_PACKETS_PER_BUFFER);
+	if (ret)
+		return ret;
 
 	runtime->hw = btlesbc->pcm_hw;
 	if (substream->pcm->device & 1) {
@@ -479,22 +792,32 @@ static int btlesbc_pcm_open(struct snd_pcm_substream *substream)
 		runtime->hw.info |= SNDRV_PCM_INFO_NONINTERLEAVED;
 	}
 	if (substream->pcm->device & 2)
-		runtime->hw.info &= ~(SNDRV_PCM_INFO_MMAP |
-				      SNDRV_PCM_INFO_MMAP_VALID);
+		runtime->hw.info &= ~(SNDRV_PCM_INFO_MMAP
+			| SNDRV_PCM_INFO_MMAP_VALID);
 
 	/*
 	 * Allocate the maximum buffer now and then just use part of it when
 	 * the substream starts. We don't need DMA because it will just
 	 * get written to by the BTLE code.
 	 */
-	btlesbc_log("%s, allocating %u bytes, built %s %s\n", __func__,
-		MAX_BUFFER_SIZE, __DATE__, __TIME__);
-	/* We only use this buffer in this driver and we do not do
+	btlesbc_log("%s, built %s %s\n", __func__, __DATE__, __TIME__);
+	/* We only use this buffer in the kernel and we do not do
 	 * DMA so vmalloc should be OK. */
-	btlesbc->buffer = vmalloc(MAX_BUFFER_SIZE);
-	if (btlesbc->buffer == NULL) {
-		pr_err("%s:%d - ERROR buffer allocation failed\n",
+	btlesbc->pcm_buffer = vmalloc(MAX_PCM_BUFFER_SIZE);
+	if (btlesbc->pcm_buffer == NULL) {
+		pr_err("%s:%d - ERROR PCM buffer allocation failed\n",
 			__func__, __LINE__);
+		return -ENOMEM;
+	}
+
+	/* We only use this buffer in the kernel and we do not do
+	 * DMA so vmalloc should be OK. */
+	btlesbc->sbc_fifo_packet_buffer = vmalloc(MAX_SBC_BUFFER_SIZE);
+	if (btlesbc->sbc_fifo_packet_buffer == NULL) {
+		pr_err("%s:%d - ERROR SBC buffer allocation failed\n",
+			__func__, __LINE__);
+		vfree(btlesbc->pcm_buffer);
+		btlesbc->pcm_buffer = NULL;
 		return -ENOMEM;
 	}
 
@@ -504,12 +827,30 @@ static int btlesbc_pcm_open(struct snd_pcm_substream *substream)
 static int btlesbc_pcm_close(struct snd_pcm_substream *substream)
 {
 	struct snd_btlesbc *btlesbc = snd_pcm_substream_chip(substream);
+#if LOG_PACKET_COUNTS
+	athome_bt_dump_sbc_stats();
+#endif
+	if (btlesbc->timer_callback_count > 0)
+		btlesbc_log("processed %d packets in %d timer callbacks\n",
+			sbc_packet_counter, btlesbc->timer_callback_count);
 
-	if (btlesbc->buffer) {
-		btlesbc_log("%s, freeing %u bytes\n", __func__, MAX_BUFFER_SIZE);
-		vfree(btlesbc->buffer);
-		btlesbc->buffer = NULL;
+	if (btlesbc->pcm_buffer) {
+		vfree(btlesbc->pcm_buffer);
+		btlesbc->pcm_buffer = NULL;
 	}
+
+	/*
+	 * Use spinlock so we don't free the SBC FIFO when the
+	 * BTLE driver is writing to it.
+	 * The s_substream_for_btle should already be NULL by now.
+	 */
+	spin_lock(&s_substream_lock);
+	if (btlesbc->sbc_fifo_packet_buffer) {
+		vfree(btlesbc->sbc_fifo_packet_buffer);
+		btlesbc->sbc_fifo_packet_buffer = NULL;
+	}
+	spin_unlock(&s_substream_lock);
+
 	return 0;
 }
 
@@ -535,19 +876,19 @@ static int btlesbc_pcm_copy(struct snd_pcm_substream *substream,
 	 * Are we reading past the end of the buffer?
 	 */
 	if ((pos + count) > btlesbc->frames_per_buffer) {
-		const int16_t *source = &btlesbc->buffer[pos];
+		const int16_t *source = &btlesbc->pcm_buffer[pos];
 		int16_t *destination = output;
 		size_t num_frames = btlesbc->frames_per_buffer - pos;
 		size_t num_bytes = num_frames * sizeof(int16_t);
 		memcpy(destination, source, num_bytes);
 
-		source = &btlesbc->buffer[0];
+		source = &btlesbc->pcm_buffer[0];
 		destination += num_frames;
 		num_frames = count - num_frames;
 		num_bytes = num_frames * sizeof(int16_t);
 		memcpy(destination, source, num_bytes);
 	} else {
-		const int16_t *source = &btlesbc->buffer[pos];
+		const int16_t *source = &btlesbc->pcm_buffer[pos];
 		int16_t *destination = output;
 		size_t num_bytes = count * sizeof(int16_t);
 		memcpy(destination, source, num_bytes);
@@ -557,8 +898,8 @@ static int btlesbc_pcm_copy(struct snd_pcm_substream *substream,
 }
 
 static int btlesbc_pcm_silence(struct snd_pcm_substream *substream,
-			     int channel, snd_pcm_uframes_t pos,
-			     snd_pcm_uframes_t count)
+			int channel, snd_pcm_uframes_t pos,
+			snd_pcm_uframes_t count)
 {
 	return 0; /* Do nothing. Only used by output? */
 }
@@ -663,7 +1004,7 @@ static struct btlesbc_hw_field fields[] = {
 };
 
 static void btlesbc_proc_read(struct snd_info_entry *entry,
-			    struct snd_info_buffer *buffer)
+			struct snd_info_buffer *buffer)
 {
 	struct snd_btlesbc *btlesbc = entry->private_data;
 	int i;
@@ -687,7 +1028,7 @@ static void btlesbc_proc_read(struct snd_info_entry *entry,
 }
 
 static void btlesbc_proc_write(struct snd_info_entry *entry,
-			     struct snd_info_buffer *buffer)
+			struct snd_info_buffer *buffer)
 {
 	struct snd_btlesbc *btlesbc = entry->private_data;
 	char line[64];
@@ -706,7 +1047,7 @@ static void btlesbc_proc_write(struct snd_info_entry *entry,
 		if (i >= ARRAY_SIZE(fields))
 			continue;
 		snd_info_get_str(item, ptr, sizeof(item));
-		if (strict_strtoull(item, 0, &val))
+		if (kstrtoull(item, 0, &val))
 			continue;
 		if (fields[i].size == sizeof(int))
 			*get_btlesbc_int_ptr(btlesbc, fields[i].offset) = val;
@@ -738,7 +1079,7 @@ static int __devinit snd_btlesbc_probe(struct platform_device *devptr)
 	int dev = devptr->id;
 
 	err = snd_card_create(index[dev], id[dev], THIS_MODULE,
-			      sizeof(struct snd_btlesbc), &card);
+			sizeof(struct snd_btlesbc), &card);
 	if (err < 0)
 		return err;
 	btlesbc = card->private_data;
