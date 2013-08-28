@@ -1764,6 +1764,10 @@ static int athome_bt_thread(void *unusedData)
 	int ret = 0;
 	struct athome_bt_thread_context thread_context = {0};
 
+	aahlog("delaying thread to let Marvell driver settle\n");
+	mdelay(5000);
+	aahlog("after mdelay\n");
+
 	if (!devices_exist) {
 		aahlog("devices_created\n");
 		if (athome_bt_user_init()) {

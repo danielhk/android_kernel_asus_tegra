@@ -791,31 +791,6 @@ void athome_bt_pkt_to_user(void *_priv, uint32_t pkt_type,
 	}
 }
 
-/* we can use sbi_host_to_card because it is thread safe */
-void athome_bt_pkt_to_chip(void *_priv, uint32_t pkt_type,
-			   const uint8_t *data, uint32_t len)
-{
-	/* make the buffer DMA friendly so sbi_host_to_card() doesn't
-	 * have to do a copy
-	 */
-	bt_private *priv = (bt_private *)_priv;
-	uint32_t new_len = ALIGN_SZ(len + 4, DMA_ALIGNMENT);
-	uint8_t* buf = kmalloc(new_len, GFP_ATOMIC);
-
-	if (!buf)
-		return;
-
-	buf[0] = len;
-	buf[1] = len >> 8;
-	buf[2] = len >> 16;
-	buf[3] = pkt_type;
-	memcpy(buf + 4, data, len);
-
-	sbi_host_to_card(priv, buf, len + 4);
-
-	kfree(buf);
-}
-
 #endif
 
 /**

@@ -1644,6 +1644,44 @@ bt_service_main_thread(void *data)
 	return BT_STATUS_SUCCESS;
 }
 
+#ifdef CONFIG_ATHOME_BT_REMOTE
+/* We must add our pkt to the queue for the main thread
+ * to process because the main thread handles power state.
+ * Must not send packet directly to chip because it could
+ * be sleeping.
+ */
+void athome_bt_pkt_to_chip(void *_priv, uint32_t pkt_type,
+			   const uint8_t *data, uint32_t len)
+{
+	bt_private *priv = (bt_private *)_priv;
+	struct sk_buff *skb;
+
+	skb = bt_skb_alloc(len, GFP_ATOMIC);
+	if (!skb) {
+		aahlog("fail to alloc skb for %u bytes\n", len);
+		return;
+	}
+	memcpy(skb->data, data, len);
+	/* Change the packet type so that the send filter
+	 * can identify our packet and allow it through.  The
+	 * send filter will change the type back to HCI_COMMAND_PKT.
+	 */
+	if (pkt_type == HCI_COMMAND_PKT)
+		pkt_type = AAH_BT_PKT_TYPE_CMD;
+
+	bt_cb(skb)->pkt_type = pkt_type;
+	skb_put(skb, len);
+	skb->dev = (void *)(&(priv->bt_dev.m_dev[BT_SEQ]));
+
+	if (priv->adapter->tx_lock == TRUE)
+		skb_queue_tail(&priv->adapter->pending_queue, skb);
+	else
+		skb_queue_tail(&priv->adapter->tx_queue, skb);
+	wake_up_interruptible(&priv->MainThread.waitQ);
+}
+#endif
+
+
 /**
  *  @brief This function handles the interrupt. it will change PS
  *  state if applicable. it will wake up main_thread to handle
