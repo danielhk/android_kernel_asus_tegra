@@ -360,7 +360,7 @@ bool athome_bt_encr_refreshed(uint16_t handle)
 }
 
 bool athome_bt_cmd_sta_or_compl(uint16_t ogf, uint16_t ocf,
-					const uint8_t *buf, uint32_t len)
+				const uint8_t *buf_p, uint32_t len)
 {
 	unsigned long flags;
 	/* Guarantee atomic update to these three globals
@@ -373,8 +373,9 @@ bool athome_bt_cmd_sta_or_compl(uint16_t ogf, uint16_t ocf,
 		inflight_ocf = INVALID;
 		if (cmd_rsp_buf_size > 0) {
 			WARN(len > cmd_rsp_buf_size,
-			     "ble response larger than rsp buf\n");
-			memcpy(cmd_rsp_buf, buf, min(cmd_rsp_buf_size, len));
+			     "ble response size %d larger than rsp buf size %d\n",
+			     len, cmd_rsp_buf_size);
+			memcpy(cmd_rsp_buf, buf_p, min(cmd_rsp_buf_size, len));
 		}
 		spin_unlock_irqrestore(&stack_state_lock, flags);
 		complete(&cmd_response);
@@ -578,17 +579,17 @@ static void athome_bt_enqueue_data(struct sk_buff_head *Q, const void *ptr,
 	skb_queue_tail(Q, skb);
 }
 
-void athome_bt_process_le_evt(const uint8_t *buf, uint32_t len)
+void athome_bt_process_le_evt(const uint8_t *buf_p, uint32_t len)
 {
-	athome_bt_enqueue_data(&rx_evt, buf, len);
+	athome_bt_enqueue_data(&rx_evt, buf_p, len);
 	wake_up_interruptible(&rx_wait);
 }
 
-bool athome_bt_process_le_data(uint16_t handle, const uint8_t *buf,
+bool athome_bt_process_le_data(uint16_t handle, const uint8_t *buf_p,
 								uint32_t len)
 {
 	if (athome_bt_find_connection(handle) >= 0) {
-		athome_bt_enqueue_data(&rx_dat, buf, len);
+		athome_bt_enqueue_data(&rx_dat, buf_p, len);
 		wake_up_interruptible(&rx_wait);
 		return true;
 	}
@@ -1217,22 +1218,22 @@ bool athome_bt_is_connected_to(const bdaddr_t *macP)
  * The buf array should contain at least EVT_PACKET_LEN bytes.
  * We pass in the buf to avoid allocating large arrays on the stack.
  */
-static int athome_bt_set_scan_enabled(bool enabled, uint8_t *buf)
+static int athome_bt_set_scan_enabled(bool enabled, uint8_t *buf_p, size_t blen)
 {
 	char *mode = enabled ? "enabled" : "disabled";
-	uint8_t *evt_data = buf + HCI_EVENT_HDR_SIZE;
+	uint8_t *evt_data = buf_p + HCI_EVENT_HDR_SIZE;
 	uint8_t *cmd_cmpl_data = evt_data + sizeof(struct hci_ev_cmd_complete);
 	uint8_t *parP;
 	int err;
 	int sta;
 
-	parP = buf;
+	parP = buf_p;
 	put8LE(&parP, enabled ? 1 : 0);	/* scanning enabled or disabled */
 	put8LE(&parP, 0);	/* duplicate filter off */
 	err = athome_bt_simple_cmd(HCI_OGF_LE,
 				HCI_LE_Set_Scan_Enable,
-				parP - buf, buf,
-				sizeof(buf), buf);
+				parP - buf_p, buf_p,
+				blen, buf_p);
 	if (err) {
 		aahlog("failed to send cmd to set scan parameters.\n");
 		return err;
@@ -1249,26 +1250,24 @@ static int athome_bt_set_scan_enabled(bool enabled, uint8_t *buf)
  * The buf array should contain at least EVT_PACKET_LEN bytes.
  * We pass in the buf to avoid allocating large arrays on the stack.
  */
-static int athome_bt_set_scan_timing(
-		int scan_interval,
-		int scan_window,
-		uint8_t *buf)
+static int athome_bt_set_scan_timing(int scan_interval, int scan_window,
+				     uint8_t *buf_p, size_t blen)
 {
-	uint8_t *evt_data = buf + HCI_EVENT_HDR_SIZE;
+	uint8_t *evt_data = buf_p + HCI_EVENT_HDR_SIZE;
 	uint8_t *cmd_cmpl_data = evt_data + sizeof(struct hci_ev_cmd_complete);
 	uint8_t *parP;
 	int err;
 	int sta;
 
 	aahlog("set scan timing: interval = %d, window = %d\n", scan_interval, scan_window);
-	parP = buf;
+	parP = buf_p;
 	put8LE(&parP, 0);	/* passive scan */
 	put16LE(&parP, scan_interval); /* time between listens per channel */
 	put16LE(&parP, scan_window); /* time spent listening per interval */
 	put8LE(&parP,  0);	/* use real mac address on packets we send */
 	put8LE(&parP, 0);	/* accept all advertisement packets */
 	err = athome_bt_simple_cmd(HCI_OGF_LE, HCI_LE_Set_Scan_Parameters,
-				parP - buf, buf, sizeof(buf), buf);
+				   parP - buf_p, buf_p, blen, buf_p);
 	if (err) {
 		aahlog("failed to send cmd to set scan parameters.\n");
 		return err;
@@ -1293,6 +1292,8 @@ static int athome_bt_host_setup(void)
 
 	aahlog("host setup\n");
 	parP = buf;
+
+	aahlog("turning le and le simul on\n");
 	put8LE(&parP, 1);		/* le on */
 	put8LE(&parP, 1);		/* le simul on */
 	err = athome_bt_simple_cmd(HCI_OGF_Controller_And_Baseband,
@@ -1306,6 +1307,7 @@ static int athome_bt_host_setup(void)
 		return -3;
 	}
 
+	aahlog("read buffer size\n");
 	err = athome_bt_simple_cmd(HCI_OGF_LE, HCI_LE_Read_Buffer_Size,
 						0, NULL, sizeof(buf), buf);
 	if (err)
@@ -1321,6 +1323,7 @@ static int athome_bt_host_setup(void)
 
 	aahlog("LE INFO:\n");
 
+	aahlog("read local supported features\n");
 	err = athome_bt_simple_cmd(HCI_OGF_LE,
 				HCI_LE_Read_Local_Supported_Features,
 				0, NULL, sizeof(buf), buf);
@@ -1334,6 +1337,7 @@ static int athome_bt_host_setup(void)
 			aahlog(" -> chip supports unknown LE feature %d\n", i);
 
 
+	aahlog("read supported states\n");
 	err = athome_bt_simple_cmd(HCI_OGF_LE, HCI_LE_Read_Supported_States, 0,
 				NULL, sizeof(buf), buf);
 	if (err)
@@ -1418,7 +1422,7 @@ static int athome_bt_host_setup(void)
 	}
 
 	err = athome_bt_set_scan_timing(AAH_BT_NORMAL_SCAN_INTERVAL,
-		AAH_BT_SCAN_WINDOW, buf);
+					AAH_BT_SCAN_WINDOW, buf, sizeof(buf));
 	if (err)
 		return err;
 
@@ -1806,7 +1810,8 @@ static int athome_bt_thread(void *unusedData)
 		/* Only scan if we can connect to more Bemotes. */
 		if (!is_scanning && !is_connecting) {
 			if (thread_context.nconns < ATHOME_RMT_MAX_CONNS) {
-				ret = athome_bt_set_scan_enabled(true, buf);
+				ret = athome_bt_set_scan_enabled(true, buf,
+								 sizeof(buf));
 				if (ret)
 					break; /* exit while loop */
 
