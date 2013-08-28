@@ -15,52 +15,12 @@
 #ifndef _BT_ATHOME_UTIL_H_
 #define _BT_ATHOME_UTIL_H_
 
+#include <asm/unaligned.h>
 #include <linux/kernel.h>
 
-/* unaligned and endian-agnostic access */
-static inline uint16_t r16LE(void *ptr)
-{
-	uint8_t *p = (uint8_t*)ptr;
-	return (((uint16_t)p[1]) << 8) | p[0];
-}
-
-static inline uint32_t r32LE(void *ptr)
-{
-	uint8_t *p = (uint8_t*)ptr;
-	return  (((uint32_t)p[3]) << 24) | (((uint32_t)p[2]) << 16) |
-		(((uint32_t)p[1]) <<  8) | p[0];
-}
-
-static inline uint64_t r64LE(void *ptr)
-{
-	uint8_t *p = (uint8_t*)ptr;
-	return  (((uint64_t)p[7]) << 56) | (((uint64_t)p[6]) << 48) |
-		(((uint64_t)p[5]) << 40) | (((uint64_t)p[4]) << 32) |
-		(((uint64_t)p[3]) << 24) | (((uint64_t)p[2]) << 16) |
-		(((uint64_t)p[1]) <<  8) | p[0];
-}
-
-static inline void w16LE(void *ptr, uint16_t val)
-{
-	uint8_t *p = (uint8_t*)ptr;
-
-	p[0] = val;
-	p[1] = val >> 8;
-}
-
-static inline void w64LE(void *ptr, uint64_t val)
-{
-	uint8_t *p = (uint8_t*)ptr;
-
-	p[0] = val >>  0;
-	p[1] = val >>  8;
-	p[2] = val >> 16;
-	p[3] = val >> 24;
-	p[4] = val >> 32;
-	p[5] = val >> 40;
-	p[6] = val >> 48;
-	p[7] = val >> 56;
-}
+#define ATHOME_RMT_MAX_CONNS 2
+#define INVALID_CONN_ID	     0xFFFF
+#define INVALID_OCF_OGF	     0xFFFF
 
 /* access to packed non-typedefed structures with autoincrement */
 static inline uint8_t get8LE(uint8_t **parPP)
@@ -73,7 +33,7 @@ static inline uint8_t get8LE(uint8_t **parPP)
 
 static inline uint16_t get16LE(uint8_t **parPP)
 {
-	uint16_t ret = r16LE(*parPP);
+	uint16_t ret = get_unaligned_le16(*parPP);
 	(*parPP) += 2;
 
 	return ret;
@@ -86,13 +46,13 @@ static inline void put8LE(uint8_t **parPP, uint8_t v)
 
 static inline void put16LE(uint8_t **parPP, uint16_t v)
 {
-	w16LE(*parPP, v);
+	put_unaligned_le16(v, *parPP);
 	(*parPP) += 2;
 }
 
 static inline void put64LE(uint8_t **parPP, uint64_t v)
 {
-	w64LE(*parPP, v);
+	put_unaligned_le64(v, *parPP);
 	(*parPP) += 8;
 }
 

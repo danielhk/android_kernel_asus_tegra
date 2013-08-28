@@ -18,37 +18,54 @@
 
 #include "bt_athome_proto.h"
 
-struct athome_bt_known_remote {
-	struct athome_bt_known_remote *next;
-	uint8_t bind_mode;
-	bdaddr_t MAC;
-	uint8_t LTK[AAH_BT_LTK_SZ];
-};
+/* Init the user-facind devnode & structures */
+int aahbt_usr_init(void);
 
-/*
- *	Given a MAC, see if we heard about such a device from the user.
- */
-struct athome_bt_known_remote *athome_bt_find_known(const bdaddr_t *macP);
+/* Deinit user-facing devnode & structures */
+void aahbt_usr_deinit(void);
 
-/*
- *	Init the user-facind devnode & structures
- */
-int athome_bt_user_init(void);
+/* Send some data to user through the user-facing devnode. */
+void aahbt_usr_enqueue(uint8_t typ,
+			   const void *data,
+			   unsigned len,
+			   const bdaddr_t *macP);
 
-/*
- *	Deinit user-facing devnode & structures
- */
-void athome_bt_user_deinit(void);
+/* Indicate that there is room to queue more data for TX */
+void aahbt_usr_signal_tx_has_room(void);
 
-/*
- *	Send some data to user through the user-facing devnode.
+/* Called from the stack core when it either starts up, or shuts down in
+ * response to the Marvell driver stopping or starting the stack.
  */
-void athome_bt_usr_enqueue(uint8_t typ, const void *data, unsigned len);
+void aahbt_usr_set_stack_ready(bool stack_is_ready);
 
-/*
- *	See if the user has asked to place the driver into "bind" mode.
+/* Called from the core to purge the queues while the stack is in a safe,
+ * shutdown state, or in response to the userland closing the device node.
  */
-bool athome_bt_usr_in_bind_mode(void);
+void aahbt_usr_purge_queues(void);
+
+/* Called from various places to add a message to the user msg queue indicating
+ * the current ready status of the driver.
+ */
+void aahbt_usr_queue_ready_message(void);
+
+/* Called during a shutdown operation by the stack's core to make
+ * certain that it is in sync with calls from userland.  The idea is
+ * that during a shutdown operation, the core will call set_stack_ready
+ * in order to set the flag indicating that subsequent API calls will be
+ * rejected with either a status message to indicate that the stack is
+ * not ready, or (in the case of read) an event indicating that the
+ * stack is not ready.  At this point, no new calls may come in and the
+ * stack core will abort any operations which may already be in
+ * progress (possibly from a userland thread) and shutting down the work
+ * thread.  Once all of this is finished, it will call
+ * sync_with_userland which will obtain and then release the API lock.
+ * This ensures that any user threads which may have been in the middle
+ * of an operation when the shutdown started have exited with an
+ * appropriate response.  After syncing, it is safe for the core to
+ * start the process of purging any state (message queues, connection
+ * state, etc...)
+ */
+void aahbt_usr_sync_with_userland(void);
 
 #endif
 

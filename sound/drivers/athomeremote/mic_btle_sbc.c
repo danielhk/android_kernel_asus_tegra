@@ -66,7 +66,12 @@ MODULE_SUPPORTED_DEVICE("{{ALSA,RemoteMic soundcard}}");
 #define MAX_PCM_SUBSTREAMS  4
 #define MAX_MIDI_DEVICES    0
 
-#define SUPPORTED_SAMPLE_RATE   16000
+/* Define these all in one place so they stay in sync. */
+#define USE_RATE_MIN          8000
+#define USE_RATE_MAX         16000
+#define USE_RATES_ARRAY     { USE_RATE_MIN, 11025, USE_RATE_MAX }
+#define USE_RATES_MASK \
+	(SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_11025 | SNDRV_PCM_RATE_16000)	
 
 #define MAX_FRAMES_PER_BUFFER  (8192)
 
@@ -98,13 +103,6 @@ struct sbc_fifo_packet {
 
 #define SND_BTLESBC_RUNNING_TIMEOUT_MSEC    (500)
 
-/* Use preprocessor trick to build name. */
-#define __PCM_RATE_NAME__(x) SNDRV_PCM_RATE_##x
-#define PCM_RATE_NAME(x)     __PCM_RATE_NAME__(x)
-#define USE_RATE             PCM_RATE_NAME(SUPPORTED_SAMPLE_RATE)
-
-#define USE_RATE_MIN         SUPPORTED_SAMPLE_RATE
-#define USE_RATE_MAX         SUPPORTED_SAMPLE_RATE
 
 #define TIMER_STATE_BEFORE_SBC    0
 #define TIMER_STATE_DURING_SBC    1
@@ -157,6 +155,8 @@ struct snd_btlesbc {
 	struct snd_card *card;
 	struct snd_pcm *pcm;
 	struct snd_pcm_hardware pcm_hw;
+
+	uint32_t sample_rate;
 
 	uint previous_jiffies; /* Used to detect underflows. */
 	uint timeout_jiffies;
@@ -508,7 +508,7 @@ static uint btlesbc_calc_frame_advance(struct snd_btlesbc *btlesbc)
 	uint elapsed_jiffies = now_jiffies - btlesbc->previous_jiffies;
 	/* Convert jiffies to frames. */
 	uint frames_by_time = jiffies_to_msecs(elapsed_jiffies)
-		* SUPPORTED_SAMPLE_RATE / 1000;
+		* btlesbc->sample_rate / 1000;
 	btlesbc->previous_jiffies = now_jiffies;
 
 	/* Don't write more than one buffer full. */
@@ -577,7 +577,7 @@ static int btlesbc_schedule_timer(struct snd_pcm_substream *substream)
 	int ret;
 	struct snd_btlesbc *btlesbc = snd_pcm_substream_chip(substream);
 	uint msec_to_sleep = (substream->runtime->period_size * 1000)
-			/ SUPPORTED_SAMPLE_RATE;
+			/ btlesbc->sample_rate;
 	uint jiffies_to_sleep = msecs_to_jiffies(msec_to_sleep);
 	if (jiffies_to_sleep < 2)
 		jiffies_to_sleep = 2;
@@ -750,6 +750,7 @@ static int btlesbc_pcm_prepare(struct snd_pcm_substream *substream)
 	if (runtime->buffer_size > MAX_FRAMES_PER_BUFFER)
 		return -EINVAL;
 
+	btlesbc->sample_rate = runtime->rate;
 	btlesbc->frames_per_buffer = runtime->buffer_size;
 
 	return 0; /* TODO - review */
@@ -761,7 +762,7 @@ static struct snd_pcm_hardware btlesbc_pcm_hardware = {
 				 SNDRV_PCM_INFO_RESUME |
 				 SNDRV_PCM_INFO_MMAP_VALID),
 	.formats =		USE_FORMATS,
-	.rates =		USE_RATE,
+	.rates =		USE_RATES_MASK,
 	.rate_min =		USE_RATE_MIN,
 	.rate_max =		USE_RATE_MAX,
 	.channels_min =		USE_CHANNELS_MIN,
@@ -810,12 +811,13 @@ static int btlesbc_pcm_open(struct snd_pcm_substream *substream)
 		runtime->hw.info &= ~(SNDRV_PCM_INFO_MMAP
 			| SNDRV_PCM_INFO_MMAP_VALID);
 
+	btlesbc_log("%s, built %s %s\n", __func__, __DATE__, __TIME__);
+
 	/*
 	 * Allocate the maximum buffer now and then just use part of it when
 	 * the substream starts. We don't need DMA because it will just
 	 * get written to by the BTLE code.
 	 */
-	btlesbc_log("%s, built %s %s\n", __func__, __DATE__, __TIME__);
 	/* We only use this buffer in the kernel and we do not do
 	 * DMA so vmalloc should be OK. */
 	btlesbc->pcm_buffer = vmalloc(MAX_PCM_BUFFER_SIZE);
@@ -975,7 +977,7 @@ static void print_formats(struct snd_btlesbc *btlesbc,
 static void print_rates(struct snd_btlesbc *btlesbc,
 			struct snd_info_buffer *buffer)
 {
-	static int rates[] = { SUPPORTED_SAMPLE_RATE };
+	static int rates[] = USE_RATES_ARRAY;
 	int i;
 
 	if (btlesbc->pcm_hw.rates & SNDRV_PCM_RATE_CONTINUOUS)

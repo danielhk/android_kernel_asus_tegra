@@ -15,91 +15,89 @@
 #ifndef _BT_ATHOME_LE_STACK_H_
 #define _BT_ATHOME_LE_STACK_H_
 
+#define AAH_MAX_BTLE_PAYLOAD_SZ	27
+#define AAH_MIN_BTLE_PAYLOAD_SZ	3
 
 #include "bt_athome_proto.h"
 
-/*
- * If connected to a given MAC, schedule a disconnection soon. Async.
- */
-void athome_bt_disc_from_mac(const bdaddr_t *macP);
+/* Called at driver module load and unload time */
+int  aahbt_stack_init_module(void);
+void aahbt_stack_exit_module(void);
 
-/*
- * Get driver state (list of connections and their states)
+/* Command status or complete filter.  Return true if this matches the command
+ * result the LE portion of the stack was waiting for.
  */
-void athome_bt_get_state(struct bt_athome_state *state);
+bool aahbt_process_cmd_status_or_complete(uint16_t opcode,
+					  const uint8_t *buf,
+					  uint32_t len);
 
-/*
- * If connected to a given MAC, schedule encryption to start soon
+/* Called by the splitter when it receives messages from the radio we might be
+ * interested in.
  */
-void athome_bt_start_encr_for_mac(const bdaddr_t *macP);
-
-/*
- * Get a connection's statistics
- */
-bool athome_bt_get_stats(struct athome_bt_stats *stats, const bdaddr_t *macP);
-
-/*
- * Send a packet to a remote. Returns false on certain failures, but a return
- * of "true" does not guarantee anything more than that the packet was sent to
- * the BTLE chip. Higher level code, if it wants to, can deal with higher-level
- * reliability.
- */
-bool athome_bt_send_data(const bdaddr_t *macP, uint8_t typ,
-			const void *data, uint8_t data_sz, bool for_user);
-
-/*
- * Check if we're currently connected to a given MAC
- */
-bool athome_bt_is_connected_to(const bdaddr_t *macP);
-
-/*
- * Filters:
- * Return true if it was meant for LE. Basic work is OK. Try to be fast
- */
-bool athome_bt_connection_went_down(uint16_t handle);
-bool athome_bt_encr_changed(uint16_t handle);
-bool athome_bt_encr_refreshed(uint16_t handle);
-bool athome_bt_cmd_sta_or_compl(uint16_t ogf, uint16_t ocf,
-				const uint8_t *buf, uint32_t len);
-bool athome_bt_compl_pkts(uint16_t handle, uint16_t num);
-bool athome_bt_process_le_data(uint16_t handle,
-				const uint8_t *buf, uint32_t len);
-
-/*
- * An LE event was delivered. Do quick processing on it or save it for later.
- * Please do not make this function slow - the other BT stack will be waiting
- * for you.
- */
-void athome_bt_process_le_evt(const uint8_t *buf, uint32_t len);
+void aahbt_enqueue_msg(const void *ptr, uint32_t len, uint8_t type);
 
 /*
  * Prepare the LE stack to start. This setus up all the stack needs to start
  * and does everything except starting. This function may sleep/block as
- * needed. If all goes well, athome_bt_stack_start() may be called later.
+ * needed. If all goes well, aahbt_stack_start() may be called later.
  */
-void athome_bt_stack_prepare(void);
+void aahbt_stack_prepare(void);
 
 /*
  * Actually start the stack. Possibly called from atomic context, Cannot block.
- * Will always be preceded by a call to athome_bt_stack_prepare().
+ * Will always be preceded by a call to aahbt_stack_prepare().
  */
-void athome_bt_stack_start(void);
+void aahbt_stack_start(void);
 
+/*
+ * Cleanup state in prep for future restart of LE stack
+ */
+void aahbt_stack_shutdown(void);
 
 
 /*
- *	cleanup state in prep for future restart of LE stack
+ * This must exist elsewhere in the kernel. Used for audio packets
  */
-void athome_bt_stack_shutdown(void);
+void athome_bt_audio_dec(int which,
+			 int format,
+			 const uint8_t *data,
+			 unsigned len,
+			 bool new_timings);
 
-
-/*
- *	This must exist elsewhere in the kernel. Used for audio packets
+/* Called by the user interface code when the devnode is closed and the stack
+ * should become quiescent.
  */
-void athome_bt_audio_dec(int which, int format,
-			const uint8_t *data, unsigned len, bool new_timings);
+void aahbt_reset_stack(void);
 
+/* called in order to wake up the AAH work thread if needed.  Mostly used
+ * internally, but called at least once from the splitter level.
+ */
+void aahbt_wake_thread(void);
 
+/* Used in a coupe of places to implement ASSERTs to make certain that some
+ * actions are taking place on the AAH work thread.
+ */
+bool aahbt_running_on_aah_thread(void);
+
+/* driver interface IOCTL thunks. */
+void aahbt_set_listening(bool should_listen);
+int  aahbt_start_connecting(const bdaddr_t *MAC, uint32_t timeout_msec);
+int  aahbt_start_disconnecting(const bdaddr_t *MAC);
+void aahbt_get_default_conn_settings(struct aahbt_conn_settings_t *s);
+void aahbt_set_default_conn_settings(const struct aahbt_conn_settings_t *s);
+int  aahbt_start_encrypting(const bdaddr_t *MAC, const uint8_t *key);
+int  aahbt_get_random_bytes(uint8_t *bytes, size_t amt);
+int  aahbt_do_aes128(const uint8_t* key, const uint8_t* in, uint8_t* out);
+int  aahbt_get_evt_filter_flags(const bdaddr_t *MAC, uint32_t *flags);
+int  aahbt_set_evt_filter_flags(const bdaddr_t *MAC, uint32_t  flags);
+
+/* driver interface ::write thunk */
+int  aahbt_queue_acl_for_tx(const bdaddr_t *MAC, const void* data, size_t len);
+
+/* used by the driver interface ::write and ::poll implementations for TX flow
+ * control.
+ */
+bool aahbt_tx_pipeline_has_room(void);
 
 #endif
 

@@ -150,6 +150,11 @@ struct aah_io_driver_state {
 
 	/* animation mode */
 	u8 led_mode;
+
+#ifdef HACK_DEBUG_USING_LED
+	struct led_rgb_vals hack_color;
+	bool hack_disable_ioctl;
+#endif
 };
 
 /*
@@ -186,6 +191,22 @@ static const struct input_device_id aah_io_event_filter_ids[] = {
 
 static inline int lp5521_write(struct i2c_client *client, u8 reg, u8 value);
 
+static int aah_io_led_set_rgb(struct aah_io_driver_state *state,
+			      const struct led_rgb_vals *rgb_val)
+{
+
+#ifdef HACK_DEBUG_USING_LED
+	if (state->hack_disable_ioctl)
+		rgb_val = &state->hack_color;
+#endif
+	if (state->led_mode != AAH_LED_MODE_DIRECT)
+		return -EFAULT;
+
+	return i2c_smbus_write_i2c_block_data(state->i2c_client,
+					      LP5521_REG_LED_PWM_BASE,
+					      3, &rgb_val->rgb[0]);
+}
+
 static int aah_io_led_set_mode(struct aah_io_driver_state *state,
 			       const u8 mode)
 {
@@ -203,6 +224,10 @@ static int aah_io_led_set_mode(struct aah_io_driver_state *state,
 			lp5521_write(client,
 				     LP5521_REG_OP_MODE, LP5521_CMD_DIRECT);
 			state->led_mode = mode;
+#ifdef HACK_DEBUG_USING_LED
+			if (state->hack_disable_ioctl)
+				aah_io_led_set_rgb(state, &state->hack_color);
+#endif
 			break;
 		default:
 			pr_err("%s: unknown mode %d\n", __func__, mode);
@@ -214,33 +239,25 @@ static int aah_io_led_set_mode(struct aah_io_driver_state *state,
 	return rc;
 }
 
-static int aah_io_led_set_rgb(struct aah_io_driver_state *state,
-			      const struct led_rgb_vals *rgb_val)
-{
-	if (state->led_mode != AAH_LED_MODE_DIRECT)
-		return -EFAULT;
-
-	return i2c_smbus_write_i2c_block_data(state->i2c_client,
-					      LP5521_REG_LED_PWM_BASE,
-					      3, &rgb_val->rgb[0]);
-}
-
 #ifdef HACK_DEBUG_USING_LED
-static bool hack_disable_ioctl;
 int aah_io_led_hack( uint rgb_color )
 {
 	/* no clean way to get the state so have to use a global */
 	struct aah_io_driver_state *state = g_state;
-	struct led_rgb_vals rgb_val;
 	static uint last_color = (uint) -1;
 	int rc = 0;
-	if ((rgb_color != last_color) && (state != NULL)) {
-		rgb_val.rgb[0] = (rgb_color >> 16) & 0xFF;
-		rgb_val.rgb[1] = (rgb_color >> 8) & 0xFF;
-		rgb_val.rgb[2] = (rgb_color >> 0) & 0xFF;
-		hack_disable_ioctl = true;
-		rc = aah_io_led_set_rgb(state, &rgb_val);
-		last_color = rgb_color;
+
+	if (!state)
+		return -EFAULT;
+
+	if (rgb_color != last_color) {
+		state->hack_color.rgb[0] = (rgb_color >> 16) & 0xFF;
+		state->hack_color.rgb[1] = (rgb_color >> 8) & 0xFF;
+		state->hack_color.rgb[2] = (rgb_color >> 0) & 0xFF;
+		state->hack_disable_ioctl = true;
+		rc = aah_io_led_set_rgb(state, &state->hack_color);
+		if (!rc)
+			last_color = rgb_color;
 	}
 	return rc;
 }
@@ -507,10 +524,6 @@ static long aah_io_leddev_ioctl(struct file *file, unsigned int cmd,
 			rc = -EFAULT;
 			break;
 		}
-
-#ifdef HACK_DEBUG_USING_LED
-		if (!hack_disable_ioctl)
-#endif
 		rc = aah_io_led_set_rgb(state, &req);
 	} break;
 

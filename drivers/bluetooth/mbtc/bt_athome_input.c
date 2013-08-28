@@ -30,6 +30,13 @@
 #define HACK_LED_YELLOW   0x808000
 #define HACK_LED_WHITE    0xFFFFFF
 
+static void aahbt_input_apply_ab_filter(unsigned which,
+					uint16_t* x,
+					uint16_t* y);
+static void aahbt_input_apply_distance_filter(unsigned which,
+					      uint16_t* x,
+					      uint16_t* y);
+
 int aah_io_led_hack( uint rgb_color );
 
 /* Map event types to colors. */
@@ -43,13 +50,10 @@ static int event_colors[HACK_LED_EVENT_COUNT] = {
 	[HACK_LED_EVENT_DISCONNECT] = HACK_LED_WHITE,
 	};
 
-void athome_bt_led_show_event(int event_type)
+void aahbt_input_led_show_event(int event_type)
 {
-	static int previous_event_type = -1;
-	if (event_type != previous_event_type) {
-		previous_event_type = event_type;
-		aah_io_led_hack(event_colors[event_type]);
-	}
+	BUG_ON(event_type >= ARRAY_SIZE(event_colors));
+	aah_io_led_hack(event_colors[event_type]);
 }
 #endif /* HACK_DEBUG_USING_LED */
 
@@ -98,7 +102,7 @@ static unsigned short ikeys[] = {KEY_BACK, KEY_HOMEPAGE, KEY_VOLUMEUP,
 					KEY_VOLUMEDOWN, AAH_BT_KEY_DPAD_CENTER,
 					AAH_BT_KEY_POWER, AAH_BT_KEY_INPUT};
 
-static int athome_bt_input_init_device(struct input_dev **idevP)
+static int aahbt_input_init_device(struct input_dev **idevP)
 {
 	int err, i;
 	struct input_dev *idev;
@@ -159,17 +163,17 @@ static int athome_bt_input_init_device(struct input_dev **idevP)
 	return 0;
 }
 
-static void athome_bt_input_del_device(struct input_dev *idev)
+static void aahbt_input_del_device(struct input_dev *idev)
 {
 	input_mt_destroy_slots(idev);
 	input_unregister_device(idev);
 	input_free_device(idev);
 }
 
-static int athome_bt_input_init_debug(void)
+static int aahbt_input_init_debug(void)
 {
 	struct dentry *entry;
-	debugfs_dir = debugfs_create_dir("athome_bt_input", NULL);
+	debugfs_dir = debugfs_create_dir("aahbt_input", NULL);
 	if (!debugfs_dir)
 		return -ENODEV;
 
@@ -202,29 +206,29 @@ static int athome_bt_input_init_debug(void)
 	return 0;
 }
 
-static void athome_bt_input_deinit_debug(void)
+static void aahbt_input_deinit_debug(void)
 {
 	debugfs_remove_recursive(debugfs_dir);
 }
 
-int athome_bt_input_init(void)
+int aahbt_input_init(void)
 {
 	int err;
 	size_t i;
 
-	if (athome_bt_input_init_debug())
+	if (aahbt_input_init_debug())
 		aahlog("Failed to create debugfs entries\n");
 
 	aahlog("touch filter, alpha = %d, beta = %d, enabled = %d\n",
 		filter_params.alpha, filter_params.beta, filter_params.enabled);
 
-	athome_bt_input_reset_state();
+	aahbt_input_reset_state();
 
 	for (i = 0; i < ATHOME_RMT_MAX_CONNS; i++) {
 		scnprintf(inputs[i].uniq, sizeof(inputs[i].uniq),
 						"athome_bt_%d", i);
 
-		err = athome_bt_input_init_device(&inputs[i].idev);
+		err = aahbt_input_init_device(&inputs[i].idev);
 		if (err)
 			break;
 		inputs[i].idev->uniq = inputs[i].uniq;
@@ -234,23 +238,23 @@ int athome_bt_input_init(void)
 	/* we failed */
 	while (i) {
 		i--;
-		athome_bt_input_del_device(inputs[i].idev);
+		aahbt_input_del_device(inputs[i].idev);
 		inputs[i].idev = NULL;
 	}
 	return err;
 }
 
-void athome_bt_input_deinit(void)
+void aahbt_input_deinit(void)
 {
 	int i;
 
-	athome_bt_input_deinit_debug();
+	aahbt_input_deinit_debug();
 
 	for(i = 0; i < ATHOME_RMT_MAX_CONNS; i++)
-		athome_bt_input_del_device(inputs[i].idev);
+		aahbt_input_del_device(inputs[i].idev);
 }
 
-void athome_bt_input_reset_state(void)
+void aahbt_input_reset_state(void)
 {
 	size_t i;
 	for (i = 0; i < ARRAY_SIZE(inputs); i++) {
@@ -267,10 +271,12 @@ void athome_bt_input_reset_state(void)
 		I->idev = backup.idev;
 		memcpy(backup.uniq, I->uniq, sizeof(backup.uniq));
 	}
+
+	aahbt_input_led_show_event(HACK_LED_EVENT_DISCONNECT);
 }
 
 /* Print touch event log less often as the count goes up. */
-static bool athome_bt_should_report_touch(uint32_t count)
+static bool aahbt_input_should_report_touch(uint32_t count)
 {
 	if (count < (0x3F00))
 		return ((count & 0x3F) == 0);
@@ -280,11 +286,11 @@ static bool athome_bt_should_report_touch(uint32_t count)
 		return ((count & 0x3FFF) == 0);
 }
 
-void athome_bt_input_send_touch(unsigned which,
-				int pointer_idx,
-				uint16_t x,
-				uint16_t y,
-				bool is_down)
+void aahbt_input_send_touch(unsigned which,
+			    int pointer_idx,
+			    uint16_t x,
+			    uint16_t y,
+			    bool is_down)
 {
 	struct input_dev *idev;
 	uint32_t mask = 1UL << pointer_idx;
@@ -297,7 +303,7 @@ void athome_bt_input_send_touch(unsigned which,
 
 	if (is_down && !wasdown) {
 		BUG_ON(!inputs[which].last_evt_time_valid);
-		athome_bt_led_show_event(HACK_LED_EVENT_TOUCH_DOWN);
+		aahbt_input_led_show_event(HACK_LED_EVENT_TOUCH_DOWN);
 		inputs[which].last_touch_evt = inputs[which].last_evt;
 		inputs[which].last_touch_evt_time_valid = true;
 		inputs[which].vx = 0;
@@ -307,7 +313,7 @@ void athome_bt_input_send_touch(unsigned which,
 		inputs[which].last_x = x;
 		inputs[which].last_y = y;
 	} else if (!is_down && wasdown)
-		athome_bt_led_show_event(HACK_LED_EVENT_INPUT_UP);
+		aahbt_input_led_show_event(HACK_LED_EVENT_INPUT_UP);
 
 	if (!is_down && !wasdown)
 		return;
@@ -318,13 +324,13 @@ void athome_bt_input_send_touch(unsigned which,
 	inputs[which].touch_count++;
 
 	if (is_down) {
-		athome_apply_ab_filter(which, &x, &y);
-		athome_apply_distance_filter(which, &x, &y);
+		aahbt_input_apply_ab_filter(which, &x, &y);
+		aahbt_input_apply_distance_filter(which, &x, &y);
 
 		input_report_abs(idev, ABS_MT_POSITION_X, x);
 		input_report_abs(idev, ABS_MT_POSITION_Y, y);
 		if (LOG_INPUT_EVENTS) {
-			if (athome_bt_should_report_touch(inputs[which].touch_count))
+			if (aahbt_input_should_report_touch(inputs[which].touch_count))
 				aahlog("[%d] finger down, %4u touch events, x = %5d, y = %5d\n",
 					pointer_idx, inputs[which].touch_count, x, y);
 		}
@@ -349,7 +355,9 @@ void athome_bt_input_send_touch(unsigned which,
 	}
 }
 
-void athome_apply_ab_filter(unsigned which, uint16_t* x, uint16_t* y) {
+static void aahbt_input_apply_ab_filter(unsigned which,
+					uint16_t* x,
+					uint16_t* y) {
 	struct timespec delta_timespec;
 	s32 dt;
 	s32 rx, ry;
@@ -387,7 +395,9 @@ void athome_apply_ab_filter(unsigned which, uint16_t* x, uint16_t* y) {
 	*y = inputs[which].py;
 }
 
-void athome_apply_distance_filter(unsigned which, uint16_t* x, uint16_t* y) {
+static void aahbt_input_apply_distance_filter(unsigned which,
+					      uint16_t* x,
+					      uint16_t* y) {
 	uint32_t delta_x, delta_y, dist;
 	if (!filter_params.enabled) {
 		return;
@@ -407,7 +417,7 @@ void athome_apply_distance_filter(unsigned which, uint16_t* x, uint16_t* y) {
 	}
 }
 
-void athome_bt_input_send_buttons(unsigned which, uint32_t mask)
+void aahbt_input_send_buttons(unsigned which, uint32_t mask)
 {
 	struct input_dev *idev;
 	int i;
@@ -417,8 +427,9 @@ void athome_bt_input_send_buttons(unsigned which, uint32_t mask)
 	if (LOG_INPUT_EVENTS)
 		aahlog("[%d] button mask = 0x%08X\n", which, mask);
 
-	athome_bt_led_show_event((mask != 0)
-		? HACK_LED_EVENT_BUTTON_DOWN : HACK_LED_EVENT_INPUT_UP);
+	aahbt_input_led_show_event((mask != 0)
+		? HACK_LED_EVENT_BUTTON_DOWN
+		: HACK_LED_EVENT_INPUT_UP);
 
 	idev = inputs[which].idev;
 
@@ -429,7 +440,7 @@ void athome_bt_input_send_buttons(unsigned which, uint32_t mask)
 	}
 }
 
-void athome_bt_input_send_button(unsigned which, uint8_t id, bool down)
+void aahbt_input_send_button(unsigned which, uint8_t id, bool down)
 {
 	struct input_dev *idev;
 
@@ -438,7 +449,7 @@ void athome_bt_input_send_button(unsigned which, uint8_t id, bool down)
 	if (LOG_INPUT_EVENTS)
 		aahlog("[%d] button %d %s\n", which, id, (down ? "down" : "up"));
 
-	athome_bt_led_show_event(down
+	aahbt_input_led_show_event(down
 		? HACK_LED_EVENT_BUTTON_DOWN : HACK_LED_EVENT_INPUT_UP);
 
 	if (id < ARRAY_SIZE(ikeys)) {
@@ -448,7 +459,7 @@ void athome_bt_input_send_button(unsigned which, uint8_t id, bool down)
 	}
 }
 
-void athome_bt_input_calculate_time(unsigned which, long usec_since_last)
+void aahbt_input_calculate_time(unsigned which, long usec_since_last)
 {
 	BUG_ON(which >= ARRAY_SIZE(inputs));
 
@@ -462,7 +473,7 @@ void athome_bt_input_calculate_time(unsigned which, long usec_since_last)
 	}
 }
 
-void athome_bt_input_frame(unsigned which)
+void aahbt_input_frame(unsigned which)
 {
 	BUG_ON(which >= ARRAY_SIZE(inputs));
 	BUG_ON(!inputs[which].last_evt_time_valid);

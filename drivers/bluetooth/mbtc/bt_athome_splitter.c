@@ -12,6 +12,7 @@
  * GNU General Public License for more details.
  */
 
+#include <asm/unaligned.h>
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci.h>
 #include <linux/semaphore.h>
@@ -22,15 +23,15 @@
 #include "bt_athome_logging.h"
 #include "bt_athome_util.h"
 
+/* If we can manage it, we would like 4 ACL buffers for packet transmission */
+#define AAH_TX_PKT_TGT 4
 
 /*
  * Note: we assume all splitter functions are called from the main
  * thread of bt driver. No synchronization is necessary between them.
  */
-
 /* We allow only one command in flight at a time */
-static int send_credit = 1;
-
+static int cmd_credit = 1;
 /*
  * Only one copy of this data exists in the kernel:
  * This is the driver-private data for the MBT driver whom we're piggy-backing
@@ -40,37 +41,150 @@ static int send_credit = 1;
  */
 static void *drv_priv = NULL;
 
-
-
 /* event masks for things we need */
   /* disconnect, encr_change, encr_refresh */
 static const uint64_t evtsNeeded = 0x0000800000000090ULL;
   /* LE meta event*/
 static const uint64_t evtsLE = 0x2000000000000000ULL;
 
+/* State used by the splitter level to track active LE connections.  Messages
+ * which contain a connection ID are checked against this set to determine if
+ * they should be passed to the AAH level of things, or if they should be sent
+ * up the normal processing path.
+ *
+ * In addition, this set is use to track ACL data transmissions in flight and
+ * properly manage the flow-control bookkeeping.
+ *
+ * The set is manipulated by only the Marvell driver thread, and the driver
+ * thread always processes messages in the order which they came from the
+ * BT/BTLE chip, therefor the set of active LE connections should always be
+ * correct with respect to the current message being processed by the Marvell
+ * driver thread.
+ */
+static DEFINE_SPINLOCK(conn_tracking_lock);
+struct aahbt_le_conn {
+	uint16_t conn_id;
+	size_t tx_in_flight;
+};
+static struct aahbt_le_conn aahbt_tracked_le_conns[ATHOME_RMT_MAX_CONNS];
+static uint32_t aahbt_max_tx_in_flight;
+static uint32_t aahbt_cur_tx_in_flight;
 
-static int athome_bt_filter_disconn(void *dataP)
+static inline void reset_tracked_le_conns(void)
 {
-	struct hci_ev_disconn_complete *evt = dataP;
+	size_t i;
+	spin_lock(&conn_tracking_lock);
 
-	return athome_bt_connection_went_down(r16LE(&evt->handle) & ACL_CONN_MASK);
+	for (i = 0; i < ARRAY_SIZE(aahbt_tracked_le_conns); ++i) {
+		aahbt_tracked_le_conns[i].conn_id = INVALID_CONN_ID;
+		aahbt_tracked_le_conns[i].tx_in_flight = 0;
+	}
+
+	aahbt_cur_tx_in_flight = 0;
+
+	spin_unlock(&conn_tracking_lock);
 }
 
-static int athome_bt_filter_encr_change(void *dataP)
+static inline struct aahbt_le_conn *cid_find_le_conn_l(uint16_t cid)
 {
-	struct hci_ev_encrypt_change *evt = dataP;
+	size_t i;
 
-	return athome_bt_encr_changed(r16LE(&evt->handle) & ACL_CONN_MASK);
+	for (i = 0; i < ARRAY_SIZE(aahbt_tracked_le_conns); ++i)
+		if (cid == aahbt_tracked_le_conns[i].conn_id)
+			return aahbt_tracked_le_conns + i;
+
+	return NULL;
 }
 
-static int athome_bt_filter_encr_refresh(void *dataP)
+static inline bool cid_is_le_conn(uint16_t cid)
 {
-	struct hci_ev_encrypt_refresh *evt = dataP;
-
-	return athome_bt_encr_refreshed(r16LE(&evt->handle) & ACL_CONN_MASK);
+	bool ret;
+	spin_lock(&conn_tracking_lock);
+	ret = (NULL != cid_find_le_conn_l(cid));
+	spin_unlock(&conn_tracking_lock);
+	return ret;
 }
 
-static void athome_bt_filter_ftr_page_0(uint8_t *features)
+static bool aahbt_filter_disconn(const void *dataP)
+{
+	const struct hci_ev_disconn_complete *evt = dataP;
+	uint16_t cid = get_unaligned_le16(&evt->handle);
+	size_t i;
+	bool ret = false;
+
+	spin_lock(&conn_tracking_lock);
+
+	for (i = 0; i < ARRAY_SIZE(aahbt_tracked_le_conns); ++i) {
+		struct aahbt_le_conn *c = aahbt_tracked_le_conns + i;
+		if (c->conn_id == cid) {
+			BUG_ON(aahbt_cur_tx_in_flight < c->tx_in_flight);
+
+			aahbt_cur_tx_in_flight -= c->tx_in_flight;
+			c->conn_id = INVALID_CONN_ID;
+			c->tx_in_flight = 0;
+			aahbt_purge_acl_for_conn_id(drv_priv, cid);
+
+			ret = true;
+			break;
+		}
+	}
+
+	spin_unlock(&conn_tracking_lock);
+	return ret;
+}
+
+static bool aahbt_filter_encr_change(const void *dataP)
+{
+	const struct hci_ev_encrypt_change *evt = dataP;
+	return cid_is_le_conn(get_unaligned_le16(&evt->handle));
+}
+
+static bool aahbt_filter_encr_refresh(const void *dataP)
+{
+	const struct hci_ev_encrypt_refresh *evt = dataP;
+	return cid_is_le_conn(get_unaligned_le16(&evt->handle));
+}
+
+static bool aahbt_filter_le_meta(const void *dataP)
+{
+	const struct hci_ev_le_conn_complete *evt;
+	const uint8_t *d = dataP;
+	/* We always pass LE meta events to the AAH half of things.  This
+	 * filter's main job is to look for successful LE connection completed
+	 * events and record the connection ID in the aahbt_tracked_le_conns
+	 * array used for filtering subsequent messages.
+	 */
+	if (HCI_EV_LE_CONN_COMPLETE != d[0])
+		return true;
+
+	evt = (struct hci_ev_le_conn_complete *)(d + 1);
+	if (!evt->status) {
+		uint16_t cid = get_unaligned_le16(&evt->handle);
+		size_t i;
+
+		spin_lock(&conn_tracking_lock);
+		for (i = 0; i < ARRAY_SIZE(aahbt_tracked_le_conns); ++i) {
+			struct aahbt_le_conn *c = aahbt_tracked_le_conns + i;
+			if (c->conn_id == INVALID_CONN_ID) {
+				c->conn_id = cid;
+				BUG_ON(c->tx_in_flight);
+				break;
+			}
+		}
+		spin_unlock(&conn_tracking_lock);
+
+		/* At the point where we are receiving a connection completed
+		 * event, we should always have room in our tracked array.  If
+		 * we don't it can only be because of a bookkeeping bug at the
+		 * AAH stack level.
+		 */
+		BUG_ON(i >= ARRAY_SIZE(aahbt_tracked_le_conns));
+	}
+
+	return true;
+}
+
+static void aahbt_filter_ftr_page_0(uint8_t *features)
 {
 	if (features[4] & 0x40) {
 		aahlog("features[0]: clearing 4,6 - LE supported\n");
@@ -82,31 +196,34 @@ static void athome_bt_filter_ftr_page_0(uint8_t *features)
 	}
 }
 
-static void athome_bt_reset(void)
+static void aahbt_reset(void)
 {
 	aahlog("resetting\n");
 
-	athome_bt_stack_shutdown();
+	aahbt_stack_shutdown();
 
 	if (LOG_BT_CREDIT)
-		aahlog("resetting send_credit to 1\n");
-	send_credit = 1;
+		aahlog("resetting cmd_credit to 1\n");
+	cmd_credit = 1;
+
+	reset_tracked_le_conns();
 
 	aahlog("reset complete\n");
 }
 
-static int athome_bt_filter_cmd_complete(uint8_t *rx_buf, uint32_t len,
-						bool *enq_if_oursP)
+static int aahbt_filter_cmd_complete(const uint8_t *rx_buf,
+				     uint32_t len,
+				     bool *enq_if_oursP)
 {
-	struct hci_ev_cmd_complete *evt =
-			(struct hci_ev_cmd_complete *)
+	const struct hci_ev_cmd_complete *evt =
+			(const struct hci_ev_cmd_complete *)
 			(rx_buf + HCI_EVENT_HDR_SIZE);
-	uint16_t opcode = r16LE(&evt->opcode);
+	uint16_t opcode = get_unaligned_le16(&evt->opcode);
 	uint16_t ogf = hci_opcode_ogf(opcode);
 	uint16_t ocf = hci_opcode_ocf(opcode);
 	int i, forus = 0;
 
-	if (athome_bt_cmd_sta_or_compl(ogf, ocf, rx_buf, len)) {
+	if (aahbt_process_cmd_status_or_complete(opcode, rx_buf, len)) {
 		forus = 1;
 		*enq_if_oursP = 0;
 	}
@@ -118,9 +235,9 @@ static int athome_bt_filter_cmd_complete(uint8_t *rx_buf, uint32_t len,
 		 *	window after a reset, and we instead have one. This
 		 *	code assures our semaphore acts that way too.
 		 */
-		send_credit = 1;
+		cmd_credit = 1;
 		if (LOG_BT_CREDIT)
-			aahlog("resetting send_credit to 1 on reset\n");
+			aahlog("resetting cmd_credit to 1 on reset\n");
 
 	 } else if (ogf == HCI_OGF_Controller_And_Baseband &&
 		ocf == HCI_Read_LE_Host_Support && !forus) {
@@ -183,7 +300,7 @@ static int athome_bt_filter_cmd_complete(uint8_t *rx_buf, uint32_t len,
 
 			BUG_ON(len < sizeof(*repl) + sizeof(*evt));
 
-			athome_bt_filter_ftr_page_0(repl->features);
+			aahbt_filter_ftr_page_0(repl->features);
 		}
 		if (ocf == HCI_Read_Local_Supported_Extended_Features &&
 			!forus) {
@@ -193,7 +310,7 @@ static int athome_bt_filter_cmd_complete(uint8_t *rx_buf, uint32_t len,
 			BUG_ON(len < sizeof(*repl) + sizeof(*evt));
 
 			if (repl->page_nr == 0)
-				athome_bt_filter_ftr_page_0(repl->features);
+				aahbt_filter_ftr_page_0(repl->features);
 			else if (repl->page_nr == 1) {
 
 				if (repl->features[0] & 0x02) {
@@ -211,14 +328,40 @@ static int athome_bt_filter_cmd_complete(uint8_t *rx_buf, uint32_t len,
 		if (ocf == HCI_Read_Buffer_Size) {
 			struct hci_rp_read_buffer_size *repl =
 				(struct hci_rp_read_buffer_size*)(evt + 1);
-			uint16_t pkts;
+			uint16_t pkts, normal_pkts, aah_pkts, reported_pkts;
 
 			BUG_ON(len < sizeof(*repl) + sizeof(*evt));
-			pkts = r16LE(&repl->acl_max_pkt);
 
-			aahlog("fixing up acl packet number from %d\n", pkts);
-			if (pkts)
-				w16LE(&repl->acl_max_pkt, pkts - 1);
+			pkts = get_unaligned_le16(&repl->acl_max_pkt);
+
+			/* If we cannot hit our target number of payloads and
+			 * leave at least that many payloads for the normal
+			 * stack, then give 1/2 rounded up to the normal stack,
+			 * and 1/2 rounded down to AAH.
+			 */
+			if (pkts < (2 * AAH_TX_PKT_TGT))
+				aah_pkts = pkts >> 1;
+			else
+				aah_pkts = AAH_TX_PKT_TGT;
+
+			normal_pkts = pkts - aah_pkts;
+
+			reported_pkts = forus ? aah_pkts : normal_pkts;
+			aahlog("Chip has %hu buffers, telling %s that it may "
+			       "have %hu buffers.\n",
+			       pkts,
+			       forus ? "aahbt" : "bluedroid",
+			       reported_pkts);
+
+			put_unaligned_le16(reported_pkts, &repl->acl_max_pkt);
+
+			/* If max_tx_in_flight has been assigned a value, then
+			 * it should never change.  ASSERT this.
+			 */
+			BUG_ON(aahbt_max_tx_in_flight &&
+			      (aahbt_max_tx_in_flight != aah_pkts));
+
+		      	aahbt_max_tx_in_flight = aah_pkts;
 		}
 	} else if (ogf == HCI_OGF_LE && !forus) {
 		uint8_t len = ((uint8_t *)rx_buf)[-1];
@@ -237,24 +380,25 @@ static int athome_bt_filter_cmd_complete(uint8_t *rx_buf, uint32_t len,
 						ocf == HCI_Set_Event_Mask) {
 
 		/* it is now safe to start our stack */
-		athome_bt_stack_start();
+		aahbt_stack_start();
 	}
 
 	return forus;
 }
 
-static int athome_bt_filter_cmd_status(uint8_t *rx_buf, uint32_t len,
-						bool *enq_if_oursP)
+static int aahbt_filter_cmd_status(const uint8_t *rx_buf,
+				   uint32_t len,
+				   bool *enq_if_oursP)
 {
-	struct hci_ev_cmd_status *evt =
-			(struct hci_ev_cmd_status *)
+	const struct hci_ev_cmd_status *evt =
+			(const struct hci_ev_cmd_status *)
 			(rx_buf + HCI_EVENT_HDR_SIZE);
-	uint16_t opcode = r16LE(&evt->opcode);
+	uint16_t opcode = get_unaligned_le16(&evt->opcode);
 	uint16_t ogf = hci_opcode_ogf(opcode);
 	uint16_t ocf = hci_opcode_ocf(opcode);
 	bool forus = 0;
 
-	if (athome_bt_cmd_sta_or_compl(ogf, ocf, rx_buf, len)) {
+	if (aahbt_process_cmd_status_or_complete(opcode, rx_buf, len)) {
 		forus = 1;
 		*enq_if_oursP = 0;
 	}
@@ -276,26 +420,44 @@ static int athome_bt_filter_cmd_status(uint8_t *rx_buf, uint32_t len,
 	return forus;
 }
 
-static int athome_bt_filter_num_comp_pkt(void *dataP, uint32_t *rx_len)
+static int aahbt_filter_num_comp_pkt(void *dataP, uint32_t *rx_len)
 {
+	/* Go over this NumberOfCompletedPackets event and pull out all of the
+	 * records related to LE connections so that the main stack does not
+	 * hear about packets being completed for connections it does not know
+	 * about.  At the same time, build one or more new NumOfCompletedPackets
+	 * events to send to the AAH LE portion of the stack which contain the
+	 * completed packets info for active LE connections.
+	 */
 	struct num_comp_pkts *evt = dataP;
 	struct comp_pkts_info *in = evt->handles, *out = evt->handles;
 	int num_skipped = 0;
 	int i, new_creds = 0;
 
-	for (i = 0; i < evt->num_hndl; i++, in++) {
-		uint16_t conn = r16LE(&in->handle);
-		uint16_t pkts = r16LE(&in->count);
+	spin_lock(&conn_tracking_lock);
 
-		if (athome_bt_compl_pkts(conn, pkts)) {
+	for (i = 0; i < evt->num_hndl; i++, in++) {
+		uint16_t conn = get_unaligned_le16(&in->handle);
+		uint16_t pkts = get_unaligned_le16(&in->count);
+		struct aahbt_le_conn *c = cid_find_le_conn_l(conn);
+
+		if (c) {
+			BUG_ON(c->tx_in_flight < pkts);
+			BUG_ON(aahbt_cur_tx_in_flight < pkts);
+
+			c->tx_in_flight -= pkts;
+			aahbt_cur_tx_in_flight -= pkts;
+
 			new_creds += pkts;
 			num_skipped++;
 		} else {
-			w16LE(&out->handle, conn);
-			w16LE(&out->count, pkts);
+			put_unaligned_le16(conn, &out->handle);
+			put_unaligned_le16(pkts, &out->count);
 			out++;
 		}
 	}
+
+	spin_unlock(&conn_tracking_lock);
 
 	if (LOG_BT_EVTS)
 		aahlog("got %u data credits back, hid %u handles\n",
@@ -304,31 +466,31 @@ static int athome_bt_filter_num_comp_pkt(void *dataP, uint32_t *rx_len)
 	*rx_len -= num_skipped * 2 * sizeof(uint16_t);
 	evt->num_hndl -= num_skipped;
 
+	if (num_skipped)
+		aahbt_wake_thread();
+
 	return !evt->num_hndl;
 }
 
-void athome_bt_send_to_user(uint32_t pkt_type,
-			    const uint8_t *data, uint32_t len)
+void aahbt_send_to_chip(uint32_t pkt_type,
+		        const uint8_t *data,
+			uint32_t len)
 {
-	smp_rmb();
-	if (!drv_priv)
-		aahlog("Attempt to send to user with no private data\n");
-	else
-		athome_bt_pkt_to_user(drv_priv, pkt_type, data, len);
-}
+	/* See comments in bt_main.c as to why this lock needs to be held */
+	spin_lock(&conn_tracking_lock);
 
-void athome_bt_send_to_chip(uint32_t pkt_type,
-			    const uint8_t *data, uint32_t len)
-{
-	smp_rmb();
 	if (!drv_priv)
 		aahlog("Attempt to send to chip with no private data\n");
 	else
-		athome_bt_pkt_to_chip(drv_priv, pkt_type, data, len);
+		aahbt_pkt_to_chip(drv_priv, pkt_type, data, len);
+
+	spin_unlock(&conn_tracking_lock);
 }
 
-int athome_bt_remote_filter_rx_data(void *priv, u32 pkt_type, u8 *rx_buf,
-					u32 *rx_len)
+int aahbt_remote_filter_rx_data(void *priv,
+				u32 pkt_type,
+				u8 *rx_buf,
+				u32 *rx_len)
 {
 	bool isours = false, enq_if_ours = true;
 
@@ -338,7 +500,6 @@ int athome_bt_remote_filter_rx_data(void *priv, u32 pkt_type, u8 *rx_buf,
 	smp_wmb();
 
 	if (pkt_type == HCI_EVENT_PKT) {
-
 		uint8_t *evt_data = rx_buf + HCI_EVENT_HDR_SIZE;
 		struct hci_event_hdr *evt = (struct hci_event_hdr*)rx_buf;
 		struct hci_ev_cmd_complete *cmd_complete =
@@ -346,68 +507,70 @@ int athome_bt_remote_filter_rx_data(void *priv, u32 pkt_type, u8 *rx_buf,
 		struct hci_ev_cmd_status *cmd_status =
 			(struct hci_ev_cmd_status*)evt_data;
 
-
 		switch (evt->evt) {
 
 		case HCI_EV_DISCONN_COMPLETE:
-			isours = athome_bt_filter_disconn(evt_data);
+			isours = aahbt_filter_disconn(evt_data);
 			break;
 
 		case HCI_EV_ENCRYPT_CHANGE:
-			isours = athome_bt_filter_encr_change(evt_data);
+			isours = aahbt_filter_encr_change(evt_data);
 			break;
 
 		case HCI_EV_CMD_COMPLETE:
 			if (cmd_complete->ncmd) {
 				if (LOG_BT_CREDIT)
-					aahlog("inc(cmpl)\n");
-				send_credit++;
+					aahlog("cmd complete; cmd_credit = 1\n");
+				cmd_credit = 1;
 			}
-			isours = athome_bt_filter_cmd_complete(rx_buf, *rx_len,
-								&enq_if_ours);
+			isours = aahbt_filter_cmd_complete(rx_buf,
+							   *rx_len,
+							   &enq_if_ours);
 			break;
 
 		case HCI_EV_CMD_STATUS:
 			if (cmd_status->ncmd) {
 				if (LOG_BT_CREDIT)
-					aahlog("inc(sta)\n");
-				send_credit++;
+					aahlog("cmd status; cmd_credit = 1\n");
+				cmd_credit = 1;
 			}
-			isours = athome_bt_filter_cmd_status(rx_buf, *rx_len,
-								&enq_if_ours);
+			isours = aahbt_filter_cmd_status(rx_buf,
+							 *rx_len,
+							 &enq_if_ours);
 			break;
 
 		case HCI_EV_NUM_COMP_PKTS:
-			isours = athome_bt_filter_num_comp_pkt(evt_data,
-								rx_len);
+			isours = aahbt_filter_num_comp_pkt(evt_data, rx_len);
 			enq_if_ours = 0;
 			break;
 
 		case HCI_EV_ENCR_REFRESH:
-			isours = athome_bt_filter_encr_refresh(evt_data);
+			isours = aahbt_filter_encr_refresh(evt_data);
 			break;
 
 		case HCI_EV_LE_META:
-			isours = 1;
+			isours = aahbt_filter_le_meta(evt_data);
 			break;
 		}
 
 		if (isours && enq_if_ours)
-			athome_bt_process_le_evt(rx_buf, *rx_len);
-
+			aahbt_enqueue_msg(rx_buf, *rx_len, HCI_EVENT_PKT);
 	} else if (pkt_type == HCI_ACLDATA_PKT) {
 
 		struct hci_acl_hdr *acl = (struct hci_acl_hdr*)rx_buf;
+		uint16_t cid = get_unaligned_le16(&acl->handle) & ACL_CONN_MASK;
 
-		isours = athome_bt_process_le_data(r16LE(&acl->handle) & ACL_CONN_MASK, rx_buf, *rx_len);
+		isours = cid_is_le_conn(cid);
+		if (isours)
+			aahbt_enqueue_msg(rx_buf, *rx_len, HCI_ACLDATA_PKT);
 	}
 
-	athome_bt_logpacket(1, pkt_type, rx_buf, *rx_len, isours);
+	aahbt_logpacket(1, pkt_type, rx_buf, *rx_len, isours);
 
 	return isours ? AAH_BT_PKT_DROP : AAH_BT_PKT_PROCEED;
 }
 
-int athome_bt_pkt_send_req(void *priv, struct sk_buff *skb)
+int aahbt_pkt_send_req(void *priv, struct sk_buff *skb)
 {
 	struct hci_command_hdr *cmd = (struct hci_command_hdr*)skb->data;
 	bool wasours = 0, log_it = 1, skipsem = false;
@@ -437,7 +600,7 @@ int athome_bt_pkt_send_req(void *priv, struct sk_buff *skb)
 				aahlog("unexpected chip reset\n");
 			first = 0;
 
-			athome_bt_reset();
+			aahbt_reset();
 			skipsem = true;
 
 		} else if (ogf == HCI_OGF_Controller_And_Baseband &&
@@ -458,10 +621,13 @@ int athome_bt_pkt_send_req(void *priv, struct sk_buff *skb)
 
 		} else if (ogf == HCI_OGF_Controller_And_Baseband &&
 				ocf == HCI_Set_Event_Mask) {
+			void* mask_loc;
+			uint64_t mask, oldmask;
 
-			uint64_t mask = r64LE(((uint8_t*)skb->data) +
-						HCI_COMMAND_HDR_SIZE);
-			uint64_t oldmask = mask;
+			mask_loc = (((uint8_t*)skb->data) +
+					HCI_COMMAND_HDR_SIZE);
+			mask = get_unaligned_le64(mask_loc);
+			oldmask = mask;
 
 			if ((mask & evtsNeeded) != evtsNeeded) {
 				aahlog("EDR stack blocked some vital "
@@ -473,8 +639,7 @@ int athome_bt_pkt_send_req(void *priv, struct sk_buff *skb)
 					"unexpectedly - OK, just weird\n");
 			}
 			mask |= evtsLE;
-			w64LE(((uint8_t*)skb->data) + HCI_COMMAND_HDR_SIZE,
-					mask);
+			put_unaligned_le64(mask, mask_loc);
 
 			aahlog("modified event mask 0x%08X%08X -> 0x%08X%08X"
 				"\n", (uint32_t)(oldmask >> 32),
@@ -482,7 +647,7 @@ int athome_bt_pkt_send_req(void *priv, struct sk_buff *skb)
 				(uint32_t)mask);
 
 			/* it is now safe to prepare our stack */
-			athome_bt_stack_prepare();
+			aahbt_stack_prepare();
 
 		} else if (ogf == HCI_OGF_LE && !wasours) {
 
@@ -497,13 +662,13 @@ int athome_bt_pkt_send_req(void *priv, struct sk_buff *skb)
 
 			evt->evt = HCI_EV_CMD_COMPLETE;
 			comp->ncmd = 1;
-			w16LE(&comp->opcode, cmd->opcode);
+			put_unaligned_le16(cmd->opcode, &comp->opcode);
 
 			aahlog("LE command (0x%x) from EDR stack!\n", ocf);
 			switch (ocf) {
 			case HCI_LE_Read_Buffer_Size:
 				bs->status = 0;
-				w16LE(&bs->le_mtu, 256); /* why not ? */
+				put_unaligned_le16(256, &bs->le_mtu); /* why not ? */
 				bs->le_max_pkt = 16; /* why not */
 				end = (uint8_t*)(bs + 1);
 				break;
@@ -559,15 +724,14 @@ int athome_bt_pkt_send_req(void *priv, struct sk_buff *skb)
 
 				log_it = 0; /* log now so we can log "reply" */
 
-				athome_bt_logpacket(0, HCI_COMMAND_PKT,
+				aahbt_logpacket(0, HCI_COMMAND_PKT,
 						(const uint8_t*)skb->data,
 						skb->len, 0);
-
-				athome_bt_logpacket(1, HCI_EVENT_PKT, buf, end - buf, 0);
-
-				athome_bt_send_to_user(HCI_EVENT_PKT, buf,
-								end - buf);
-
+				aahbt_logpacket(1, HCI_EVENT_PKT,
+						buf, end - buf, 0);
+				aahbt_pkt_to_user(drv_priv,
+						  HCI_EVENT_PKT,
+						  buf, end - buf);
 
 				ret = AAH_BT_PKT_DROP;
 			}
@@ -577,20 +741,66 @@ int athome_bt_pkt_send_req(void *priv, struct sk_buff *skb)
 	if (ret == AAH_BT_PKT_PROCEED && !skipsem &&
 			(bt_cb(skb)->pkt_type == HCI_COMMAND_PKT ||
 				bt_cb(skb)->pkt_type == PKT_MARVELL)) {
+		BUG_ON(!cmd_credit);
+		--cmd_credit;
 		if (LOG_BT_CREDIT)
-			aahlog("dec\n");
-		--send_credit;
-		BUG_ON(send_credit < 0);
+			aahlog("cmd credit dec; credits now %d\n", cmd_credit);
 	}
 
 	if (log_it)
-		athome_bt_logpacket(0, bt_cb(skb)->pkt_type, (const uint8_t*)skb->data,
-							skb->len, wasours);
+		aahbt_logpacket(0,
+				bt_cb(skb)->pkt_type,
+				(const uint8_t*)skb->data,
+				skb->len,
+				wasours);
 
 	return ret;
 }
 
-int athome_bt_ok_to_send(void)
+int aahbt_ok_to_send(void)
 {
-	return send_credit > 0;
+	return cmd_credit > 0;
+}
+
+void aahbt_splitter_init(void)
+{
+	reset_tracked_le_conns();
+}
+
+bool aahbt_splitter_may_tx_data(void)
+{
+	bool ret;
+	spin_lock(&conn_tracking_lock);
+	ret = (aahbt_cur_tx_in_flight < aahbt_max_tx_in_flight);
+	spin_unlock(&conn_tracking_lock);
+	return ret;
+}
+
+void aahbt_splitter_send_data(uint16_t conn_id, struct sk_buff *skb)
+{
+	struct aahbt_le_conn *c;
+	BUG_ON(!skb);
+	BUG_ON(!drv_priv);
+
+	spin_lock(&conn_tracking_lock);
+
+	c = cid_find_le_conn_l(conn_id);
+	if (!c) {
+		aahlog("WARNING: dropping ACL packet sent to unknown conn_id "
+		       "%hd\n", conn_id);
+		goto bailout;
+	}
+
+	BUG_ON(aahbt_cur_tx_in_flight >= aahbt_max_tx_in_flight);
+	aahbt_cur_tx_in_flight++;
+	c->tx_in_flight++;
+
+	/* TODO: optimize this; we should be able to send the SKB directly
+	 * without needing to clone it.
+	 */
+	aahbt_pkt_to_chip(drv_priv, HCI_ACLDATA_PKT, skb->data, skb->len);
+
+bailout:
+	spin_unlock(&conn_tracking_lock);
+	kfree_skb(skb);
 }

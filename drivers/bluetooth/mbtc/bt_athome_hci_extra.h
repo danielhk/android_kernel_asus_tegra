@@ -34,9 +34,9 @@
 #define HCI_ERR_Success					0x00
 #define HCI_ERR_Unknown_HCI_Command			0x01
 
-
 #define HCI_OGF_Vendor					0x3F
 # define HCI_CMD_Marvell_Set_MCA			0x71
+# define HCI_CMD_Marvell_BLE_COEX_MODE_CONFIG		0x8A
 /* params: BT_MCA, LE_MCA */
 #  define HCI_Marvell_MCA_500_ppm			0x00
 #  define HCI_Marvell_MCA_250_ppm			0x01
@@ -122,6 +122,27 @@ struct hci_ev_le_conn_update {
 	__le16   supervision_timeout;
 } __packed;
 
+#define HCI_EV_LE_READ_REMOTE_FEATURES_COMP	0x04
+struct hci_ev_le_read_remote_features {
+	__u8     status;
+	__le16   handle;
+	__u8     feature_mask[8];
+} __packed;
+
+struct hci_cp_le_encrypt_req {
+	__u8     key[16];
+	__u8     in[16];
+} __packed;
+
+struct hci_ev_le_encrypt_resp {
+	__u8     status;
+	__u8     out[16];
+} __packed;
+
+struct hci_ev_le_rand_resp {
+	__u8    status;
+	__u8    bytes[8];
+} __packed;
 
 #define BT_HCI_VERSION_3	5
 #define BT_HCI_VERSION_4	6
@@ -171,6 +192,4 @@ struct num_comp_pkts {
 	struct comp_pkts_info handles[0];
 } __packed;
 
-
 #endif
-

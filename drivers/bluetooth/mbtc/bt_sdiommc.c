@@ -55,6 +55,134 @@ static const struct sdio_device_id bt_ids[] = {
 
 MODULE_DEVICE_TABLE(sdio, bt_ids);
 
+#define ENABLE_AAHBT_PACKET_LOG
+#ifdef ENABLE_AAHBT_PACKET_LOG
+#define AAHBT_PKT_LOG_CNT 128
+struct aahbt_logged_pkt {
+	bool is_tx;
+	size_t len;
+	size_t olen;
+	uint64_t ts;
+	uint8_t data[40];
+};
+
+static DEFINE_MUTEX(aahbt_pkt_log_lock);
+static int aahbt_pkt_log_enabled;
+static struct aahbt_logged_pkt aahbt_pkt_log[AAHBT_PKT_LOG_CNT];
+static struct aahbt_logged_pkt aahbt_shadow_pkt_log[AAHBT_PKT_LOG_CNT];
+static size_t aahbt_pkt_log_wr;
+static bool aahbt_pkt_log_full;
+
+#include <linux/ctype.h>
+static void hexdump8(const void* d, size_t len)
+{
+	size_t i;
+	printk("\tHex dump of %d bytes from %p", len, d);
+
+	for (i = 0; i < len; i += 16) {
+		size_t j;
+
+		printk("\n\t%08x :", i);
+
+		for (j = 0; ((i + j) < len) && (j < 16); ++j)
+			printk(" %02x", ((const uint8_t*)d)[i + j]);
+
+		for (     ; (j < 16); ++j)
+			printk("   ");
+
+		printk(" : ");
+
+		for (j = 0; ((i + j) < len) && (j < 16); ++j) {
+			char c = ((const char*)d)[i + j];
+			printk("%c", isprint(c) ? c : '.');
+		}
+	}
+
+	printk("\n");
+}
+
+static void aahbt_log_pkt(const void *d, size_t l, bool is_tx) {
+	struct aahbt_logged_pkt *p;
+
+	if (!aahbt_pkt_log_enabled)
+		return;
+
+	mutex_lock(&aahbt_pkt_log_lock);
+	BUG_ON(aahbt_pkt_log_wr >= ARRAY_SIZE(aahbt_pkt_log));
+
+	p = aahbt_pkt_log + aahbt_pkt_log_wr;
+	aahbt_pkt_log_wr = (aahbt_pkt_log_wr + 1) % ARRAY_SIZE(aahbt_pkt_log);
+	if (!aahbt_pkt_log_wr)
+		aahbt_pkt_log_full = true;
+
+	p->is_tx = is_tx;
+	p->olen  = l;
+	p->len   = min(l, ARRAY_SIZE(p->data));
+	p->ts    = cpu_clock(smp_processor_id());
+	memcpy(p->data, d, p->len);
+
+	mutex_unlock(&aahbt_pkt_log_lock);
+}
+
+void aahbt_set_pkt_log_enabled(int enabled) {
+	aahbt_pkt_log_enabled = enabled;
+}
+
+void aahbt_dump_pkt_log(int post_dump_delay) {
+	size_t amt, start;
+	size_t aahbt_shadow_pkt_log_wr;
+	bool aahbt_shadow_pkt_log_full;
+
+
+	if (!aahbt_pkt_log_enabled)
+		return;
+
+	printk("AAHBT :: Starting log dump\n");
+
+	mutex_lock(&aahbt_pkt_log_lock);
+	memcpy(aahbt_shadow_pkt_log,
+	       aahbt_pkt_log,
+	       sizeof(aahbt_shadow_pkt_log));
+	aahbt_shadow_pkt_log_wr   = aahbt_pkt_log_wr;
+	aahbt_shadow_pkt_log_full = aahbt_pkt_log_full;
+	aahbt_pkt_log_wr 	    = 0;
+	aahbt_pkt_log_full 	    = false;
+	mutex_unlock(&aahbt_pkt_log_lock);
+
+	if (aahbt_shadow_pkt_log_full) {
+		amt = ARRAY_SIZE(aahbt_shadow_pkt_log);
+		start = aahbt_shadow_pkt_log_wr;
+	} else {
+		amt = aahbt_shadow_pkt_log_wr;
+		start = 0;
+	}
+
+	while (amt) {
+		uint64_t sec, nsec;
+		struct aahbt_logged_pkt *p = aahbt_shadow_pkt_log + start;
+		start = (start + 1) % ARRAY_SIZE(aahbt_shadow_pkt_log);
+
+		sec = p->ts;
+		nsec = do_div(sec, 1000000000);
+
+		printk("[%6lld.%09lld] : %s of %u bytes\n",
+			sec, nsec, p->is_tx ? "TX" : "RX", p->olen);
+		hexdump8(p->data, p->len);
+
+		amt--;
+	}
+
+	if (post_dump_delay > 0)
+		msleep(post_dump_delay);
+
+	printk("AAHBT :: log dump finished\n");
+}
+#else  /* ENABLE_AAHBT_PACKET_LOG */
+static void aahbt_log_pkt(const void *d, size_t l, bool is_tx) { }
+void aahbt_set_pkt_log_enabled(int enabled) { }
+void aahbt_dump_pkt_log(int post_dump_delay) { }
+#endif  /* ENABLE_AAHBT_PACKET_LOG */
+
 /********************************************************
 		Global Variables
 ********************************************************/
@@ -749,7 +877,7 @@ sd_download_firmware_w_helper(bt_private * priv)
 }
 
 #ifdef CONFIG_ATHOME_BT_REMOTE
-void athome_bt_pkt_to_user(void *_priv, uint32_t pkt_type,
+void aahbt_pkt_to_user(void *_priv, uint32_t pkt_type,
 			   const uint8_t *data, uint32_t len)
 {
 	bt_private *priv = (bt_private *) _priv;
@@ -874,10 +1002,12 @@ sd_card_to_host(bt_private * priv)
 	}
 	DBG_HEXDUMP(DAT_D, "BT: SDIO Blk Rd", payload, buf_len);
 
+	aahbt_log_pkt(payload, buf_len, false);
+
 #ifdef CONFIG_ATHOME_BT_REMOTE
 	{
 		uint32_t len = buf_len - 4;
-		int action = athome_bt_remote_filter_rx_data(priv, type,
+		int action = aahbt_remote_filter_rx_data(priv, type,
 							     payload + 4,
 							     &len);
 
@@ -1586,6 +1716,8 @@ sbi_host_to_card(bt_private * priv, u8 * payload, u16 nb)
 	int tmpbufsz;
 
 	ENTER();
+
+	aahbt_log_pkt(payload, nb, true);
 
 	if (!card || !card->func) {
 		PRINTM(ERROR, "BT: card or function is NULL!\n");

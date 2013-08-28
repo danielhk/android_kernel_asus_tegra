@@ -18,9 +18,7 @@
 #include "bt_athome_logging.h"
 #include "bt_athome_splitter.h"
 
-
-
-void athome_bt_logpacket(char chip, uint32_t type, const u8 *data, u32 sz,
+void aahbt_logpacket(char chip, uint32_t type, const u8 *data, u32 sz,
 			uint8_t owned_by)
 {
 	static const char *owner[] = {"BT", "BLE", "?"};

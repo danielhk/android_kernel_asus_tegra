@@ -35,8 +35,10 @@
 void aahlog_bytes(char *buf, size_t buf_len, const char *bytes, size_t len);
 void aahlog_uuid(char *buf, size_t buf_len, const char *bytes, size_t len);
 
-void athome_bt_logpacket(char chip, uint32_t type,
+void aahbt_logpacket(char chip, uint32_t type,
 				const u8 *data, u32 sz, uint8_t owned_by);
 
+void aahbt_set_pkt_log_enabled(int enabled);
+void aahbt_dump_pkt_log(int post_dump_delay);
 #endif
 

@@ -33,6 +33,7 @@
   *
   */
 
+#include <asm/unaligned.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/wlan_plat.h>
@@ -41,8 +42,12 @@
 #include "bt_drv.h"
 #include "mbt_char.h"
 #include "bt_sdio.h"
+
+#ifdef CONFIG_ATHOME_BT_REMOTE
+#include "bt_athome_le_stack.h"
 #include "bt_athome_logging.h"
 #include "bt_athome_splitter.h"
+#endif
 
 /** Version */
 #define VERSION "M2614110"
@@ -1564,7 +1569,7 @@ bt_service_main_thread(void *data)
 		    ((!priv->adapter->IntCounter) &&
 		     (!priv->bt_dev.tx_dnld_rdy ||
 #ifdef CONFIG_ATHOME_BT_REMOTE
-		      !athome_bt_ok_to_send() ||
+		      !aahbt_ok_to_send() ||
 #endif
 		      skb_queue_empty(&priv->adapter->tx_queue)))) {
 			PRINTM(INFO, "Main: Thread sleeping...\n");
@@ -1595,26 +1600,33 @@ bt_service_main_thread(void *data)
 			continue;
 		if (priv->bt_dev.tx_dnld_rdy == TRUE) {
 #ifdef CONFIG_ATHOME_BT_REMOTE
-			if (!athome_bt_ok_to_send())
+			if (!aahbt_ok_to_send())
 				continue;
 #endif
 			if (!skb_queue_empty(&priv->adapter->tx_queue)) {
 				skb = skb_dequeue(&priv->adapter->tx_queue);
 				if (skb) {
-					int dosend = AAH_BT_PKT_PROCEED;
+					bool dosend = true;
 #ifdef CONFIG_ATHOME_BT_REMOTE
-					dosend = athome_bt_pkt_send_req(priv, skb);
+					switch (aahbt_pkt_send_req(priv, skb))
+					{
+					case AAH_BT_PKT_PROCEED: break;
+					case AAH_BT_PKT_DROP:
+						dosend = false;
+						break;
+					default:
+						aahlog("Unknown action on send packet: "
+						       "%d\n", dosend);
+						break;
+					}
 #endif
-					if (dosend == AAH_BT_PKT_PROCEED) {
+					if (dosend) {
 						if (send_single_packet(priv, skb))
 							((struct m_dev *)skb->dev)->
 								stat.err_tx++;
 						else
 							((struct m_dev *)skb->dev)->
 								stat.byte_tx += skb->len;
-					} else if (dosend != AAH_BT_PKT_DROP) {
-						aahlog("Unknown action on send packet: "
-						       "%d\n", dosend);
 					}
 					kfree_skb(skb);
 				}
@@ -1632,11 +1644,13 @@ bt_service_main_thread(void *data)
  * Must not send packet directly to chip because it could
  * be sleeping.
  */
-void athome_bt_pkt_to_chip(void *_priv, uint32_t pkt_type,
+void aahbt_pkt_to_chip(void *_priv, uint32_t pkt_type,
 			   const uint8_t *data, uint32_t len)
 {
 	bt_private *priv = (bt_private *)_priv;
 	struct sk_buff *skb;
+
+	BUG_ON((pkt_type == HCI_ACLDATA_PKT) && !aahbt_running_on_aah_thread());
 
 	skb = bt_skb_alloc(len, GFP_ATOMIC);
 	if (!skb) {
@@ -1660,6 +1674,66 @@ void athome_bt_pkt_to_chip(void *_priv, uint32_t pkt_type,
 	else
 		skb_queue_tail(&priv->adapter->tx_queue, skb);
 	wake_up_interruptible(&priv->MainThread.waitQ);
+}
+
+static inline bool aahbt_skb_is_acl_for_conn_id(struct sk_buff *skb,
+						uint16_t conn_id)
+{
+	uint16_t pkt_cid;
+
+	if (bt_cb(skb)->pkt_type != HCI_ACLDATA_PKT)
+		return false;
+
+	if (skb->len < 2)
+		return false;
+
+	pkt_cid = get_unaligned_le16(skb->data) & ACL_CONN_MASK;
+	return (pkt_cid == conn_id);
+}
+
+static void aahbt_purge_acl_for_conn_id_from_queue(struct sk_buff_head *queue,
+						   uint16_t conn_id)
+{
+	unsigned long flags;
+	struct sk_buff *I;
+
+	BUG_ON(!queue);
+	spin_lock_irqsave(&queue->lock, flags);
+
+	BUG_ON(!queue->next);
+	I = queue->next;
+	while (I != (struct sk_buff*)queue) {
+		struct sk_buff *next = I->next;
+
+		if (aahbt_skb_is_acl_for_conn_id(I, conn_id)) {
+			__skb_unlink(I, queue);
+			kfree_skb(I);
+		}
+
+		I = next;
+	}
+
+	spin_unlock_irqrestore(&queue->lock, flags);
+}
+
+void aahbt_purge_acl_for_conn_id(void *_priv, uint16_t conn_id)
+{
+	/* Called in the context of the Marvell work thread when an LE
+	 * connection has gone down.  The aah splitter logic returns all
+	 * ACL transmit credits for this connection to the pool, this may
+	 * include credits for packets which are currently held by the Marvell
+	 * driver's pending and tx_queues.  Since we have returned all TX
+	 * credits to the TX pool, it is important to also purge any associated
+	 * pending packets from the queues as well.
+	 */
+	bt_private *priv = (bt_private *)_priv;
+	BUG_ON(!priv);
+	BUG_ON(current != priv->MainThread.task);
+
+	aahbt_purge_acl_for_conn_id_from_queue(&priv->adapter->pending_queue,
+					       conn_id);
+	aahbt_purge_acl_for_conn_id_from_queue(&priv->adapter->tx_queue,
+					       conn_id);
 }
 #endif
 
@@ -2521,6 +2595,10 @@ bt_init_module(void)
 		ret = BT_STATUS_FAILURE;
 		goto done;
 	}
+
+#ifdef CONFIG_ATHOME_BT_REMOTE
+	ret = aahbt_stack_init_module();
+#endif
 done:
 	if (ret)
 		PRINTM(MSG, "BT: Driver loading failed\n");
@@ -2539,6 +2617,10 @@ done:
 static void
 bt_exit_module(void)
 {
+#ifdef CONFIG_ATHOME_BT_REMOTE
+	aahbt_stack_exit_module();
+#endif
+
 	ENTER();
 	PRINTM(MSG, "BT: Unloading driver\n");
 	sbi_unregister();

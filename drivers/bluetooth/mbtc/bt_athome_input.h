@@ -24,9 +24,9 @@
 #endif
 
 #if HACK_DEBUG_USING_LED
-void athome_bt_led_show_event(int event_type);
+void aahbt_led_show_event(int event_type);
 #else
-#define athome_bt_led_show_event(c) /* noop */
+#define aahbt_led_show_event(c) /* noop */
 #endif
 
 #define HACK_LED_EVENT_CONNECT       0
@@ -52,21 +52,19 @@ void athome_bt_led_show_event(int event_type);
 #define AAH_RAW_X_MAX 0xffff
 #define AAH_RAW_Y_MAX 0xffff
 
-int athome_bt_input_init(void);
-void athome_bt_input_deinit(void);
-void athome_bt_input_reset_state(void);
-void athome_bt_input_send_touch(unsigned which,
+int aahbt_input_init(void);
+void aahbt_input_deinit(void);
+void aahbt_input_reset_state(void);
+void aahbt_input_send_touch(unsigned which,
 				int pointer_idx,
 				uint16_t x,
 				uint16_t y,
 				bool is_down);
-void athome_apply_ab_filter(unsigned which, uint16_t* x, uint16_t* y);
-void athome_apply_distance_filter(unsigned which, uint16_t* x, uint16_t* y);
-void athome_bt_input_send_buttons(unsigned which, uint32_t mask);
-void athome_bt_input_send_button(unsigned which, uint8_t id, bool down);
-void athome_bt_input_calculate_time(unsigned which, long usec_since_last);
-void athome_bt_input_frame(unsigned which);
-
+void aahbt_input_send_buttons(unsigned which, uint32_t mask);
+void aahbt_input_send_button(unsigned which, uint8_t id, bool down);
+void aahbt_input_calculate_time(unsigned which, long usec_since_last);
+void aahbt_input_frame(unsigned which);
+void aahbt_input_led_show_event(int event_type);
 
 #endif
 
