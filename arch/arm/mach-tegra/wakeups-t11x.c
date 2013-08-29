@@ -150,6 +150,27 @@ static int tegra_wake_event_irq[] = {
 
 static int last_gpio = -1;
 
+int tegra_set_wake_gpio(unsigned int wake, int gpio)
+{
+	if (wake < 0 || wake >= ARRAY_SIZE(tegra_gpio_wakes))
+		return -EINVAL;
+
+	tegra_wake_event_irq[wake] = -EAGAIN;
+	tegra_gpio_wakes[wake] = gpio;
+
+	return 0;
+}
+
+int tegra_set_wake_irq(unsigned int wake, int irq)
+{
+	if (wake < 0 || wake >= ARRAY_SIZE(tegra_wake_event_irq))
+		return -EINVAL;
+
+	tegra_wake_event_irq[wake] = irq;
+
+	return 0;
+}
+
 int tegra_gpio_to_wake(int gpio)
 {
 	int i;
