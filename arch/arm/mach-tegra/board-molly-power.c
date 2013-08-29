@@ -391,7 +391,7 @@ static struct i2c_board_info __initdata palma_device[] = {
 
 /* EN_USB3_VBUS From TEGRA GPIO PN4 */
 static struct regulator_consumer_supply fixed_reg_usb3_vbus_supply[] = {
-	REGULATOR_SUPPLY("usb_vbus", "tegra-xhci"),
+	REGULATOR_SUPPLY("usb_vbus", "tegra-xhci"), /* VBUS_USB_SW */
 };
 
 /* no gpio enable required */
@@ -439,8 +439,8 @@ static struct regulator_consumer_supply fixed_reg_avdd_hdmi_pll_supply[] = {
 	}
 
 FIXED_REG(6,	usb3_vbus,	usb3_vbus,
-	  palmas_rails(ldousb),	0,	0,
-	  TEGRA_GPIO_PN4,	true,	true,	0,	5000);
+	  NULL,	0,	0,
+	  TEGRA_GPIO_PN4,	false,	false,	0,	5000);
 
 FIXED_REG(10,	avdd_hdmi_pll,	avdd_hdmi_pll,
 	  palmas_rails(ldo3),	0,	0,
