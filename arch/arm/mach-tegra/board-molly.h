@@ -59,6 +59,11 @@
 #define TEGRA_GPIO_I2C5_SCL             TEGRA_GPIO_PZ6
 #define TEGRA_GPIO_I2C5_SDA             TEGRA_GPIO_PZ7
 
+/* HDMI Hotplug detection pin */
+#define MOLLY_HDMI_HPD	 TEGRA_GPIO_PN7
+/* HDMI level shifter enable on SPDIF_IN - GPIO_PK6 */
+#define MOLLY_HDMI_LS_EN TEGRA_GPIO_PK6
+
 int molly_regulator_init(void);
 int molly_suspend_init(void);
 int molly_sdhci_init(void);

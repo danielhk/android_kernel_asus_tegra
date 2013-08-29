@@ -59,11 +59,6 @@ struct platform_device * __init molly_host1x_init(void)
 
 #ifdef CONFIG_TEGRA_DC
 
-/* HDMI Hotplug detection pin */
-#define molly_hdmi_hpd	 TEGRA_GPIO_PN7
-/* HDMI level shifter enable on SPDIF_IN - GPIO_PK6 */
-#define molly_hdmi_ls_en TEGRA_GPIO_PK6
-
 static struct regulator *molly_hdmi_reg;
 static struct regulator *molly_hdmi_pll;
 static struct regulator *molly_hdmi_vddio;
@@ -256,7 +251,7 @@ static struct tegra_dc_out molly_disp_out = {
 	.parent_clk	= "pll_d2_out0",
 
 	.dcc_bus	= 3,
-	.hotplug_gpio	= molly_hdmi_hpd,
+	.hotplug_gpio	= MOLLY_HDMI_HPD,
 	.hdmi_out	= &molly_hdmi_out,
 
 	.max_pixclock	= KHZ2PICOS(297000),
@@ -364,18 +359,18 @@ int __init molly_panel_init(void)
 		return -EINVAL;
 	}
 
-	gpio_request(molly_hdmi_hpd, "hdmi_hpd");
-	gpio_direction_input(molly_hdmi_hpd);
+	gpio_request(MOLLY_HDMI_HPD, "hdmi_hpd");
+	gpio_direction_input(MOLLY_HDMI_HPD);
 
 #if MOLLY_ON_DALMORE == 0
-	err = gpio_request(molly_hdmi_ls_en, "hdmi_ls_en");
+	err = gpio_request(MOLLY_HDMI_LS_EN, "hdmi_ls_en");
 	pr_info("%s: gpio_request(hdmi_ls_en) returned %d\n",
 		__func__, err);
 	/* keep level shifter always enabled, otherwise
 	 * HPD hotplug detection fails because it's also
 	 * coming through the level shifter.
 	 */
-	err = gpio_direction_output(molly_hdmi_ls_en, 1);
+	err = gpio_direction_output(MOLLY_HDMI_LS_EN, 1);
 	pr_info("%s: gpio_direction_output(hdmi_ls_en, 1) returned %d\n",
 		__func__, err);
 #endif
