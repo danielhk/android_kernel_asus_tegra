@@ -790,7 +790,6 @@ static void __init tegra_molly_init(void)
 	molly_edp_init();
 	molly_panel_init();
 	molly_pmon_init();
-	tegra_release_bootloader_fb();
 #ifdef CONFIG_TEGRA_WDT_RECOVERY
 	tegra_wdt_recovery_init();
 #endif
