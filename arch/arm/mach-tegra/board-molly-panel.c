@@ -247,7 +247,8 @@ struct tegra_hdmi_out molly_hdmi_out = {
 
 static struct tegra_dc_out molly_disp_out = {
 	.type		= TEGRA_DC_OUT_HDMI,
-	.flags		= TEGRA_DC_OUT_HOTPLUG_HIGH,
+	.flags		= TEGRA_DC_OUT_HOTPLUG_HIGH |
+			  TEGRA_DC_OUT_HOTPLUG_WAKE_LP0,
 	.parent_clk	= "pll_d2_out0",
 
 	.dcc_bus	= 3,

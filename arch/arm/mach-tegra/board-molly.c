@@ -603,6 +603,13 @@ static struct tegra_usb_platform_data tegra_udc_pdata = {
 	},
 };
 
+static void __init molly_wake_sources_init(void)
+{
+	/* Set HDMI HPD GPIO as wakeup source */
+	tegra_set_wake_gpio(4, MOLLY_HDMI_HPD);
+	/* Disable external PMU wakeup */
+	tegra_set_wake_irq(18, -EAGAIN);
+}
 
 static void __init molly_usb_init(void)
 {
@@ -827,6 +834,7 @@ static void __init tegra_molly_init(void)
 	molly_i2c_init();
 	molly_spi_init();
 	molly_radio_init();
+	molly_wake_sources_init();
 	molly_usb_init();
 	molly_xusb_init();
 	molly_hsic_init();
