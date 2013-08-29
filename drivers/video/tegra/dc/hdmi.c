@@ -884,9 +884,12 @@ static bool tegra_dc_hdmi_detect(struct tegra_dc *dc)
 
 	err = tegra_edid_get_monspecs(hdmi->edid, &specs);
 	if (err < 0) {
-		if (dc->out->n_modes)
+		if (dc->out->n_modes) {
+			/* tegra_dc_enable() grabs the same lock so release */
+			mutex_unlock(&dc->lock);
 			tegra_dc_enable(dc);
-		else {
+			mutex_lock(&dc->lock);
+		} else {
 			dev_err(&dc->ndev->dev, "error reading edid\n");
 			goto fail;
 		}
