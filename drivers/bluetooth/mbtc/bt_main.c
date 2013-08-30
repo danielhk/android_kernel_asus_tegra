@@ -1588,6 +1588,9 @@ bt_service_main_thread(void *data)
 		if (priv->adapter->WakeupTries ||
 		    ((!priv->adapter->IntCounter) &&
 		     (!priv->bt_dev.tx_dnld_rdy ||
+#ifdef CONFIG_ATHOME_BT_REMOTE
+		      !athome_bt_ok_to_send() ||
+#endif
 		      skb_queue_empty(&priv->adapter->tx_queue)))) {
 			PRINTM(INFO, "Main: Thread sleeping...\n");
 			schedule();
@@ -1616,6 +1619,10 @@ bt_service_main_thread(void *data)
 		if (priv->adapter->ps_state == PS_SLEEP)
 			continue;
 		if (priv->bt_dev.tx_dnld_rdy == TRUE) {
+#ifdef CONFIG_ATHOME_BT_REMOTE
+			if (!athome_bt_ok_to_send())
+				continue;
+#endif
 			if (!skb_queue_empty(&priv->adapter->tx_queue)) {
 				skb = skb_dequeue(&priv->adapter->tx_queue);
 				if (skb) {

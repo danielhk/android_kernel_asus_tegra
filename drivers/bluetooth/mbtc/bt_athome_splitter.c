@@ -23,10 +23,14 @@
 #include "bt_athome_util.h"
 
 
+/*
+ * Note: we assume all splitter functions are called from the main
+ * thread of bt driver. No synchronization is necessary between them.
+ */
 
+/* We allow only one command in flight at a time */
+static int send_credit = 1;
 
-/* virtualization state */
-static struct semaphore send_sem = __SEMAPHORE_INITIALIZER(send_sem, 1);
 /*
  * Only one copy of this data exists in the kernel:
  * This is the driver-private data for the MBT driver whom we're piggy-backing
@@ -84,8 +88,9 @@ static void athome_bt_reset(void)
 
 	athome_bt_stack_shutdown();
 
-	while(!down_trylock(&send_sem));
-	up(&send_sem);
+	if (LOG_BT_CREDIT)
+		aahlog("resetting send_credit to 1\n");
+	send_credit = 1;
 
 	aahlog("reset complete\n");
 }
@@ -113,10 +118,9 @@ static int athome_bt_filter_cmd_complete(uint8_t *rx_buf, uint32_t len,
 		 *	window after a reset, and we instead have one. This
 		 *	code assures our semaphore acts that way too.
 		 */
-		while(!down_trylock(&send_sem));
-		up(&send_sem);
-		if (LOG_BT_SEM)
-			aahlog("resetting bt sem to 1 on reset\n");
+		send_credit = 1;
+		if (LOG_BT_CREDIT)
+			aahlog("resetting send_credit to 1 on reset\n");
 
 	 } else if (ogf == HCI_OGF_Controller_And_Baseband &&
 		ocf == HCI_Read_LE_Host_Support && !forus) {
@@ -355,9 +359,9 @@ int athome_bt_remote_filter_rx_data(void *priv, u32 pkt_type, u8 *rx_buf,
 
 		case HCI_EV_CMD_COMPLETE:
 			if (cmd_complete->ncmd) {
-				if (LOG_BT_SEM)
-					aahlog("up(cmpl)\n");
-				up(&send_sem);
+				if (LOG_BT_CREDIT)
+					aahlog("inc(cmpl)\n");
+				send_credit++;
 			}
 			isours = athome_bt_filter_cmd_complete(rx_buf, *rx_len,
 								&enq_if_ours);
@@ -365,9 +369,9 @@ int athome_bt_remote_filter_rx_data(void *priv, u32 pkt_type, u8 *rx_buf,
 
 		case HCI_EV_CMD_STATUS:
 			if (cmd_status->ncmd) {
-				if (LOG_BT_SEM)
-					aahlog("up(sta)\n");
-				up(&send_sem);
+				if (LOG_BT_CREDIT)
+					aahlog("inc(sta)\n");
+				send_credit++;
 			}
 			isours = athome_bt_filter_cmd_status(rx_buf, *rx_len,
 								&enq_if_ours);
@@ -573,9 +577,10 @@ int athome_bt_pkt_send_req(void *priv, struct sk_buff *skb)
 	if (ret == AAH_BT_PKT_PROCEED && !skipsem &&
 			(bt_cb(skb)->pkt_type == HCI_COMMAND_PKT ||
 				bt_cb(skb)->pkt_type == PKT_MARVELL)) {
-		if (LOG_BT_SEM)
-			aahlog("down\n");
-		down(&send_sem);
+		if (LOG_BT_CREDIT)
+			aahlog("dec\n");
+		--send_credit;
+		BUG_ON(send_credit < 0);
 	}
 
 	if (log_it)
@@ -585,3 +590,7 @@ int athome_bt_pkt_send_req(void *priv, struct sk_buff *skb)
 	return ret;
 }
 
+int athome_bt_ok_to_send(void)
+{
+	return send_credit > 0;
+}

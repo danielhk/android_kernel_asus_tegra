@@ -46,6 +46,11 @@ int athome_bt_remote_filter_rx_data(void *priv, u32 pkt_type,
  */
 int athome_bt_pkt_send_req(void *priv, struct sk_buff *skb);
 
+/*
+ *	Check if the splitter thinks it is ok to send a packet
+ */
+int athome_bt_ok_to_send(void);
+
 /*  ========== functions provided to external LE driver ========== */
 
 void athome_bt_send_to_user(uint32_t pkt_type,
