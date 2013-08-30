@@ -486,5 +486,6 @@
 
 #define HDMI_NV_PDISP_SOR_PAD_CTLS0				0xd2
 #define  DRIVE_CURRENT_FUSE_OVERRIDE_T11x	(1 << 31)
+#define  BG_VREF_LEVEL(x)			(((x) & 0xf) << 8)
 
 #endif
