@@ -30,8 +30,8 @@ static __initdata struct tegra_pingroup_config molly_pinmux_common[] = {
 
 	/* UARTD pinmux - debug uart */
 	DEFAULT_PINMUX(GMI_A16,       UARTD,       NORMAL,    NORMAL,   OUTPUT),
-	DEFAULT_PINMUX(GMI_A17,       UARTD,       NORMAL,    TRISTATE, INPUT),
-	DEFAULT_PINMUX(GMI_A18,       UARTD,       NORMAL,    TRISTATE, INPUT),
+	DEFAULT_PINMUX(GMI_A17,       UARTD,       PULL_UP,   TRISTATE, INPUT),
+	DEFAULT_PINMUX(GMI_A18,       UARTD,       PULL_UP,   TRISTATE, INPUT),
 	DEFAULT_PINMUX(GMI_A19,       UARTD,       NORMAL,    NORMAL,   OUTPUT),
 
 	/* SOC pinmux */
@@ -83,7 +83,7 @@ static __initdata struct tegra_pingroup_config molly_pinmux_common[] = {
 
 	/* SPI2 (SWD) pinmux */
 	DEFAULT_PINMUX(KB_COL0,       SPI2,        NORMAL,    NORMAL,   OUTPUT),
-	DEFAULT_PINMUX(KB_COL1,       SPI2,        NORMAL,    NORMAL,   INPUT),
+	DEFAULT_PINMUX(KB_COL1,       SPI2,        PULL_UP,   NORMAL,   INPUT),
 	DEFAULT_PINMUX(KB_ROW5,       SPI2,        NORMAL,    NORMAL,   OUTPUT),
 
 	/* I2CPWR pinmux */
@@ -121,15 +121,24 @@ static __initdata struct tegra_pingroup_config molly_pinmux_common[] = {
 	/* USB pinmux */
 	DEFAULT_PINMUX(USB_VBUS_EN0,  USB,         PULL_DOWN, NORMAL,   OUTPUT),
 
+	/* UART3 is connected to WLAN as an optional interconnect
+	 * but we use SD for now.  This pins need to be placed in a safe
+	 * state to prevent both chips from driving the signals.
+	 */
+	DEFAULT_PINMUX(UART3_RTS_N,   UARTC,       NORMAL,    NORMAL,   OUTPUT),
+	DEFAULT_PINMUX(UART3_CTS_N,   UARTC,       PULL_UP,   TRISTATE, INPUT),
+	DEFAULT_PINMUX(UART3_RXD,     UARTC,       PULL_UP,   TRISTATE, INPUT),
+	DEFAULT_PINMUX(UART3_TXD,     UARTC,       NORMAL,    NORMAL,   OUTPUT),
+
 	/* GPIO pinmux */
 	/* LED_EN */
 	GPIO_PINMUX(GMI_AD10, NORMAL, NORMAL, OUTPUT, DISABLE),
 	/* LED_TRIG_N */
-	GPIO_PINMUX(GMI_AD11, PULL_UP, NORMAL, OUTPUT, DISABLE),
+	GPIO_PINMUX(GMI_AD11, NORMAL, NORMAL, OUTPUT, DISABLE),
 	/* STD_TEMP_ALERT */
 	GPIO_PINMUX(GMI_CS0_N, NORMAL, NORMAL, INPUT, DISABLE),
 	/* LED_INT_N* */
-	GPIO_PINMUX(GMI_CS4_N, PULL_DOWN, NORMAL, INPUT, DISABLE),
+	GPIO_PINMUX(GMI_CS4_N, NORMAL, NORMAL, INPUT, DISABLE),
 	/* USB_PWR_FLT_N */
 	GPIO_PINMUX(GMI_WP_N, PULL_UP, NORMAL, INPUT, DISABLE),
 	/* WL_BT_RST_N */
@@ -152,6 +161,8 @@ static __initdata struct tegra_pingroup_config molly_pinmux_common[] = {
 	GPIO_PINMUX(KB_COL7, PULL_UP, NORMAL, INPUT, DISABLE),
 	/* BT_WL_OSC_SLP */
 	GPIO_PINMUX(CLK3_REQ, PULL_UP, NORMAL, OUTPUT, DISABLE),
+	/* BT_TX_PWR */
+	GPIO_PINMUX(GPIO_PU4, PULL_UP, NORMAL, INPUT, DISABLE),
 	/* WLAN_IRQ_N */
 	GPIO_PINMUX(GPIO_PU5, PULL_UP, NORMAL, INPUT, DISABLE),
 	/* BT_WL_2HOST */
@@ -277,13 +288,7 @@ static __initdata struct tegra_pingroup_config unused_pins_lowpower[] = {
 	UNUSED_PINMUX(GPIO_PU3),
 	UNUSED_PINMUX(UART2_RXD),
 	UNUSED_PINMUX(UART2_TXD),
-	/* UART3 is connected to WLAN as an optional interconnet
-	 * but we use SD for now so this is unused.
-	 */
-	UNUSED_PINMUX(UART3_CTS_N),
-	UNUSED_PINMUX(UART3_RTS_N),
-	UNUSED_PINMUX(UART3_RXD),
-	UNUSED_PINMUX(UART3_TXD),
+
 	UNUSED_PINMUX(OWR),
 	UNUSED_PINMUX(SPDIF_OUT),
 	UNUSED_PINMUX(USB_VBUS_EN1),
