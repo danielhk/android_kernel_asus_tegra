@@ -739,7 +739,7 @@ static bool tegra_dc_check_constraint(const struct fb_videomode *mode)
 }
 
 static bool tegra_dc_hdmi_mode_filter(const struct tegra_dc *dc,
-					struct fb_videomode *mode)
+			       struct fb_videomode *mode)
 {
 	if (mode->vmode & FB_VMODE_INTERLACED)
 		return false;
@@ -2038,7 +2038,12 @@ static void tegra_dc_hdmi_enable(struct tegra_dc *dc)
 	tegra_dc_writel(dc, GENERAL_ACT_REQ << 8, DC_CMD_STATE_CONTROL);
 	tegra_dc_writel(dc, GENERAL_ACT_REQ, DC_CMD_STATE_CONTROL);
 
-	tegra_nvhdcp_set_plug(hdmi->nvhdcp, 1);
+	/* we are called at boot when the actual connection state
+	 * isn't known, and other times (like fb_blank, which
+	 * does a disable followed by an enable) when it is.
+	 * don't just assume a connection but check dc->connected.
+	 */
+	tegra_nvhdcp_set_plug(hdmi->nvhdcp, hdmi->dc->connected);
 	tegra_dc_io_end(dc);
 }
 
