@@ -191,7 +191,6 @@ static struct tegra_dc_mode hdmi_panel_modes[] = {
 
 static void molly_hdmi_hotplug_report(bool state)
 {
-	pr_info("%s: state = %d\n", __func__, state);
 	if (state) {
 		tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_DDC_SDA,
 						TEGRA_PUPD_PULL_DOWN);
