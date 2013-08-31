@@ -22,6 +22,11 @@
 #ifndef __DRIVERS_VIDEO_TEGRA_DC_HDMI_H
 #define __DRIVERS_VIDEO_TEGRA_DC_HDMI_H
 
+struct tegra_dc_hdmi_data;
+
+#include "edid.h"
+#include "nvhdcp.h"
+
 #define HDMI_INFOFRAME_TYPE_VENDOR	0x81
 #define HDMI_INFOFRAME_TYPE_AVI		0x82
 #define HDMI_INFOFRAME_TYPE_SPD		0x83
@@ -232,9 +237,39 @@ struct hdmi_extres_infoframe {
 	u8		hdmi_vic;
 } __packed;
 
-#define HDMI_VENDOR_VERSION 0x01
+struct tegra_dc_hdmi_data {
+	struct tegra_dc			*dc;
+	struct tegra_edid		*edid;
+	struct tegra_edid_hdmi_eld		eld;
+	struct tegra_nvhdcp		*nvhdcp;
 
-struct tegra_dc_hdmi_data;
+	struct resource			*base_res;
+	void __iomem			*base;
+	struct clk			*clk;
+
+	struct clk			*disp1_clk;
+	struct clk			*disp2_clk;
+	struct clk			*hda_clk;
+	struct clk			*hda2codec_clk;
+	struct clk			*hda2hdmi_clk;
+
+#ifdef CONFIG_SWITCH
+	struct switch_dev		hpd_switch;
+#endif
+	struct tegra_hdmi_out		info;
+
+	spinlock_t			suspend_lock;
+	bool				suspended;
+	bool				eld_retrieved;
+	bool				clk_enabled;
+	unsigned			audio_freq;
+	unsigned			audio_source;
+	bool				audio_inject_null;
+
+	bool				dvi;
+};
+
+#define HDMI_VENDOR_VERSION 0x01
 
 unsigned long tegra_hdmi_readl(struct tegra_dc_hdmi_data *hdmi,
 				unsigned long reg);
@@ -243,5 +278,6 @@ void tegra_hdmi_writel(struct tegra_dc_hdmi_data *hdmi,
 struct tegra_dc *tegra_dc_hdmi_get_dc(struct tegra_dc_hdmi_data *hdmi);
 int tegra_hdmi_connector_is_dvi(struct tegra_dc *dc);
 int tegra_dc_find_cea_vic_from_fb_vmode(const struct fb_videomode *mode);
-
+bool tegra_dc_hdmi_mode_filter(const struct tegra_dc *dc,
+			       struct fb_videomode *mode);
 #endif
