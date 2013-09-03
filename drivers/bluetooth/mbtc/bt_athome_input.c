@@ -60,6 +60,7 @@ static struct {
 	char uniq[16];
 	int32_t vx, vy;
 	int32_t px, py;
+	int32_t last_x, last_y;
 	struct timespec last_evt;
 	struct timespec last_touch_evt;
 	uint32_t touch_count; /* cleared on finger up */
@@ -69,7 +70,13 @@ static struct {
 	u32 enabled;
 	u16 alpha;
 	u16 beta;
-} filter_params = {.enabled = 1, .alpha = 50, .beta = 0};
+	u16 min_square_distance;
+} filter_params = {
+	.enabled = 1,
+	.alpha = 50,
+	.beta = 0,
+	.min_square_distance = 9 // in 100s of micrometers squared
+};
 
 static struct dentry *debugfs_dir;
 
@@ -166,6 +173,13 @@ static int athome_bt_input_init_debug(void)
 		aahlog("Failed to create debugfs file for beta attr.\n");
 		return -ENODEV;
 	}
+	entry = debugfs_create_u16("min_square_distance", 0600, debugfs_dir,
+			&filter_params.min_square_distance);
+	if (!entry) {
+		aahlog("Failed to create debugfs file for distance filter "
+				"min_square_distance attr.\n");
+		return -ENODEV;
+	}
 	entry = debugfs_create_bool("enabled", 0600, debugfs_dir,
 			&filter_params.enabled);
 	if (!entry) {
@@ -250,9 +264,6 @@ void athome_bt_input_send_touch(unsigned which,
 	struct input_dev *idev;
 	uint32_t mask = 1UL << pointer_idx;
 	bool wasdown;
-	struct timespec delta_timespec;
-	s32 dt;
-	s32 rx, ry;
 
 	BUG_ON(which >= ARRAY_SIZE(inputs));
 
@@ -266,6 +277,8 @@ void athome_bt_input_send_touch(unsigned which,
 		inputs[which].vy = 0;
 		inputs[which].px = x;
 		inputs[which].py = y;
+		inputs[which].last_x = x;
+		inputs[which].last_y = y;
 	} else if (!is_down && wasdown)
 		athome_bt_led_show_event(HACK_LED_EVENT_INPUT_UP);
 
@@ -278,57 +291,15 @@ void athome_bt_input_send_touch(unsigned which,
 	inputs[which].touch_count++;
 
 	if (is_down) {
+		athome_apply_ab_filter(which, &x, &y);
+		athome_apply_distance_filter(which, &x, &y);
 
-		if (filter_params.enabled) {
-			delta_timespec = timespec_sub(inputs[which].last_evt,
-					inputs[which].last_touch_evt);
-			dt = delta_timespec.tv_sec * MSEC_PER_SEC;
-			dt += delta_timespec.tv_nsec / NSEC_PER_MSEC;
-
-			inputs[which].px = inputs[which].px +
-					(inputs[which].vx * dt);
-			inputs[which].py = inputs[which].py +
-					(inputs[which].vy * dt);
-
-			rx = x - inputs[which].px;
-			ry = y - inputs[which].py;
-
-			inputs[which].px +=
-					((s32)filter_params.alpha * rx) / 100;
-			inputs[which].py +=
-					((s32)filter_params.alpha * ry) / 100;
-			if (dt > 0) {
-				inputs[which].vx += (s32)filter_params.beta *
-						rx / (100 * dt);
-				inputs[which].vy += (s32)filter_params.beta *
-						ry / (100 * dt);
-			}
-
-			inputs[which].px = clamp(inputs[which].px,
-					0, AAH_RAW_X_MAX);
-			inputs[which].py = clamp(inputs[which].py,
-					0, AAH_RAW_Y_MAX);
-			inputs[which].last_touch_evt = inputs[which].last_evt;
-
-			input_report_abs(idev, ABS_MT_POSITION_X,
-					inputs[which].px);
-			input_report_abs(idev, ABS_MT_POSITION_Y,
-					inputs[which].py);
-
-			if (LOG_INPUT_EVENTS) {
-				if (athome_bt_should_report_touch(inputs[which].touch_count))
-					aahlog("[%d] finger down, %4u touch events, px = %5d, py = %5d\n",
-						pointer_idx, inputs[which].touch_count,
-						inputs[which].px, inputs[which].py);
-			}
-		} else {
-			input_report_abs(idev, ABS_MT_POSITION_X, x);
-			input_report_abs(idev, ABS_MT_POSITION_Y, y);
-			if (LOG_INPUT_EVENTS) {
-				if (athome_bt_should_report_touch(inputs[which].touch_count))
-					aahlog("[%d] finger down, %4u touch events, x = %5d, y = %5d\n",
-						pointer_idx, inputs[which].touch_count, x, y);
-			}
+		input_report_abs(idev, ABS_MT_POSITION_X, x);
+		input_report_abs(idev, ABS_MT_POSITION_Y, y);
+		if (LOG_INPUT_EVENTS) {
+			if (athome_bt_should_report_touch(inputs[which].touch_count))
+				aahlog("[%d] finger down, %4u touch events, x = %5d, y = %5d\n",
+					pointer_idx, inputs[which].touch_count, x, y);
 		}
 
 		inputs[which].fingers_down |= mask;
@@ -348,6 +319,60 @@ void athome_bt_input_send_touch(unsigned which,
 			aahlog("[%d] finger release after %4u touch events\n",
 				pointer_idx, inputs[which].touch_count);
 		inputs[which].touch_count = 0;
+	}
+}
+
+void athome_apply_ab_filter(unsigned which, uint16_t* x, uint16_t* y) {
+	struct timespec delta_timespec;
+	s32 dt;
+	s32 rx, ry;
+
+	if (!filter_params.enabled) {
+		return;
+	}
+
+	delta_timespec = timespec_sub(inputs[which].last_evt,
+			inputs[which].last_touch_evt);
+	dt = delta_timespec.tv_sec * MSEC_PER_SEC;
+	dt += delta_timespec.tv_nsec / NSEC_PER_MSEC;
+
+	inputs[which].px = inputs[which].px + (inputs[which].vx * dt);
+	inputs[which].py = inputs[which].py + (inputs[which].vy * dt);
+
+	rx = *x - inputs[which].px;
+	ry = *y - inputs[which].py;
+
+	inputs[which].px += ((s32)filter_params.alpha * rx) / 100;
+	inputs[which].py += ((s32)filter_params.alpha * ry) / 100;
+	if (dt > 0) {
+		inputs[which].vx += (s32)filter_params.beta * rx / (100 * dt);
+		inputs[which].vy += (s32)filter_params.beta * ry / (100 * dt);
+	}
+
+	inputs[which].px = clamp(inputs[which].px, 0, AAH_RAW_X_MAX);
+	inputs[which].py = clamp(inputs[which].py, 0, AAH_RAW_Y_MAX);
+	inputs[which].last_touch_evt = inputs[which].last_evt;
+	*x = inputs[which].px;
+	*y = inputs[which].py;
+}
+
+void athome_apply_distance_filter(unsigned which, uint16_t* x, uint16_t* y) {
+	uint32_t delta_x, delta_y, dist;
+	if (!filter_params.enabled) {
+		return;
+	}
+	delta_x = (*x - inputs[which].last_x) * 10 *
+			AAH_BT_TOUCHPAD_WIDTH / AAH_RAW_X_MAX;
+	delta_y = (*y - inputs[which].last_y) * 10 *
+			AAH_BT_TOUCHPAD_HEIGHT / AAH_RAW_Y_MAX;
+	dist = delta_x * delta_x + delta_y * delta_y;
+
+	if (dist < filter_params.min_square_distance) {
+		*x = inputs[which].last_x;
+		*y = inputs[which].last_y;
+	} else {
+		inputs[which].last_x = *x;
+		inputs[which].last_y = *y;
 	}
 }
 

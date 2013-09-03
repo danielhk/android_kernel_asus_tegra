@@ -59,6 +59,8 @@ void athome_bt_input_send_touch(unsigned which,
 				uint16_t x,
 				uint16_t y,
 				bool is_down);
+void athome_apply_ab_filter(unsigned which, uint16_t* x, uint16_t* y);
+void athome_apply_distance_filter(unsigned which, uint16_t* x, uint16_t* y);
 void athome_bt_input_send_buttons(unsigned which, uint32_t mask);
 void athome_bt_input_send_button(unsigned which, uint8_t id, bool down);
 void athome_bt_input_calculate_time(unsigned which, long usec_since_last);
