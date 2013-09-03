@@ -38,6 +38,17 @@
 
 DECLARE_WAIT_QUEUE_HEAD(wq_worker);
 
+/* number of failures before giving up.  some monitors
+ * leave HPD asserted when they go into suspend, which
+ * causes hdcp to fail.  if we give up, then we'll
+ * not be able to notice when the monitor turns back on
+ * because there is no HPD change.  to support such
+ * monitors, set the limit to -1, which means don't stop
+ * trying as long as HPD is asserted.
+ */
+#define FAIL_COUNT_LIMIT -1
+#define HDCP_MAX_FAIL_MESSAGES 3
+
 /* for 0x40 Bcaps */
 #define BCAPS_REPEATER (1 << 6)
 #define BCAPS_READY (1 << 5)
@@ -62,6 +73,9 @@ DECLARE_WAIT_QUEUE_HEAD(wq_worker);
 		pr_debug("nvhdcp: " __VA_ARGS__)
 #define nvhdcp_err(...)	\
 		pr_err("nvhdcp: Error: " __VA_ARGS__)
+#define nvhdcp_err_throttled(...)	\
+		if (nvhdcp->print_error_messages) \
+			pr_err("nvhdcp: Error: " __VA_ARGS__)
 #define nvhdcp_info(...)	\
 		pr_info("nvhdcp: " __VA_ARGS__)
 
@@ -100,6 +114,7 @@ struct tegra_nvhdcp {
 	u32				num_bksv_list;
 	u64				bksv_list[TEGRA_NVHDCP_MAX_DEVS];
 	int				fail_count;
+	bool				print_error_messages;
 };
 
 static inline bool nvhdcp_is_plugged(struct tegra_nvhdcp *nvhdcp)
@@ -119,7 +134,7 @@ static int nvhdcp_i2c_read(struct tegra_nvhdcp *nvhdcp, u8 reg,
 					size_t len, void *data)
 {
 	int status;
-	int retries = 15;
+	int retries = 1;
 	struct i2c_msg msg[] = {
 		{
 			.addr = 0x74 >> 1, /* primary link */
@@ -136,18 +151,18 @@ static int nvhdcp_i2c_read(struct tegra_nvhdcp *nvhdcp, u8 reg,
 	};
 
 	do {
-		if (!nvhdcp_is_plugged(nvhdcp)) {
-			nvhdcp_err("disconnect during i2c xfer\n");
-			return -EIO;
-		}
 		status = i2c_transfer(nvhdcp->client->adapter,
 			msg, ARRAY_SIZE(msg));
 		if ((status < 0) && (retries > 1))
 			msleep(250);
+		if (!nvhdcp_is_plugged(nvhdcp)) {
+			nvhdcp_err("disconnect during i2c xfer\n");
+			return -EIO;
+		}
 	} while ((status < 0) && retries--);
 
 	if (status < 0) {
-		nvhdcp_err("i2c xfer error %d\n", status);
+		nvhdcp_err_throttled("i2c xfer error %d\n", status);
 		return status;
 	}
 
@@ -167,20 +182,20 @@ static int nvhdcp_i2c_write(struct tegra_nvhdcp *nvhdcp, u8 reg,
 			.buf = buf,
 		},
 	};
-	int retries = 15;
+	int retries = 1;
 
 	buf[0] = reg;
 	memcpy(buf + 1, data, len);
 
 	do {
-		if (!nvhdcp_is_plugged(nvhdcp)) {
-			nvhdcp_err("disconnect during i2c xfer\n");
-			return -EIO;
-		}
 		status = i2c_transfer(nvhdcp->client->adapter,
 			msg, ARRAY_SIZE(msg));
 		if ((status < 0) && (retries > 1))
 			msleep(250);
+		if (!nvhdcp_is_plugged(nvhdcp)) {
+			nvhdcp_err("disconnect during i2c xfer\n");
+			return -EIO;
+		}
 	} while ((status < 0) && retries--);
 
 	if (status < 0) {
@@ -879,7 +894,7 @@ static void nvhdcp_downstream_worker(struct work_struct *work)
 
 	e = get_bcaps(nvhdcp, &b_caps);
 	if (e) {
-		nvhdcp_err("Bcaps read failure\n");
+		nvhdcp_err_throttled("Bcaps read failure\n");
 		goto failure;
 	}
 
@@ -1006,6 +1021,8 @@ static void nvhdcp_downstream_worker(struct work_struct *work)
 
 	nvhdcp->state = STATE_LINK_VERIFY;
 	nvhdcp_info("link verified!\n");
+	nvhdcp->fail_count = 0;
+	nvhdcp->print_error_messages = true;
 
 	while (1) {
 		if (!nvhdcp_is_plugged(nvhdcp))
@@ -1030,15 +1047,27 @@ static void nvhdcp_downstream_worker(struct work_struct *work)
 
 failure:
 	nvhdcp->fail_count++;
-	if(nvhdcp->fail_count > 5) {
-	        nvhdcp_err("nvhdcp failure - too many failures, giving up!\n");
-	} else {
-		nvhdcp_err("nvhdcp failure - renegotiating in 1 second\n");
-		if (!nvhdcp_is_plugged(nvhdcp))
+	if (FAIL_COUNT_LIMIT > -1) {
+		if (nvhdcp->fail_count > FAIL_COUNT_LIMIT) {
+			nvhdcp_err("hdcp failure - too many failures, giving up!\n");
 			goto lost_hdmi;
-		queue_delayed_work(nvhdcp->downstream_wq, &nvhdcp->work,
-						msecs_to_jiffies(1000));
+		}
 	}
+	if (!nvhdcp_is_plugged(nvhdcp))
+		goto lost_hdmi;
+	if (nvhdcp->print_error_messages) {
+		if (nvhdcp->fail_count < HDCP_MAX_FAIL_MESSAGES)
+			nvhdcp_err("hdcp failure - renegotiating in 1 second\n");
+		else {
+			nvhdcp->print_error_messages = false;
+			nvhdcp_err("hdcp failed %d consecutive times\n",
+				   nvhdcp->fail_count);
+			nvhdcp_err("will keep trying but silencing "
+				   "logs until hotplug or success\n");
+		}
+	}
+	queue_delayed_work(nvhdcp->downstream_wq, &nvhdcp->work,
+			   msecs_to_jiffies(1000));
 
 lost_hdmi:
 	nvhdcp->state = STATE_UNAUTHENTICATED;
@@ -1061,6 +1090,7 @@ static int tegra_nvhdcp_on(struct tegra_nvhdcp *nvhdcp)
 	nvhdcp->state = STATE_UNAUTHENTICATED;
 	if (nvhdcp_is_plugged(nvhdcp)) {
 		nvhdcp->fail_count = 0;
+		nvhdcp->print_error_messages = true;
 		queue_delayed_work(nvhdcp->downstream_wq, &nvhdcp->work,
 						msecs_to_jiffies(100));
 	}
@@ -1254,6 +1284,7 @@ struct tegra_nvhdcp *tegra_nvhdcp_create(struct tegra_dc_hdmi_data *hdmi,
 	nvhdcp->info.addr = 0x74 >> 1;
 	nvhdcp->info.platform_data = nvhdcp;
 	nvhdcp->fail_count = 0;
+	nvhdcp->print_error_messages = true;
 
 	adapter = i2c_get_adapter(bus);
 	if (!adapter) {
