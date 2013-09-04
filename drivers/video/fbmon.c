@@ -1015,7 +1015,7 @@ void fb_edid_to_monspecs(unsigned char *edid, struct fb_monspecs *specs)
 
 struct hdmi_vendor_block {
 	u16 source_physical_address;
-	u8 max_tdms_clock;
+	u8 max_tmds_clock;
 	u8 video_latency;
 	u8 audio_latency;
 	u8 i_video_latency;
@@ -1030,35 +1030,53 @@ struct hdmi_vendor_block {
 	u8 hdmi_2d_detail[MAX_HDMI_3D_LEN];
 };
 
+/* start is index into edid[] of the first byte after the ieee_oui.
+ * end is the index into edid[] of the last byte in the vsdb.
+ */
 static void fb_hvd_parse(unsigned char *edid, struct hdmi_vendor_block *hvd,
-	u8 start)
+			 u8 start, u8 end)
 {
 	char mask;
 	int i;
 
 	hvd->source_physical_address = (edid[start + 1] << 8) | edid[start];
 	start += 3;
+	if (start > end)
+		return;
 
-	hvd->max_tdms_clock = edid[start++];
+	hvd->max_tmds_clock = edid[start++];
+	if (start > end)
+		return;
 
 	mask = edid[start++];
+	if (start > end)
+		return;
 	if (mask & LATENCY_PRESENT) {
 		hvd->video_latency = edid[start++];
 		hvd->audio_latency = edid[start++];
-	}
-	if (mask & I_LATENCY_PRESENT) {
-		hvd->i_video_latency = edid[start++];
-		hvd->i_audio_latency = edid[start++];
+		if (mask & I_LATENCY_PRESENT) {
+			hvd->i_video_latency = edid[start++];
+			hvd->i_audio_latency = edid[start++];
+		}
+		if (start > end)
+			return;
 	}
 	/* TODO
 	 * Parse 3D masks and structures
 	 */
 	start++;
+	if (start > end)
+		return;
 	hvd->hdmi_vic_len = (edid[start] >> 5) & HDMI_VIC_LEN_MASK;
 	hvd->hdmi_3d_len = edid[start] & HDMI_3D_LEN_MASK;
 	start++;
-	for (i = 0; i < hvd->hdmi_vic_len; i++)
+	if (start > end)
+		return;
+	for (i = 0; i < hvd->hdmi_vic_len; i++) {
 		hvd->hdmi_vic[i] = edid[start++];
+		if (start > end)
+			return;
+	}
 }
 
 /**
@@ -1104,7 +1122,9 @@ void fb_edid_add_monspecs(unsigned char *edid, struct fb_monspecs *specs)
 				(edid[pos + 2] << 16);
 			if (ieee_reg == 0x000c03)
 				specs->misc |= FB_MISC_HDMI;
-			fb_hvd_parse(edid, &hvd, pos + 3);
+			if (len >= 5)
+				fb_hvd_parse(edid, &hvd, pos + 3,
+					     pos + len - 1);
 			hdmi_num = hvd.hdmi_vic_len;
 		}
 
