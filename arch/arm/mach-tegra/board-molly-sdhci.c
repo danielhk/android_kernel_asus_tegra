@@ -46,6 +46,7 @@
 #define MOLLY_WLAN_RST	TEGRA_GPIO_PW5
 #endif
 #define MOLLY_WLAN_WOW	TEGRA_GPIO_PU5
+
 static void (*wifi_status_cb)(int card_present, void *dev_id);
 static void *wifi_status_cb_devid;
 static int molly_wifi_status_register(void (*callback)(int , void *), void *);
@@ -62,14 +63,13 @@ static struct wifi_platform_data molly_wifi_control = {
 
 static struct resource wifi_resource[] = {
 	[0] = {
-		.name	= "wlan_irq",
-		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHLEVEL
-				| IORESOURCE_IRQ_SHAREABLE,
+		.name	= "mrvl_wlan_irq",
+		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWEDGE,
 	},
 };
 
 static struct platform_device molly_wifi_device = {
-	.name		= "wlan",
+	.name		= "mrvl_wlan",
 	.id		= 1,
 	.num_resources	= 1,
 	.resource	= wifi_resource,
@@ -329,7 +329,7 @@ static int __init molly_wifi_init(void)
 	rc = gpio_request(MOLLY_WLAN_RST, "wlan_rst");
 	if (rc)
 		pr_err("WLAN_RST gpio request failed:%d\n", rc);
-	rc = gpio_request(MOLLY_WLAN_WOW, "bcmsdh_sdmmc");
+	rc = gpio_request(MOLLY_WLAN_WOW, "wlan_wow");
 	if (rc)
 		pr_err("WLAN_WOW gpio request failed:%d\n", rc);
 
