@@ -636,6 +636,8 @@ static struct fb_videomode *fb_create_modedb(unsigned char *edid, int *dbsize)
 	for (i = 0; i < 4; i++, block+= DETAILED_TIMING_DESCRIPTION_SIZE) {
 		if (!(block[0] == 0x00 && block[1] == 0x00)) {
 			get_detailed_timing(block, &mode[num]);
+			DPRINTK("%s: mode[%d] is detailed timing, xres=%d, yres=%d\n",
+				__func__, num, mode[num].xres, mode[num].yres);
 			if (first) {
 			        mode[num].flag |= FB_MODE_IS_FIRST;
 				first = 0;
@@ -644,19 +646,22 @@ static struct fb_videomode *fb_create_modedb(unsigned char *edid, int *dbsize)
 		}
 	}
 
-	DPRINTK("   Supported VESA Modes\n");
+	DPRINTK("   Supported VESA Modes: starting at num %d\n", num);
 	block = edid + ESTABLISHED_TIMING_1;
 	num += get_est_timing(block, &mode[num]);
 
-	DPRINTK("   Standard Timings\n");
+	DPRINTK("   Standard Timings: starting at num %d\n", num);
 	block = edid + STD_TIMING_DESCRIPTIONS_START;
 	for (i = 0; i < STD_TIMING; i++, block += STD_TIMING_DESCRIPTION_SIZE)
 		num += get_std_timing(block, &mode[num], ver, rev);
 
 	block = edid + DETAILED_TIMING_DESCRIPTIONS_START;
 	for (i = 0; i < 4; i++, block+= DETAILED_TIMING_DESCRIPTION_SIZE) {
-		if (block[0] == 0x00 && block[1] == 0x00 && block[3] == 0xfa)
+		if (block[0] == 0x00 && block[1] == 0x00 && block[3] == 0xfa) {
+			DPRINTK("%s: DTD[%d] starting at num %d\n",
+				__func__, i, num);
 			num += get_dst_timing(block + 5, &mode[num], ver, rev);
+		}
 	}
 
 	/* Yikes, EDID data is totally useless */
@@ -1039,6 +1044,7 @@ static void fb_hvd_parse(unsigned char *edid, struct hdmi_vendor_block *hvd,
 	char mask;
 	int i;
 
+	DPRINTK("%s: start = %d, end = %d\n", __func__, start, end);
 	hvd->source_physical_address = (edid[start + 1] << 8) | edid[start];
 	start += 3;
 	if (start > end)
@@ -1107,19 +1113,20 @@ void fb_edid_add_monspecs(unsigned char *edid, struct fb_monspecs *specs)
 
 	while (pos < edid[2]) {
 		u8 len = edid[pos] & 0x1f, type = (edid[pos] >> 5) & 7;
-		pr_debug("Data block %u of %u bytes\n", type, len);
+		DPRINTK("Data block %u of %u bytes at pos 0x%x\n", type, len, pos);
 
 		pos++;
 		if (type == 2) {
 			for (i = pos; i < pos + len; i++) {
 				u8 idx = edid[i] & 0x7f;
 				svd[svd_n++] = idx;
-				pr_debug("N%sative mode #%d\n",
+				DPRINTK("N%sative mode #%d\n",
 					 edid[i] & 0x80 ? "" : "on-n", idx);
 			}
 		} else if (type == 3 && len >= 3) {
 			u32 ieee_reg = edid[pos] | (edid[pos + 1] << 8) |
 				(edid[pos + 2] << 16);
+			DPRINTK("  Vendor Specific Data Block\n");
 			if (ieee_reg == 0x000c03)
 				specs->misc |= FB_MISC_HDMI;
 			if (len >= 5)
@@ -1156,7 +1163,7 @@ void fb_edid_add_monspecs(unsigned char *edid, struct fb_monspecs *specs)
 		get_detailed_timing(edid + edt[i - specs->modedb_len], &m[i]);
 		if (i == specs->modedb_len)
 			m[i].flag |= FB_MODE_IS_FIRST;
-		pr_debug("Adding %ux%u@%u\n", m[i].xres, m[i].yres, m[i].refresh);
+		DPRINTK("Adding %ux%u@%u\n", m[i].xres, m[i].yres, m[i].refresh);
 	}
 
 	for (i = specs->modedb_len + num; i < specs->modedb_len + num + svd_n; i++) {
@@ -1165,8 +1172,8 @@ void fb_edid_add_monspecs(unsigned char *edid, struct fb_monspecs *specs)
 			pr_warning("Reserved SVD code %d\n", idx);
 		} else {
 			memcpy(&m[i], cea_modes + idx, sizeof(m[i]));
-			pr_debug("Adding SVD #%d: %ux%u@%u\n", idx,
-				 m[i].xres, m[i].yres, m[i].refresh);
+			DPRINTK("Adding SVD #%d: %ux%u@%u at %d\n", idx,
+				m[i].xres, m[i].yres, m[i].refresh, i);
 		}
 	}
 
@@ -1179,12 +1186,20 @@ void fb_edid_add_monspecs(unsigned char *edid, struct fb_monspecs *specs)
 		}
 
 		memcpy(&m[i], &hdmi_ext_modes[vic], sizeof(m[i]));
+		DPRINTK("Adding hdmi_ext_modes[%d] at %d: %ux%u@%u\n",
+			vic, i, m[i].xres, m[i].yres, m[i].refresh);
 		i++;
 	}
 
 	kfree(specs->modedb);
 	specs->modedb = m;
 	specs->modedb_len = specs->modedb_len + num + svd_n + j;
+
+	DPRINTK("Completed modedb:\n");
+	for (j = 0; j < specs->modedb_len; j++) {
+		DPRINTK("\tmodedb[%d]: %ux%u@%u, flag 0x%x\n",
+			j, m[j].xres, m[j].yres, m[j].refresh, m[j].flag);
+	}
 }
 
 /*
