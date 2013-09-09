@@ -999,7 +999,7 @@ static int azx_single_wait_for_response(struct azx *chip, unsigned int addr)
 		udelay(1);
 	}
 	if (printk_ratelimit())
-		snd_printd(SFX "get_response timeout: IRS=0x%x\n",
+		snd_printd(SFX "get_response timeout: IRS=0x%lx\n",
 			   azx_readw(chip, IRS));
 	chip->rirb.res[addr] = -1;
 	return -EIO;
@@ -1027,7 +1027,7 @@ static int azx_single_send_cmd(struct hda_bus *bus, u32 val)
 		udelay(1);
 	}
 	if (printk_ratelimit())
-		snd_printd(SFX "send_cmd timeout: IRS=0x%x, val=0x%x\n",
+		snd_printd(SFX "send_cmd timeout: IRS=0x%lx, val=0x%x\n",
 			   azx_readw(chip, IRS), val);
 	return -EIO;
 }
