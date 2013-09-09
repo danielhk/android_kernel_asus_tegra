@@ -764,9 +764,6 @@ static void hdmi_intrinsic_event(struct hda_codec *codec, unsigned int res)
 	int pin_nid;
 	int pin_idx;
 	struct hda_jack_tbl *jack;
-#ifdef CONFIG_SND_HDA_PLATFORM_NVIDIA_TEGRA
-	struct hdmi_eld *eld = &spec->pins[pin_idx].sink_eld;
-#endif
 
 	jack = snd_hda_jack_tbl_get_from_tag(codec, tag);
 	if (!jack)
@@ -788,6 +785,8 @@ static void hdmi_intrinsic_event(struct hda_codec *codec, unsigned int res)
 #ifdef CONFIG_SND_HDA_PLATFORM_NVIDIA_TEGRA
 	if (((codec->preset->id == 0x10de0020) ||
 		(codec->preset->id == 0x10de0022))) {
+		struct hdmi_eld *eld = &spec->pins[pin_idx].sink_eld;
+
 		/*
 		 * HDMI sink's ELD info cannot always be retrieved for now, e.g.
 		 * in console or for audio devices. Assume the highest speakers
