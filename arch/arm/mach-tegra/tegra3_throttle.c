@@ -174,7 +174,7 @@ tegra_throttle_set_cur_state(struct thermal_cooling_device *cdev,
 	int direction;
 	int i;
 	int num_of_cap_clocks = ARRAY_SIZE(cap_freqs_table);
-	unsigned long bthrot_speed;
+	unsigned long bthrot_speed, max_state;
 	struct throttle_table *throt_entry;
 	struct throttle_table cur_throt_freq = {
 #ifdef CONFIG_TEGRA_DUAL_CBUS
@@ -195,6 +195,8 @@ tegra_throttle_set_cur_state(struct thermal_cooling_device *cdev,
 
 	if (cur_state == 1 && direction == 0)
 		bthrot->throttle_count++;
+
+	tegra_throttle_get_max_state(cdev, &max_state);
 
 	mutex_lock(&bthrot_list_lock);
 	list_for_each_entry(bthrot, &bthrot_list, node) {
@@ -219,6 +221,13 @@ tegra_throttle_set_cur_state(struct thermal_cooling_device *cdev,
 	cpu_cap_freq = bthrot_speed;
 	tegra_cpu_set_speed_cap(NULL);
 	mutex_unlock(&bthrot_list_lock);
+
+	if (cur_state == 0)
+		pr_info("cdev %s: stoppped throttling.\n", cdev->type);
+	else
+		pr_info("cdev %s: Throttle state: %lu/%lu Limit: %lu KHz.\n",
+			cdev->type, cur_state, max_state,
+			cpu_cap_freq);
 
 	return 0;
 }
