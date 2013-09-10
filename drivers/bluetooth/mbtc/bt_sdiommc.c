@@ -1255,6 +1255,7 @@ bt_sdio_suspend(struct device *dev)
 	skb_queue_purge(&priv->adapter->tx_queue);
 
 	priv->adapter->is_suspended = TRUE;
+	bt_enable_hostwake_irq(TRUE);
 	LEAVE();
 	/* We will keep the power when hs enabled successfully */
 	if ((mbt_pm_keep_power) && (priv->adapter->hs_state == HS_ACTIVATED)) {
@@ -1290,6 +1291,7 @@ bt_sdio_resume(struct device *dev)
 
 	ENTER();
 	if (func) {
+		bt_enable_hostwake_irq(FALSE);
 		pm_flags = sdio_get_host_pm_caps(func);
 		PRINTM(CMD, "BT: %s: resume: PM flags = 0x%x\n",
 		       sdio_func_id(func), pm_flags);

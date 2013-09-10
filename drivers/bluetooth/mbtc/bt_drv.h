@@ -614,6 +614,9 @@ int bt_prepare_command(bt_private * priv);
 /** This function frees the structure of adapter */
 void bt_free_adapter(bt_private * priv);
 
+/** This function enables the host wake irq */
+void bt_enable_hostwake_irq(bool on);
+
 /** bt driver call this function to register to bus driver */
 int *sbi_register(void);
 /** bt driver call this function to unregister to bus driver */

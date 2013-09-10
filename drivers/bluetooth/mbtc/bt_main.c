@@ -36,6 +36,7 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/wlan_plat.h>
+#include <linux/mbtc_plat.h>
 
 #include "bt_drv.h"
 #include "mbt_char.h"
@@ -115,7 +116,11 @@ static int debug_intf = 1;
 /** Enable minicard power-up/down */
 static int minicard_pwrup = 1;
 /** Pointer to struct with control hooks */
-static struct wifi_platform_data *bt_control_data;
+static struct mbtc_platform_data *bt_control_data;
+/** Pointer to struct with resource */
+static struct resource *bt_irqres;
+static int irq_registered;
+static void bt_register_hostwake_irq(void *handle);
 
 /**
  *  @brief Alloc bt device
@@ -1782,7 +1787,10 @@ sbi_register_conf_dpc(bt_private * priv)
 		}
 	}
 #ifdef SDIO_SUSPEND_RESUME
-	priv->bt_dev.gpio_gap = 0xffff;
+	if (bt_control_data)
+		priv->bt_dev.gpio_gap = bt_control_data->gpio_gap;
+	else
+		priv->bt_dev.gpio_gap = 0xffff;
 	ret = bt_send_hscfg_cmd(priv);
 	if (ret < 0) {
 		PRINTM(FATAL, "Send HSCFG failed!\n");
@@ -2064,6 +2072,8 @@ sbi_register_conf_dpc(bt_private * priv)
 		bt_restore_tx_queue(priv);
 	}
 
+	bt_register_hostwake_irq(NULL);
+
 	/* Get FW version */
 	bt_get_fw_version(priv);
 	snprintf(priv->adapter->drv_ver, MAX_VER_STR_LEN,
@@ -2287,6 +2297,46 @@ bt_set_power(int on, unsigned long msec)
 	return 0;
 }
 
+static irqreturn_t
+bt_hostwake_isr(int irq, void *dev_id)
+{
+	PRINTM(INTR, "Recv hostwake isr\n");
+	return IRQ_HANDLED;
+}
+
+void
+bt_enable_hostwake_irq(bool on)
+{
+	if (bt_irqres && irq_registered) {
+		PRINTM(INTR, "enable_hostwake_irq=%d\n", on);
+		if (on) {
+			enable_irq(bt_irqres->start);
+			enable_irq_wake(bt_irqres->start);
+		} else {
+			disable_irq_wake(bt_irqres->start);
+			disable_irq(bt_irqres->start);
+		}
+	}
+}
+
+static void
+bt_register_hostwake_irq(void *handle)
+{
+	if (bt_irqres && !irq_registered) {
+		irq_registered =
+			request_irq(bt_irqres->start, bt_hostwake_isr,
+				    bt_irqres->flags, "bt hostwake",
+				    handle);
+		if (irq_registered < 0)
+			PRINTM(ERROR, "Couldn't acquire BT_HOST_WAKE IRQ\n");
+		else {
+			irq_registered = 1;
+			enable_irq_wake(bt_irqres->start);
+			bt_enable_hostwake_irq(FALSE);
+		}
+	}
+}
+
 /**
  *  @brief This function probes the platform-level device
  *
@@ -2296,14 +2346,18 @@ bt_set_power(int on, unsigned long msec)
 static int
 bt_probe(struct platform_device *pdev)
 {
-	struct wifi_platform_data *bt_ctrl =
-		(struct wifi_platform_data *)(pdev->dev.platform_data);
+	struct mbtc_platform_data *bt_ctrl =
+		(struct mbtc_platform_data *)(pdev->dev.platform_data);
 
 	ENTER();
 
+	bt_irqres = platform_get_resource_byname(pdev, IORESOURCE_IRQ,
+						 "mrvl_bt_irq");
 	bt_control_data = bt_ctrl;
-	bt_set_power(1, 0);	/* Power On */
-	bt_set_carddetect(1);	/* CardDetect (0->1) */
+	if (minicard_pwrup) {
+		bt_set_power(1, 0);	/* Power On */
+		bt_set_carddetect(1);	/* CardDetect (0->1) */
+	}
 
 	LEAVE();
 	return 0;
@@ -2318,14 +2372,21 @@ bt_probe(struct platform_device *pdev)
 static int
 bt_remove(struct platform_device *pdev)
 {
-	struct wifi_platform_data *bt_ctrl =
-		(struct wifi_platform_data *)(pdev->dev.platform_data);
+	struct mbtc_platform_data *bt_ctrl =
+		(struct mbtc_platform_data *)(pdev->dev.platform_data);
 
 	ENTER();
 
-	bt_control_data = bt_ctrl;
-	bt_set_power(0, 0);	/* Power Off */
-	bt_set_carddetect(0);	/* CardDetect (1->0) */
+	if (bt_irqres && irq_registered) {
+		PRINTM(MSG, "Free hostwake IRQ wakeup\n");
+		free_irq(bt_irqres->start, NULL);
+		irq_registered = 0;
+	}
+	if (minicard_pwrup) {
+		bt_set_power(0, 0);	/* Power Off */
+		bt_set_carddetect(0);	/* CardDetect (1->0) */
+	}
+	bt_control_data = NULL;
 
 	LEAVE();
 	return 0;
@@ -2347,12 +2408,11 @@ static struct platform_driver bt_device = {
 static int
 bt_add_dev(void)
 {
-	int ret = 0;
+	int ret;
 
 	ENTER();
 
-	if (minicard_pwrup)
-		ret = platform_driver_register(&bt_device);
+	ret = platform_driver_register(&bt_device);
 
 	LEAVE();
 	return ret;
@@ -2368,8 +2428,7 @@ bt_del_dev(void)
 {
 	ENTER();
 
-	if (minicard_pwrup)
-		platform_driver_unregister(&bt_device);
+	platform_driver_unregister(&bt_device);
 
 	LEAVE();
 }
