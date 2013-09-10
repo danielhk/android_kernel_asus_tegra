@@ -406,7 +406,7 @@ int tegra_dc_set_fb_mode(struct tegra_dc *dc,
 		 * of limited.
 		 */
 		if (tegra_hdmi_connector_is_dvi(dc) ||
-		   (tegra_dc_find_cea_vic_from_fb_vmode(fbmode) <= 1))
+		   (tegra_dc_find_cea_vic_from_fb_vmode(fbmode) == 1))
 			mode.avi_q = TEGRA_DC_MODE_AVI_Q_FULL;
 		else
 			mode.avi_q = TEGRA_DC_MODE_AVI_Q_LIMITED;
