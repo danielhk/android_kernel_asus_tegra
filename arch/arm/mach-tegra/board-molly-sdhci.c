@@ -18,6 +18,7 @@
 #include <linux/resource.h>
 #include <linux/platform_device.h>
 #include <linux/wlan_plat.h>
+#include <linux/mbtc_plat.h>
 #include <linux/delay.h>
 #include <linux/gpio.h>
 #include <linux/clk.h>
@@ -46,6 +47,7 @@
 #define MOLLY_WLAN_RST	TEGRA_GPIO_PW5
 #endif
 #define MOLLY_WLAN_WOW	TEGRA_GPIO_PU5
+#define MOLLY_BT_HOST_WAKE	TEGRA_GPIO_PU6
 
 static void (*wifi_status_cb)(int card_present, void *dev_id);
 static void *wifi_status_cb_devid;
@@ -71,10 +73,31 @@ static struct resource wifi_resource[] = {
 static struct platform_device molly_wifi_device = {
 	.name		= "mrvl_wlan",
 	.id		= 1,
-	.num_resources	= 1,
+	.num_resources	= ARRAY_SIZE(wifi_resource),
 	.resource	= wifi_resource,
 	.dev		= {
 		.platform_data = &molly_wifi_control,
+	},
+};
+
+static struct mbtc_platform_data molly_mbtc_control = {
+	.gpio_gap	= 0x0480, /* GPIO 4, GAP 0x80 (128 ms) */
+};
+
+static struct resource bt_resource[] = {
+	[0] = {
+		.name	= "mrvl_bt_irq",
+		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWEDGE,
+	},
+};
+
+static struct platform_device molly_bt_device = {
+	.name		= "mrvl_bt",
+	.id		= 1,
+	.num_resources	= ARRAY_SIZE(bt_resource),
+	.resource	= bt_resource,
+	.dev		= {
+		.platform_data = &molly_mbtc_control,
 	},
 };
 
@@ -332,6 +355,9 @@ static int __init molly_wifi_init(void)
 	rc = gpio_request(MOLLY_WLAN_WOW, "wlan_wow");
 	if (rc)
 		pr_err("WLAN_WOW gpio request failed:%d\n", rc);
+	rc = gpio_request(MOLLY_BT_HOST_WAKE, "bt_host_wake");
+	if (rc)
+		pr_err("BT_HOST_WAKE gpio request failed:%d\n", rc);
 
 	rc = gpio_direction_output(MOLLY_WLAN_PWR, 0);
 	if (rc)
@@ -342,11 +368,17 @@ static int __init molly_wifi_init(void)
 	rc = gpio_direction_input(MOLLY_WLAN_WOW);
 	if (rc)
 		pr_err("WLAN_WOW gpio direction configuration failed:%d\n", rc);
+	rc = gpio_direction_input(MOLLY_BT_HOST_WAKE);
+	if (rc)
+		pr_err("BT_HOST_WAKE gpio direction configuration failed:%d\n", rc);
 
 	wifi_resource[0].start = wifi_resource[0].end =
 		gpio_to_irq(MOLLY_WLAN_WOW);
+	bt_resource[0].start = bt_resource[0].end =
+		gpio_to_irq(MOLLY_BT_HOST_WAKE);
 
 	platform_device_register(&molly_wifi_device);
+	platform_device_register(&molly_bt_device);
 	return 0;
 }
 
