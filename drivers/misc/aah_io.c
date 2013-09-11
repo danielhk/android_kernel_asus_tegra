@@ -116,6 +116,7 @@ MODULE_LICENSE("GPL v2");
 
 #define WIPE_WORKER_DELAY_MS 100
 #define WIPE_TIMEOUT_SECS 10
+#define RESET_TIMEOUT_SECS 10
 
 struct aah_io_driver_state {
 	struct aah_io_platform_data *pdata;
@@ -132,6 +133,13 @@ struct aah_io_driver_state {
 
 	/* Input device registration */
 	struct platform_device *key_dev;
+
+	struct input_handler event_filter_handler;
+	struct input_handle event_filter_handle;
+	int event_filter_registered;
+
+	struct input_dev *input;
+	struct timer_list timer;
 
 	/* Used to support wipe feature during early boot */
 	struct workqueue_struct *workq;
@@ -166,6 +174,14 @@ static struct gpio_event_direct_entry gpio_keypad_keys_map[] = {
 
 		/* .gpio to be filled in from pdata */
 	},
+};
+
+static const struct input_device_id aah_io_event_filter_ids[] = {
+	{
+		.flags = INPUT_DEVICE_ID_MATCH_EVBIT,
+		.evbit = { BIT_MASK(EV_KEY) },
+	},
+	{ }
 };
 
 static inline int lp5521_write(struct i2c_client *client, u8 reg, u8 value);
@@ -266,6 +282,90 @@ static int gpio_input_event(struct gpio_event_input_devs *input_devs,
 	return 0;
 }
 
+static void aah_io_reset_timer(unsigned long __data)
+{
+	pr_crit("User initiated soft reset, restarting...\n");
+	emergency_restart();
+}
+
+static bool aah_io_event_filter(struct input_handle *handle,
+		unsigned int type, unsigned int code, int data)
+{
+	struct aah_io_driver_state *state = container_of(handle,
+			struct aah_io_driver_state,
+			event_filter_handle);
+
+	if (!state) {
+		pr_err("%s: no global state structure\n", __func__);
+		return false;
+	}
+
+	if (code != state->pdata->key_code)
+		return false;
+
+	if (data) {
+		state->timer.expires = jiffies +
+				msecs_to_jiffies(RESET_TIMEOUT_SECS *
+						1000);
+		add_timer(&state->timer);
+	} else
+		del_timer(&state->timer);
+
+	return false;
+}
+
+static int aah_io_event_filter_connect(struct input_handler *handler,
+		struct input_dev *dev, const struct input_device_id *id)
+{
+	struct aah_io_driver_state *state = container_of(handler,
+			struct aah_io_driver_state,
+			event_filter_handler);
+	int ret;
+
+	if (state->input != dev)
+		return -ENODEV;
+
+	state->event_filter_handle.dev = dev;
+	state->event_filter_handle.handler = handler;
+	state->event_filter_handle.name = "aah io event filter";
+
+	ret = input_register_handle(&state->event_filter_handle);
+	if (ret)
+		return ret;
+
+	ret = input_open_device(&state->event_filter_handle);
+	if (ret)
+		goto err_unregister_handle;
+
+	return 0;
+
+err_unregister_handle:
+	input_unregister_handle(&state->event_filter_handle);
+	return ret;
+}
+
+static void aah_io_event_filter_disconnect(struct input_handle *handle)
+{
+	struct aah_io_driver_state *state = container_of(handle,
+			struct aah_io_driver_state,
+			event_filter_handle);
+
+	input_close_device(handle);
+	input_unregister_handle(handle);
+
+	del_timer_sync(&state->timer);
+}
+
+static int aah_io_gpio_event_input_func(struct gpio_event_input_devs *input_devs,
+			struct gpio_event_info *info, void **data, int func)
+{
+	/* no clean way to get the state so have to use a global */
+	struct aah_io_driver_state *state = g_state;
+
+	state->input = input_devs->dev[0];
+	return gpio_event_input_func(input_devs, info, data, func);
+}
+
 static struct gpio_event_input_info gpio_keypad_keys_info = {
 	.info.func = gpio_event_input_func,
 	.info.event = gpio_input_event,
@@ -303,6 +403,11 @@ static void cleanup_driver_state(struct aah_io_driver_state *state)
 	if (state->dev_node_registered) {
 		misc_deregister(&state->dev_node);
 		state->dev_node_registered = 0;
+	}
+
+	if (state->event_filter_registered) {
+		input_unregister_handler(&state->event_filter_handler);
+		state->event_filter_registered = 0;
 	}
 
 	if (state->key_dev) {
@@ -358,6 +463,8 @@ static long aah_io_leddev_ioctl(struct file *file, unsigned int cmd,
 
 		/* reregister the gpio_event as a key if a code is provided. */
 		if (state->pdata->key_code) {
+			gpio_keypad_keys_info.info.func =
+					aah_io_gpio_event_input_func,
 			gpio_keypad_keys_map[0].code = state->pdata->key_code;
 			gpio_keypad_keys_info.type = EV_KEY;
 			state->key_dev = platform_device_register_data(NULL,
@@ -554,6 +661,25 @@ static int aah_io_probe(struct i2c_client *client,
 
 	dev_info(&client->dev, "lp5521 programmable led running");
 
+	init_timer(&state->timer);
+	state->timer.data = (unsigned long)state;
+	state->timer.function = aah_io_reset_timer;
+
+	state->event_filter_handler.name = "aah io event filter";
+	state->event_filter_handler.filter = aah_io_event_filter;
+	state->event_filter_handler.connect =
+			aah_io_event_filter_connect;
+	state->event_filter_handler.disconnect =
+			aah_io_event_filter_disconnect;
+	state->event_filter_handler.id_table = aah_io_event_filter_ids;
+
+	rc = input_register_handler(&state->event_filter_handler);
+	if (rc) {
+		pr_err("Failed to register event filter rc = %d", rc);
+		goto error;
+	}
+	state->event_filter_registered = 1;
+
 	/* allocate the gpio_input device */
 	gpio_keypad_keys_map[0].gpio = pdata->key_gpio;
 	state->key_dev = platform_device_register_data(NULL,
@@ -572,6 +698,7 @@ static int aah_io_probe(struct i2c_client *client,
 		pr_err("Failed to register LED device node (rc = %d)", rc);
 		goto error;
 	}
+	state->dev_node_registered = 1;
 
 	pr_info("AAH IO Driver loaded.\n");
 	g_state = state;
