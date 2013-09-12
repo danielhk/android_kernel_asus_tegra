@@ -64,6 +64,20 @@
 /* HDMI level shifter enable on SPDIF_IN - GPIO_PK6 */
 #define MOLLY_HDMI_LS_EN TEGRA_GPIO_PK6
 
+enum molly_rev {
+	MOLLY_REV_PROTO1 = 0x0,
+	MOLLY_REV_PROTO2 = 0x1,
+	MOLLY_REV_EVT1   = 0x2,
+	MOLLY_REV_EVT2   = 0x3,
+	MOLLY_REV_DVT1   = 0x4,
+	MOLLY_REV_DVT2   = 0x5,
+	MOLLY_REV_PVT    = 0x6,
+	MOLLY_REV_PROD   = 0x7,
+	MOLLY_REV_INVALID = 0xFF,
+};
+
+extern int molly_hw_rev;
+
 int molly_regulator_init(void);
 int molly_suspend_init(void);
 int molly_sdhci_init(void);

@@ -36,6 +36,7 @@
 #include <linux/spi/spi.h>
 #include <linux/tegra_uart.h>
 #include <linux/memblock.h>
+#include <linux/moduleparam.h>
 #include <linux/spi-tegra.h>
 #include <linux/rfkill-gpio.h>
 #include <linux/skbuff.h>
@@ -76,6 +77,38 @@
 #include "pm.h"
 #include "pm-irq.h"
 #include "common.h"
+
+int molly_hw_rev;
+module_param(molly_hw_rev, int, S_IRUGO);
+MODULE_PARM_DESC(molly_hw_rev, "hardware revision");
+
+static const char const *molly_hw_name[] = {
+    [MOLLY_REV_PROTO1] = "Molly PROTO1",
+    [MOLLY_REV_PROTO2] = "Molly PROTO2",
+    [MOLLY_REV_EVT1]   = "Molly EVT1",
+    [MOLLY_REV_EVT2]   = "Molly EVT2",
+    [MOLLY_REV_DVT1]   = "Molly DVT1",
+    [MOLLY_REV_DVT2]   = "Molly DVT2",
+    [MOLLY_REV_PVT]    = "Molly PVT",
+    [MOLLY_REV_PROD]   = "Molly PROD",
+};
+
+static const char *molly_hw_rev_name(void)
+{
+	int num = ARRAY_SIZE(molly_hw_name);
+
+	if (molly_hw_rev >= num ||
+	    !molly_hw_name[molly_hw_rev])
+		return "Molly unknown version";
+
+	return molly_hw_name[molly_hw_rev];
+}
+
+static void __init molly_init_hw_rev(void)
+{
+	pr_info("Molly HW revision: %02x (%s)\n",
+		molly_hw_rev, molly_hw_rev_name());
+}
 
 #if defined(CONFIG_BT_BLUESLEEP) || defined(CONFIG_BT_BLUESLEEP_MODULE)
 static struct rfkill_gpio_platform_data molly_bt_rfkill_pdata = {
@@ -829,6 +862,7 @@ static void __init molly_spi_init(void)
 
 static void __init tegra_molly_init(void)
 {
+	molly_init_hw_rev();
 	tegra_clk_init_from_table(molly_clk_init_table);
 	tegra_clk_verify_parents();
 	tegra_soc_device_init("molly");

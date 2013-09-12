@@ -149,16 +149,8 @@ static __initdata struct tegra_pingroup_config molly_pinmux_common[] = {
 	GPIO_PINMUX(SDMMC3_CLK_LB_OUT, PULL_UP, NORMAL, INPUT, DISABLE),
 	/* ENET_RESET_N_3V3 */
 	GPIO_PINMUX(SDMMC3_CLK_LB_IN, NORMAL, NORMAL, OUTPUT, DISABLE),
-	/* BOARD_ID0 */
-	GPIO_PINMUX(KB_COL3, PULL_UP, NORMAL, INPUT, DISABLE),
-	/* BOARD_ID1 */
-	GPIO_PINMUX(KB_COL4, PULL_UP, NORMAL, INPUT, DISABLE),
 	/* UI_SWITCH */
 	GPIO_PINMUX(KB_COL5, PULL_UP, NORMAL, INPUT, DISABLE),
-	/* BOARD_ID2 */
-	GPIO_PINMUX(KB_COL6, PULL_UP, NORMAL, INPUT, DISABLE),
-	/* BOARD_ID3 */
-	GPIO_PINMUX(KB_COL7, PULL_UP, NORMAL, INPUT, DISABLE),
 	/* BT_WL_OSC_SLP */
 	GPIO_PINMUX(CLK3_REQ, PULL_UP, NORMAL, OUTPUT, DISABLE),
 	/* BT_TX_PWR */
@@ -266,6 +258,19 @@ static __initdata struct tegra_pingroup_config unused_pins_lowpower[] = {
 	UNUSED_PINMUX(GMI_WAIT),
 	UNUSED_PINMUX(SDMMC1_WP_N),
 	UNUSED_PINMUX(KB_COL2),
+	/* BOARD_ID0 - make unused (pull_down) to save power,
+	   we read in bootloader */
+	UNUSED_PINMUX(KB_COL3),
+	/* BOARD_ID1 - make unused (pull_down) to save power,
+	   we read in bootloader */
+	UNUSED_PINMUX(KB_COL4),
+	/* BOARD_ID2 - make unused (pull_down) to save power,
+	   we read in bootloader */
+	UNUSED_PINMUX(KB_COL6),
+	/* BOARD_ID3 - make unused (pull_down) to save power,
+	   we read in bootloader */
+	UNUSED_PINMUX(KB_COL7),
+
 	UNUSED_PINMUX(KB_ROW0),
 	UNUSED_PINMUX(KB_ROW1),
 	UNUSED_PINMUX(KB_ROW10),
@@ -346,10 +351,11 @@ static struct gpio_init_pin_info init_gpio_mode_molly_common[] = {
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PC7, true, 0),
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PCC5, false, 0), /* CLK2_REQ - WLAN_EN */
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PV3, false, 0),
-	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PQ3, false, 0),
-	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PQ5, true, 0),
-	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PQ6, false, 0),
-	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PQ7, false, 0),
+	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PQ3, true, 0), /* BOARD_ID0 */
+	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PQ4, true, 0), /* BOARD_ID1 */
+	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PQ5, true, 0), /* UI_SWITCH */
+	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PQ6, true, 0), /* BOARD_ID3 */
+	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PQ7, true, 0), /* BOARD_ID4 */
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PR3, true, 0),
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PR4, true, 0),
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PR5, false, 0),
