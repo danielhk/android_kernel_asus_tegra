@@ -110,109 +110,6 @@ static void __init molly_init_hw_rev(void)
 		molly_hw_rev, molly_hw_rev_name());
 }
 
-#if defined(CONFIG_BT_BLUESLEEP) || defined(CONFIG_BT_BLUESLEEP_MODULE)
-static struct rfkill_gpio_platform_data molly_bt_rfkill_pdata = {
-		.name           = "bt_rfkill",
-		.shutdown_gpio  = TEGRA_GPIO_PQ7,
-		.reset_gpio	= TEGRA_GPIO_PQ6,
-		.type           = RFKILL_TYPE_BLUETOOTH,
-};
-
-static struct platform_device molly_bt_rfkill_device = {
-	.name = "rfkill_gpio",
-	.id             = -1,
-	.dev = {
-		.platform_data = &molly_bt_rfkill_pdata,
-	},
-};
-
-static struct resource molly_bluesleep_resources[] = {
-	[0] = {
-		.name = "gpio_host_wake",
-			.start  = TEGRA_GPIO_PU6,
-			.end    = TEGRA_GPIO_PU6,
-			.flags  = IORESOURCE_IO,
-	},
-	[1] = {
-		.name = "gpio_ext_wake",
-			.start  = TEGRA_GPIO_PEE1,
-			.end    = TEGRA_GPIO_PEE1,
-			.flags  = IORESOURCE_IO,
-	},
-	[2] = {
-		.name = "host_wake",
-			.flags  = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE,
-	},
-};
-
-static struct platform_device molly_bluesleep_device = {
-	.name           = "bluesleep",
-	.id             = -1,
-	.num_resources  = ARRAY_SIZE(molly_bluesleep_resources),
-	.resource       = molly_bluesleep_resources,
-};
-
-static noinline void __init molly_setup_bt_rfkill(void)
-{
-	platform_device_register(&molly_bt_rfkill_device);
-}
-
-static noinline void __init molly_setup_bluesleep(void)
-{
-	molly_bluesleep_resources[2].start =
-		molly_bluesleep_resources[2].end =
-			gpio_to_irq(TEGRA_GPIO_PU6);
-	platform_device_register(&molly_bluesleep_device);
-	return;
-}
-#elif defined CONFIG_BLUEDROID_PM
-static struct resource molly_bluedroid_pm_resources[] = {
-	[0] = {
-		.name   = "shutdown_gpio",
-		.start  = TEGRA_GPIO_PQ7,
-		.end    = TEGRA_GPIO_PQ7,
-		.flags  = IORESOURCE_IO,
-	},
-	[1] = {
-		.name = "host_wake",
-		.flags  = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE,
-	},
-	[2] = {
-		.name = "gpio_ext_wake",
-		.start  = TEGRA_GPIO_PEE1,
-		.end    = TEGRA_GPIO_PEE1,
-		.flags  = IORESOURCE_IO,
-	},
-	[3] = {
-		.name = "gpio_host_wake",
-		.start  = TEGRA_GPIO_PU6,
-		.end    = TEGRA_GPIO_PU6,
-		.flags  = IORESOURCE_IO,
-	},
-	[4] = {
-		.name = "reset_gpio",
-		.start  = TEGRA_GPIO_PQ6,
-		.end    = TEGRA_GPIO_PQ6,
-		.flags  = IORESOURCE_IO,
-	},
-};
-
-static struct platform_device molly_bluedroid_pm_device = {
-	.name = "bluedroid_pm",
-	.id             = 0,
-	.num_resources  = ARRAY_SIZE(molly_bluedroid_pm_resources),
-	.resource       = molly_bluedroid_pm_resources,
-};
-
-static noinline void __init molly_setup_bluedroid_pm(void)
-{
-	molly_bluedroid_pm_resources[1].start =
-		molly_bluedroid_pm_resources[1].end =
-				gpio_to_irq(TEGRA_GPIO_PU6);
-	platform_device_register(&molly_bluedroid_pm_device);
-}
-#endif
-
 static __initdata struct tegra_clk_init_table molly_clk_init_table[] = {
 	/* name		parent		rate		enabled */
 	{ "pll_m",	NULL,		0,		false},
@@ -886,12 +783,6 @@ static void __init tegra_molly_init(void)
 	molly_edp_init();
 	molly_panel_init();
 	molly_pmon_init();
-#if defined(CONFIG_BT_BLUESLEEP) || defined(CONFIG_BT_BLUESLEEP_MODULE)
-	molly_setup_bluesleep();
-	molly_setup_bt_rfkill();
-#elif defined CONFIG_BLUEDROID_PM
-	molly_setup_bluedroid_pm();
-#endif
 	tegra_release_bootloader_fb();
 #ifdef CONFIG_TEGRA_WDT_RECOVERY
 	tegra_wdt_recovery_init();
