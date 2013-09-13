@@ -1474,29 +1474,6 @@ int tegra_hdmi_audio_null_sample_inject(bool on)
 }
 EXPORT_SYMBOL(tegra_hdmi_audio_null_sample_inject);
 
-int tegra_hdmi_setup_hda_presence()
-{
-	struct tegra_dc_hdmi_data *hdmi = dc_hdmi;
-
-	if (!hdmi)
-		return -EAGAIN;
-
-	if (hdmi->clk_enabled && hdmi->eld_retrieved) {
-		/* If HDA_PRESENCE is already set reset it */
-		tegra_dc_unpowergate_locked(hdmi->dc);
-		if (tegra_hdmi_readl(hdmi,
-				     HDMI_NV_PDISP_SOR_AUDIO_HDA_PRESENSE_0))
-			tegra_hdmi_writel(hdmi, 0,
-				     HDMI_NV_PDISP_SOR_AUDIO_HDA_PRESENSE_0);
-
-		tegra_dc_hdmi_setup_eld_buff(hdmi->dc);
-		tegra_dc_powergate_locked(hdmi->dc);
-		return 0;
-	}
-	return -ENODEV;
-
-}
-EXPORT_SYMBOL(tegra_hdmi_setup_hda_presence);
 #endif
 
 static void tegra_dc_hdmi_write_infopack(struct tegra_dc *dc, int header_reg,
