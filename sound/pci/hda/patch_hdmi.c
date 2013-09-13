@@ -32,6 +32,7 @@
 #include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/module.h>
+#include <linux/mutex.h>
 #include <sound/core.h>
 #include <sound/jack.h>
 
@@ -46,6 +47,9 @@
 static bool static_hdmi_pcm;
 module_param(static_hdmi_pcm, bool, 0644);
 MODULE_PARM_DESC(static_hdmi_pcm, "Don't restrict PCM parameters per ELD info");
+
+/* Used to avoid race conditions when reading ELD data. */
+static DEFINE_MUTEX(eld_mutex);
 
 /*
  * The HDMI/DisplayPort configuration can be highly dynamic. A graphics device
@@ -782,21 +786,6 @@ static void hdmi_intrinsic_event(struct hda_codec *codec, unsigned int res)
 
 	hdmi_present_sense(&spec->pins[pin_idx], 1);
 
-#ifdef CONFIG_SND_HDA_PLATFORM_NVIDIA_TEGRA
-	if (((codec->preset->id == 0x10de0020) ||
-		(codec->preset->id == 0x10de0022))) {
-		struct hdmi_eld *eld = &spec->pins[pin_idx].sink_eld;
-
-		/*
-		 * HDMI sink's ELD info cannot always be retrieved for now, e.g.
-		 * in console or for audio devices. Assume the highest speakers
-		 * configuration, to _not_ prohibit multi-channel audio playback
-		 */
-		if (!eld->spk_alloc)
-			eld->spk_alloc = 0xffff;
-	}
-#endif
-
 	snd_hda_jack_report_sync(codec);
 }
 
@@ -906,18 +895,19 @@ static int hdmi_pcm_open(struct hda_pcm_stream *hinfo,
 	eld = &per_pin->sink_eld;
 
 #ifdef CONFIG_SND_HDA_PLATFORM_NVIDIA_TEGRA
-	if ((((codec->preset->id == 0x10de0020) ||
-		(codec->preset->id == 0x10de0022))) &&
-		(!eld->monitor_present || !eld->lpcm_sad_ready)) {
-		if (!eld->monitor_present) {
-			if (tegra_hdmi_setup_hda_presence() < 0) {
-				snd_printk(KERN_WARNING
-					   "HDMI: No HDMI device connected\n");
-				return -ENODEV;
-			}
-		}
+	if (((codec->preset->id == 0x10de0020) ||
+		(codec->preset->id == 0x10de0022))) {
+		/* Fallback in case the presence interrupt went unnoticed.
+		 * This seems to happen sometimes. In this case, sense the
+		 * monitor manually */
+		snd_hda_jack_set_dirty_all(codec);
+		hdmi_present_sense(per_pin, 0);
+		snd_hda_jack_report_sync(codec);
+
+		/* From here ELD should be ready. If it's not, ask user-space
+		 * to try again later */
 		if (!eld->lpcm_sad_ready)
-			return -ENODEV;
+			return -EAGAIN;
 	}
 #endif
 
@@ -977,6 +967,7 @@ static int hdmi_pcm_open(struct hda_pcm_stream *hinfo,
 
 	snd_pcm_hw_constraint_step(substream->runtime, 0,
 				   SNDRV_PCM_HW_PARAM_CHANNELS, 2);
+
 	return 0;
 }
 
@@ -1020,6 +1011,15 @@ static void hdmi_present_sense(struct hdmi_spec_per_pin *per_pin, int repoll)
 	int present = snd_hda_pin_sense(codec, pin_nid);
 	bool eld_valid = false;
 
+	mutex_lock(&eld_mutex);
+
+	/* Status unchanged? We might already be using the ELD data, so
+	 * don't mess with it */
+	if (eld->monitor_present == (!!(present & AC_PINSENSE_PRESENCE))) {
+		mutex_unlock(&eld_mutex);
+		return;
+	}
+
 	memset(eld, 0, offsetof(struct hdmi_eld, eld_buffer));
 
 	eld->monitor_present	= !!(present & AC_PINSENSE_PRESENCE);
@@ -1040,21 +1040,6 @@ static void hdmi_present_sense(struct hdmi_spec_per_pin *per_pin, int repoll)
 					   msecs_to_jiffies(300));
 		}
 	}
-}
-
-static void hdmi_repoll_eld(struct work_struct *work)
-{
-	struct hdmi_spec_per_pin *per_pin =
-	container_of(to_delayed_work(work), struct hdmi_spec_per_pin, work);
-#ifdef CONFIG_SND_HDA_PLATFORM_NVIDIA_TEGRA
-	struct hda_codec *codec = per_pin->codec;
-	struct hdmi_eld *eld = &per_pin->sink_eld;
-#endif
-
-	if (per_pin->repoll_count++ > 6)
-		per_pin->repoll_count = 0;
-
-	hdmi_present_sense(per_pin, per_pin->repoll_count);
 
 #ifdef CONFIG_SND_HDA_PLATFORM_NVIDIA_TEGRA
 	if ((codec->preset->id == 0x10de0020) ||
@@ -1068,6 +1053,18 @@ static void hdmi_repoll_eld(struct work_struct *work)
 			eld->spk_alloc = 0xffff;
 	}
 #endif
+	mutex_unlock(&eld_mutex);
+}
+
+static void hdmi_repoll_eld(struct work_struct *work)
+{
+	struct hdmi_spec_per_pin *per_pin =
+	container_of(to_delayed_work(work), struct hdmi_spec_per_pin, work);
+
+	if (per_pin->repoll_count++ > 6)
+		per_pin->repoll_count = 0;
+
+	hdmi_present_sense(per_pin, per_pin->repoll_count);
 }
 
 static int hdmi_add_pin(struct hda_codec *codec, hda_nid_t pin_nid)
