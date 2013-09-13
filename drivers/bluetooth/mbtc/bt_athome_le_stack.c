@@ -1708,12 +1708,17 @@ device_handled:
 				handle, evt->status,
 				evt->encrypt);
 			if (evt->encrypt) {
+				struct athome_bt_known_remote *remote;
 
 				if (conns[i].state ==
 						CONN_STATE_ENCRYPTING) {
 					del_timer((struct timer_list*)
 							&conns[i].timer);
 					conns[i].state = CONN_STATE_DATA;
+					remote = athome_bt_find_known(
+							&conns[i].MAC);
+					if (remote && remote->bind_mode)
+						remote->bind_mode = 0;
 				} else {
 
 					aahlog("Encr event  for invalid "
