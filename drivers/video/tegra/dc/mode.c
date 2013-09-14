@@ -258,6 +258,9 @@ int tegra_dc_program_mode(struct tegra_dc *dc, struct tegra_dc_mode *mode)
 	 * all circumstances, write N+2 to SHIFT_CLK_DIVIDER and activate it.
 	 * After 2us delay, write the target values to it. */
 #if defined(CONFIG_ARCH_TEGRA_11x_SOC) || defined(CONFIG_ARCH_TEGRA_14x_SOC)
+	/* assert no overflow, should be rare */
+	BUG_ON(SHIFT_CLK_DIVIDER(div + 2) != (div + 2));
+
 	tegra_dc_writel(dc, PIXEL_CLK_DIVIDER_PCD1 | SHIFT_CLK_DIVIDER(div + 2),
 			DC_DISP_DISP_CLOCK_CONTROL);
 	tegra_dc_writel(dc, GENERAL_UPDATE, DC_CMD_STATE_CONTROL);
