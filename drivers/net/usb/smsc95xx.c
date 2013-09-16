@@ -348,6 +348,7 @@ static int smsc95xx_write_reg_async(struct usbnet *dev, u16 index, u32 *data)
 	usb_context->req.wValue = 00;
 	usb_context->req.wIndex = cpu_to_le16(index);
 	usb_context->req.wLength = cpu_to_le16(size);
+	usb_context->dev = dev;
 
 	usb_fill_control_urb(urb, dev->udev, usb_sndctrlpipe(dev->udev, 0),
 		(void *)&usb_context->req, data, size,
