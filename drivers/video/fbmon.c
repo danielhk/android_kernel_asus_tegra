@@ -1194,12 +1194,6 @@ void fb_edid_add_monspecs(unsigned char *edid, struct fb_monspecs *specs)
 	kfree(specs->modedb);
 	specs->modedb = m;
 	specs->modedb_len = specs->modedb_len + num + svd_n + j;
-
-	DPRINTK("Completed modedb:\n");
-	for (j = 0; j < specs->modedb_len; j++) {
-		DPRINTK("\tmodedb[%d]: %ux%u@%u, flag 0x%x\n",
-			j, m[j].xres, m[j].yres, m[j].refresh, m[j].flag);
-	}
 }
 
 /*
