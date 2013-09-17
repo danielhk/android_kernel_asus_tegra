@@ -130,8 +130,9 @@ static s32 show_voltage(struct device *dev,
 
 	mutex_lock(&data->mutex);
 	if (data->shutdown_complete) {
-		ret = -ENODEV;
-		goto error;
+		dev_info(dev, "%s: called after shutdown\n", __func__);
+		mutex_unlock(&data->mutex);
+		return -ENODEV;
 	}
 	index = attr->index;
 	bus_volt_reg_addr = (INA3221_BUS_VOL_CHAN1 + (index * 2));
@@ -167,8 +168,8 @@ static s32 show_voltage(struct device *dev,
 	mutex_unlock(&data->mutex);
 	return sprintf(buf, "%d mV\n", voltage_mV);
 error:
+	dev_err(dev, "%s: failed (%d)\n", __func__, ret);
 	mutex_unlock(&data->mutex);
-	dev_err(dev, "%s: failed\n", __func__);
 	return ret;
 }
 
@@ -187,8 +188,9 @@ static s32 show_current(struct device *dev,
 
 	mutex_lock(&data->mutex);
 	if (data->shutdown_complete) {
-		ret = -ENODEV;
-		goto error;
+		dev_info(dev, "%s: called after shutdown\n", __func__);
+		mutex_unlock(&data->mutex);
+		return -ENODEV;
 	}
 	index = attr->index;
 	shunt_volt_reg_addr = (INA3221_SHUNT_VOL_CHAN1 + (index * 2));
@@ -228,8 +230,8 @@ static s32 show_current(struct device *dev,
 	mutex_unlock(&data->mutex);
 	return sprintf(buf, "%d mA\n", current_mA);
 error:
+	dev_err(dev, "%s: failed (%d)\n", __func__, ret);
 	mutex_unlock(&data->mutex);
-	dev_err(dev, "%s: failed\n", __func__);
 	return ret;
 }
 
@@ -287,8 +289,9 @@ static s32 show_power(struct device *dev,
 
 	mutex_lock(&data->mutex);
 	if (data->shutdown_complete) {
-		ret = -ENODEV;
-		goto error;
+		dev_info(dev, "%s: called after shutdown\n", __func__);
+		mutex_unlock(&data->mutex);
+		return -ENODEV;
 	}
 	index = attr->index;
 	bus_volt_reg_addr = (INA3221_BUS_VOL_CHAN1 + (index * 2));
@@ -322,8 +325,8 @@ static s32 show_power(struct device *dev,
 	mutex_unlock(&data->mutex);
 	return sprintf(buf, "%d mW\n", power_mW);
 error:
+	dev_err(dev, "%s: failed (%d)\n", __func__, ret);
 	mutex_unlock(&data->mutex);
-	dev_err(dev, "%s: failed\n", __func__);
 	return ret;
 }
 
@@ -340,8 +343,9 @@ static s32 show_power2(struct device *dev,
 
 	mutex_lock(&data->mutex);
 	if (data->shutdown_complete) {
-		ret = -ENODEV;
-		goto error;
+		dev_info(dev, "%s: called after shutdown\n", __func__);
+		mutex_unlock(&data->mutex);
+		return -ENODEV;
 	}
 
 	/*return 0 if INA is off*/
@@ -364,8 +368,8 @@ static s32 show_power2(struct device *dev,
 	mutex_unlock(&data->mutex);
 	return sprintf(buf, "%d mW\n", power_mW);
 error:
+	dev_err(dev, "%s: failed (%d)\n", __func__, ret);
 	mutex_unlock(&data->mutex);
-	dev_err(dev, "%s: failed\n", __func__);
 	return ret;
 }
 
@@ -558,6 +562,7 @@ static int __devexit ina3221_remove(struct i2c_client *client)
 static void ina3221_shutdown(struct i2c_client *client)
 {
 	struct ina3221_data *data = i2c_get_clientdata(client);
+	unregister_hotcpu_notifier(&(data->nb));
 	mutex_lock(&data->mutex);
 	__locked_power_down_ina3221(client);
 	data->shutdown_complete = 1;
