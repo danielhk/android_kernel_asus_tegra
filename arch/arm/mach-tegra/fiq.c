@@ -1,9 +1,11 @@
 /*
  * Copyright (C) 2010 Google, Inc.
+ * Copyright (c) 2013, NVIDIA CORPORATION.  All rights reserved.
  *
  * Author:
  *	Brian Swetland <swetland@google.com>
  *	Iliyan Malchev <malchev@google.com>
+ *	Lucas Dai <lucasd@nvidia.com>
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -82,7 +84,16 @@ static void tegra_fiq_unmask(struct irq_data *d)
 
 void tegra_fiq_enable(int irq)
 {
+#if defined(CONFIG_ARCH_TEGRA_3x_SOC) || \
+	defined(CONFIG_ARCH_TEGRA_2x_SOC)
+	/* GIC CPU I/F for Tegra2 and Tegra3 */
 	void __iomem *base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x100);
+#elif defined(CONFIG_ARCH_TEGRA_11x_SOC)
+	/* GIC CPU I/F for Tegra4 */
+	void __iomem *base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x2000);
+#else
+#error Unknown Tegra architecture, unable to set GIC base.
+#endif
 	/* enable FIQ */
 	u32 val = readl(base + GIC_CPU_CTRL);
 	val &= ~8; /* pass FIQs through */
