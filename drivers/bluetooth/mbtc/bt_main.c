@@ -2297,6 +2297,10 @@ bt_set_power(int on, unsigned long msec)
 	return 0;
 }
 
+/*
+ * Note that this handler will not be called.
+ * The irq is only used as a wakeup source, and never enabled.
+ */
 static irqreturn_t
 bt_hostwake_isr(int irq, void *dev_id)
 {
@@ -2310,11 +2314,9 @@ bt_enable_hostwake_irq(bool on)
 	if (bt_irqres && irq_registered) {
 		PRINTM(INTR, "enable_hostwake_irq=%d\n", on);
 		if (on) {
-			enable_irq(bt_irqres->start);
 			enable_irq_wake(bt_irqres->start);
 		} else {
 			disable_irq_wake(bt_irqres->start);
-			disable_irq(bt_irqres->start);
 		}
 	}
 }
@@ -2331,8 +2333,8 @@ bt_register_hostwake_irq(void *handle)
 			PRINTM(ERROR, "Couldn't acquire BT_HOST_WAKE IRQ\n");
 		else {
 			irq_registered = 1;
-			enable_irq_wake(bt_irqres->start);
-			bt_enable_hostwake_irq(FALSE);
+			/* we never enable this irq */
+			disable_irq(bt_irqres->start);
 		}
 	}
 }
@@ -2372,9 +2374,6 @@ bt_probe(struct platform_device *pdev)
 static int
 bt_remove(struct platform_device *pdev)
 {
-	struct mbtc_platform_data *bt_ctrl =
-		(struct mbtc_platform_data *)(pdev->dev.platform_data);
-
 	ENTER();
 
 	if (bt_irqres && irq_registered) {
