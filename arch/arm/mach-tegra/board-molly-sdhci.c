@@ -81,13 +81,13 @@ static struct platform_device molly_wifi_device = {
 };
 
 static struct mbtc_platform_data molly_mbtc_control = {
-	.gpio_gap	= 0x0480, /* GPIO 4, GAP 0x80 (128 ms) */
+	.gpio_gap	= 0x04ff, /* GPIO 4, GAP 0xff (level) */
 };
 
 static struct resource bt_resource[] = {
 	[0] = {
 		.name	= "mrvl_bt_irq",
-		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWEDGE,
+		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWLEVEL,
 	},
 };
 
