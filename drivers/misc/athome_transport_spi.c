@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, Google Inc. All rights reserved.
+ * Copyright (c) 2013, Google Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -17,7 +17,6 @@
  * MA 02111-1307 USA
  */
 
-#define pr_fmt(fmt) ATHOME_RADIO_MOD_LOG_NAME "-spi: " fmt
 #include <linux/spi/spi.h>
 #include <linux/gpio.h>
 #include <linux/mutex.h>
@@ -31,7 +30,6 @@
 #include <linux/cdev.h>
 #include <linux/fs.h>
 #include <linux/delay.h>
-#include "athome_transport.h"
 #include <linux/athome_radio.h>
 
 /*  */
@@ -43,19 +41,65 @@
 us keep cs low while we do some work and start another transaction, but that
 is exactly what we need here */
 
-static struct spi_device *spi_dev;
-static int cs_gpio;
+static int athome_xfer_tx(struct device *dev, const uint8_t *msg, size_t len);
+static int athome_xfer_rx(struct device *dev, uint8_t *buf, size_t buf_len);
 
-static int __devinit athome_radio_spi_probe(struct spi_device *spi_device)
+static struct athome_transport_ops xfer_ops = {
+	.xfer_tx = athome_xfer_tx,
+	.xfer_rx = athome_xfer_rx,
+};
+
+
+static int __devinit athome_radio_spi_probe(struct spi_device *spi)
 {
-	spi_dev = spi_device;
+	int rc;
+	struct athome_platform_data *pd;
+
+	if (!spi) {
+		pr_err("%s: no spi_dev\n", __func__);
+		return -ENODEV;
+	}
+
+	pd = dev_get_platdata(&spi->dev);
+	if (!pd) {
+		dev_alert(&spi->dev, "no platform data.\n");
+		return -ENODEV;
+	}
+
+	/* request CS gpio */
+	rc = gpio_request(pd->gpio_spi_cs, ATHOME_RADIO_MOD_NAME " cs");
+	if (rc) {
+		dev_alert(&spi->dev, "failed (%d) to request cs gpio (%d)\n",
+		          rc, pd->gpio_spi_cs);
+		return rc;
+	}
+	gpio_direction_output(pd->gpio_spi_cs, 1);
+
+	rc = athome_radio_init (&spi->dev, pd, &xfer_ops);
+	if (rc) {
+		dev_alert(&spi->dev, "failed (%d) to init driver core\n", rc);
+		gpio_free(pd->gpio_spi_cs);
+	}
+
+	return rc;
+}
+
+static int __exit athome_radio_spi_remove(struct spi_device *spi)
+{
+	struct athome_platform_data *pd = dev_get_platdata (&spi->dev);
+	athome_radio_destroy (&spi->dev);
+	gpio_free(pd->gpio_spi_cs);
 	return 0;
 }
 
-static int athome_radio_spi_remove(struct spi_device *spi_device)
+int athome_radio_spi_suspend(struct spi_device *spi, pm_message_t mesg)
 {
-	spi_dev = NULL;
-	return 0;
+    return athome_radio_suspend(&spi->dev, mesg);
+}
+
+int athome_radio_spi_resume(struct spi_device *spi)
+{
+    return athome_radio_resume(&spi->dev);
 }
 
 static struct spi_driver athome_radio_spi_driver = {
@@ -65,56 +109,32 @@ static struct spi_driver athome_radio_spi_driver = {
 	},
 	.probe = athome_radio_spi_probe,
 	.remove = athome_radio_spi_remove,
+	.suspend = athome_radio_spi_suspend,
+	.resume = athome_radio_spi_resume,
 };
 
+#define MIN_CS_TO_XFER_DELAY     10 /* min time between CS asserted and XFER */
+#define MIN_XFER_TO_XFER_DELAY   60 /* min time between sequential XFERs */
 
-int __init athome_transport_open(struct athome_platform_data *pdata)
+static int _athome_xfer_start(struct spi_device *spi)
 {
-	int ret;
-
-	cs_gpio = pdata->gpio_spi_cs;
-
-	ret = gpio_request(cs_gpio, ATHOME_RADIO_MOD_NAME " cs");
-	if (ret) {
-		pr_alert("Failed gpio_request err %d\n", ret);
-		return ret;
-	}
-	gpio_direction_output(cs_gpio, 1);
-
-	ret = spi_register_driver(&athome_radio_spi_driver);
-	if (ret < 0) {
-		pr_alert("Failed to register driver with err %d\n", ret);
-		gpio_free(cs_gpio);
-	}
-
+	struct athome_platform_data *pd = dev_get_platdata(&spi->dev);
+	int ret = spi_bus_lock(spi->master);
+	gpio_set_value(pd->gpio_spi_cs, 0);
+	udelay(MIN_CS_TO_XFER_DELAY);
 	return ret;
 }
 
-void athome_transport_close(void)
+static int _athome_xfer_stop(struct spi_device *spi)
 {
-	spi_unregister_driver(&athome_radio_spi_driver);
-	gpio_free(cs_gpio);
+	struct athome_platform_data *pd = dev_get_platdata(&spi->dev);
+	gpio_set_value(pd->gpio_spi_cs, 1);
+	udelay(MIN_XFER_TO_XFER_DELAY);
+	return spi_bus_unlock(spi->master);
 }
 
-static int _athome_xfer_start(void)
-{
-	int ret = spi_bus_lock(spi_dev->master);
-	gpio_set_value(cs_gpio, 0);
-	udelay(10);
-	return ret;
-}
-
-static int _athome_xfer_stop(void)
-{
-	gpio_set_value(cs_gpio, 1);
-	udelay(60);
-	return spi_bus_unlock(spi_dev->master);
-}
-
-/*
- *
- */
-static int _athome_xfer(const uint8_t *tx, uint8_t *rx, size_t len)
+static int _athome_xfer(struct spi_device *spi,
+                        const uint8_t *tx, uint8_t *rx, size_t len)
 {
 	struct spi_message m;
 	struct spi_transfer t = {0};
@@ -126,28 +146,22 @@ static int _athome_xfer(const uint8_t *tx, uint8_t *rx, size_t len)
 	spi_message_init(&m);
 	spi_message_add_tail(&t, &m);
 
-	return spi_sync_locked(spi_dev, &m);
+	return spi_sync_locked(spi, &m);
 }
 
-
-/*
- *
- */
-int athome_xfer_tx(const uint8_t *msg, size_t len)
+static int athome_xfer_tx(struct device *dev, const uint8_t *msg, size_t len)
 {
 	int rc, ret;
 	uint8_t hdr[3];
 	struct spi_message m;
 	struct spi_transfer t0 = {0};
 	struct spi_transfer t1 = {0};
+	struct spi_device *spi = to_spi_device(dev);
 
-	if (!spi_dev) {
-		pr_err("%s: no spi_dev\n", __func__);
-		return -ENODEV;
-	}
+	BUG_ON(!spi);
 
 	/* grab the bus and assert CS */
-	rc = _athome_xfer_start();
+	rc = _athome_xfer_start(spi);
 	if (rc)
 		return rc;
 
@@ -168,32 +182,27 @@ int athome_xfer_tx(const uint8_t *msg, size_t len)
 	spi_message_add_tail(&t0, &m);
 	spi_message_add_tail(&t1, &m);
 
-	ret = spi_sync_locked(spi_dev, &m);
+	ret = spi_sync_locked(spi, &m);
 
 	/* Release the bus, deassert CS */
-	rc =_athome_xfer_stop();
+	rc =_athome_xfer_stop(spi);
 	if (rc)
 		return rc;
 
 	return ret;
 }
 
-/*
- *
- */
-int athome_xfer_rx(uint8_t *buf, size_t buf_len)
+static int athome_xfer_rx(struct device *dev, uint8_t *buf, size_t buf_len)
 {
 	int rc, ret;
 	uint8_t hdr[3];
 	size_t msg_len;
+	struct spi_device *spi = to_spi_device(dev);
 
-	if (!spi_dev) {
-		pr_err("%s: no spi_dev\n", __func__);
-		return -ENODEV;
-	}
+	BUG_ON(!spi);
 
 	/* grab the bus and assert CS */
-	rc = _athome_xfer_start();
+	rc = _athome_xfer_start(spi);
 	if (rc)
 		return rc;
 
@@ -202,7 +211,7 @@ int athome_xfer_rx(uint8_t *buf, size_t buf_len)
 	hdr[1] = 0;
 	hdr[2] = 0;
 
-	rc = _athome_xfer(hdr, hdr, 3);
+	rc = _athome_xfer(spi, hdr, hdr, 3);
 	if (rc) {
 		ret = rc;
 		goto done;
@@ -214,11 +223,11 @@ int athome_xfer_rx(uint8_t *buf, size_t buf_len)
 		if (likely(msg_len <= buf_len)) {
 			/* read message */
 			ret = msg_len;
-			rc = _athome_xfer(NULL, buf, msg_len);
+			rc = _athome_xfer(spi, NULL, buf, msg_len);
 		} else { /* message is bigger then buffer */
 			/* read maximum length and discard it */
 			ret = 0;
-			rc = _athome_xfer(NULL, buf, buf_len);
+			rc = _athome_xfer(spi, NULL, buf, buf_len);
 		}
 	} else { /* not an valid RX msg */
 		if (hdr[0] == XFER_TYPE_NONE) { /* looks like no msg was queued */
@@ -227,7 +236,7 @@ int athome_xfer_rx(uint8_t *buf, size_t buf_len)
 		} else { /* malformatted message */
 			/* read maximum length and discard it */
 			ret = 0;
-			rc = _athome_xfer(NULL, buf, buf_len);
+			rc = _athome_xfer(spi, NULL, buf, buf_len);
 		}
 	}
 	if (rc)
@@ -236,15 +245,29 @@ int athome_xfer_rx(uint8_t *buf, size_t buf_len)
 done:
 
 	/* Release the bus, deassert CS */
-	rc =_athome_xfer_stop();
+	rc =_athome_xfer_stop(spi);
 	if (rc)
 		return rc;
 
 	return ret;
 }
 
+static int __init athome_radio_spi_init(void)
+{
+	return spi_register_driver(&athome_radio_spi_driver);
+}
+
+static void __exit athome_radio_spi_exit(void)
+{
+	return spi_unregister_driver(&athome_radio_spi_driver);
+}
+
+module_init(athome_radio_spi_init);
+module_exit(athome_radio_spi_exit);
 
 
+MODULE_DESCRIPTION("SPI transport of the @home radio module driver");
+MODULE_LICENSE("GPL");
 
 
 

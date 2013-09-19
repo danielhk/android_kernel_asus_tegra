@@ -31,12 +31,11 @@
 #include <linux/atomic.h>
 #include <linux/athome_radio.h>
 #include <linux/miscdevice.h>
-#include <linux/platform_device.h>
 #include <linux/workqueue.h>
 #include <linux/poll.h>
 #include <linux/delay.h>
-
-#include "athome_transport.h"
+#include <linux/pm.h>
+#include <linux/pm_wakeup.h>
 
 /* comms config */
 #define RX_BUF_NUM      8
@@ -57,13 +56,19 @@ struct athome_msg {
 };
 
 struct athome_state {
-	struct miscdevice dev;
+	struct miscdevice misc_dev;
 	struct mutex tx_lock;
 	struct mutex rx_lock;
 
 	atomic_t opened;
 	int      gpio_irq;
 	int      gpio_rst;
+	bool     suspended;
+	int      awake_cnt;
+	spinlock_t   slock;
+
+	struct device   *owner_dev;
+	struct athome_transport_ops *xfer_ops;
 
 	struct workqueue_struct *workq;
 	struct work_struct       tx_work;
@@ -99,26 +104,65 @@ static void athome_radio_reset(struct athome_state *st)
 	udelay(100);
 }
 
+/*
+ *  Ref counted wrappers on top of pm_stay_awake/pm_relax pair
+ *
+ */
+static void _pm_lock(struct athome_state *st)
+{
+	unsigned long flags;
+	spin_lock_irqsave(&st->slock, flags);
+	if (st->awake_cnt++ == 0) {
+		pm_stay_awake(st->misc_dev.this_device);
+	}
+	spin_unlock_irqrestore(&st->slock, flags);
+}
+
+static void _pm_unlock(struct athome_state *st)
+{
+	unsigned long flags;
+
+	BUG_ON(st->awake_cnt == 0);
+
+	spin_lock_irqsave(&st->slock, flags);
+	if (--st->awake_cnt == 0) {
+		pm_relax(st->misc_dev.this_device);
+	}
+	spin_unlock_irqrestore(&st->slock, flags);
+}
+
 static void athome_radio_flush_nolock(struct athome_state *st, int tx, int rx)
 {
+	/*
+	 * This function is called with RX interrupt disabled,
+	 * workqueue flushed and all kinds of locks held so
+	 * we can directly modify counters.
+	 */
 	if (rx) {
 		memset(st->rx_msg, 0, sizeof(st->rx_msg));
+		st->awake_cnt -= atomic_read(&st->rx_num_used);
 		atomic_set(&st->rx_num_used, 0);
 		st->posRXW = st->posRXR;
 	}
 
 	if (tx) {
 		memset(st->tx_msg, 0, sizeof(st->tx_msg));
+		st->awake_cnt -= atomic_read(&st->tx_num_used);
 		atomic_set(&st->tx_num_used, 0);
 		st->posTXW = st->posTXR;
 	}
+
+	BUG_ON(st->awake_cnt < 0);
+
+	if (st->awake_cnt == 0)
+		pm_relax(st->misc_dev.this_device);
 }
 
 static int  athome_radio_open(struct inode *inode, struct file *filp)
 {
 	int ret = 0;
 	struct athome_state *st = container_of(filp->private_data,
-					       struct athome_state, dev);
+					       struct athome_state, misc_dev);
 
 	if (atomic_cmpxchg(&st->opened, 0, 1))
 		ret = -EBUSY;
@@ -196,6 +240,9 @@ static ssize_t athome_radio_read(struct file *filp, char __user *buff,
 
 	atomic_dec(&st->rx_num_used);
 
+	/* It is expected that caller holds wakelock before calling this */
+	_pm_unlock(st);
+
 	mutex_unlock(&st->rx_lock);
 
 	return copy_to_user(buff, msg.data, count) ? -EFAULT : count;
@@ -235,6 +282,9 @@ static ssize_t athome_radio_write(struct file *filp, const char __user *buf,
 		mutex_unlock(&st->tx_lock);
 		return -EFAULT;
 	}
+
+	/* tell pm we have work to do */
+	_pm_lock(st);
 
 	st->tx_msg[st->posTXW].len  = count;
 	st->tx_msg[st->posTXW].data = txbuf;
@@ -330,10 +380,9 @@ static void athome_radio_tx_work(struct work_struct *w)
 
 	msg = st->tx_msg[st->posTXR];
 
-	rc = athome_xfer_tx(msg.data, msg.len);
+	rc = st->xfer_ops->xfer_tx(st->owner_dev, msg.data, msg.len);
 	if (rc < 0) {
-		pr_alert("%s: TX xfer failed (%d)\n",
-		          ATHOME_RADIO_MOD_NAME, rc);
+		dev_alert(st->owner_dev, "TX xfer failed (%d)\n", rc);
 	}
 
 	st->tx_msg[st->posTXR].len  = 0;
@@ -349,6 +398,9 @@ static void athome_radio_tx_work(struct work_struct *w)
 
 	/* requeue ourself */
 	queue_work(st->workq, &st->tx_work);
+
+	/* tell pm we finished a piece of work */
+	_pm_unlock(st);
 }
 
 static void athome_radio_rx_work(struct work_struct *w)
@@ -363,9 +415,8 @@ Again:
 	/* Note: RX Interrupt is disabled */
 	if (gpio_get_value(st->gpio_irq)) {
 		/* interrupt line is not asserted */
-		pr_alert("%s: spurius interrupt\n", ATHOME_RADIO_MOD_NAME);
-		enable_irq(gpio_to_irq(st->gpio_irq));
-		return;
+		dev_alert(st->owner_dev, "spurius interrupt\n");
+		goto done;
 	}
 
 	/* we should always have at least one free buffer */
@@ -373,11 +424,10 @@ Again:
 
 	/* receive data */
 	rx_cnt++;
-	rc = athome_xfer_rx(rxbuf, MAX_MSG_SIZE);
+	rc = st->xfer_ops->xfer_rx(st->owner_dev, rxbuf, MAX_MSG_SIZE);
 	if (rc < 0) {
 		/* rx xfer failed */
-		pr_alert("%s: RX xfer failed (%d)\n",
-		          ATHOME_RADIO_MOD_NAME, rc);
+		dev_alert(st->owner_dev, "RX xfer failed (%d)\n", rc);
 		goto rx_done;
 	} else if (rc == 0) {
 		/* no data */
@@ -387,12 +437,14 @@ Again:
 	if (atomic_read(&st->rx_num_used) == RX_BUF_NUM-1) {
 		/* that was the last rx buffer, and since we will always need
 		   at least one, discard it */
-		pr_alert("%s: out of rx buffers. Discarding\n",
-		          ATHOME_RADIO_MOD_NAME);
+		dev_alert(st->owner_dev, "out of rx buffers. Discarding\n");
 		goto rx_done;
 	}
 
 	if (atomic_read(&st->opened)) {
+
+		/* tell pm we have some work to do */
+		_pm_lock(st);
 
 		st->rx_msg[st->posRXW].len  = rc;
 		st->rx_msg[st->posRXW].data = rxbuf;
@@ -415,19 +467,24 @@ rx_done:
 		} else {
 			/* reset chip */
 			athome_radio_reset(st);
-			pr_alert("%s: Too much work or IRQ line might be stuck."
-			         "Resetting radio\n", ATHOME_RADIO_MOD_NAME);
+			dev_alert(st->owner_dev,
+			         "Too much work or IRQ line might be stuck."
+			         "Resetting radio\n");
 		}
 	}
 
+done:
 	/* reenable irq */
 	enable_irq(gpio_to_irq(st->gpio_irq));
+	_pm_unlock (st); /* paired with _pm_lock in irq handler */
 	return;
 }
 
 static irqreturn_t athome_radio_irq(int irq, void *data)
 {
 	struct  athome_state *st = data;
+
+	_pm_lock(st);
 	disable_irq_nosync(gpio_to_irq(st->gpio_irq));
 	queue_work(st->workq, &st->rx_work);
 
@@ -450,7 +507,7 @@ static void athome_radio_gpio_free(struct  athome_state *st)
 	gpio_free(st->gpio_rst);
 }
 
-static int __init athome_radio_gpio_init(struct  athome_state *st)
+static int __devinit athome_radio_gpio_init(struct  athome_state *st)
 {
 	int ret, irq;
 	const struct gpio gpios[] = {
@@ -461,14 +518,12 @@ static int __init athome_radio_gpio_init(struct  athome_state *st)
 
 	irq = gpio_to_irq(st->gpio_irq);
 	if (irq < 0) {
-		pr_err("%s: IRQ gpio not available as an interrupt.\n",
-		       ATHOME_RADIO_MOD_NAME);
+		dev_err(st->owner_dev, "IRQ gpio not available as an interrupt.\n");
 		return -EIO;
 	}
 	ret = gpio_request_array(gpios, ARRAY_SIZE(gpios));
 	if (ret) {
-		pr_err("%s: Failed to request required GPIOs\n",
-		        ATHOME_RADIO_MOD_NAME);
+		dev_err(st->owner_dev, "Failed to request required GPIOs\n");
 		return ret;
 	}
 
@@ -477,8 +532,7 @@ static int __init athome_radio_gpio_init(struct  athome_state *st)
 	udelay(100);
 
 	if (!gpio_get_value(st->gpio_irq)) {
-		pr_err("%s: IRQ gpio is asserted at boot\n",
-		        ATHOME_RADIO_MOD_NAME);
+		dev_err(st->owner_dev, "IRQ gpio is asserted at boot\n");
 		gpio_free_array(gpios, ARRAY_SIZE(gpios));
 		return -EIO;
 	}
@@ -487,29 +541,91 @@ static int __init athome_radio_gpio_init(struct  athome_state *st)
 }
 
 
-static int athome_radio_suspend(struct platform_device *pdev,
-				pm_message_t state)
+int athome_radio_suspend(struct device *dev, pm_message_t state)
 {
+	int irq;
+	struct athome_state *st = dev_get_drvdata(dev);
+
+	if (st->suspended)
+		return 0;
+
+	irq = gpio_to_irq(st->gpio_irq);
+
+	/* Note: User space is already frozen */
+
+	/* wait untill all tx work is done */
+	flush_work_sync(&st->tx_work);
+
+	/* mask rx irq, so there will be no new work */
+	disable_irq(irq);
+
+	/* wait until rx work is done */
+	flush_work_sync(&st->rx_work);
+
+	/* do not abort suspend or configure wakeup if nobody is listening */
+	if (atomic_read(&st->opened)) {
+
+		if (atomic_read(&st->rx_num_used)) { /* we have unhandled messages */
+			dev_info(st->owner_dev, "busy rx\n");
+			enable_irq(irq);
+			return -EBUSY;
+		}
+
+		if (gpio_get_value(st->gpio_irq) == 0) { /* irq asserted, abort suspend */
+			dev_info(st->owner_dev, "busy irq\n");
+			enable_irq(irq);
+			return -EBUSY;
+		}
+
+		irq_set_irq_wake(irq, 1);
+	}
+
+	st->suspended = true;
+	dev_info(st->owner_dev, "suspended\n");
+
 	return 0;
 }
 
-static int athome_radio_resume(struct platform_device *pdev)
+int athome_radio_resume(struct device *dev)
 {
+	int irq;
+	struct athome_state *st = dev_get_drvdata(dev);
+
+	if (!st->suspended)
+		return 0;
+
+	irq = gpio_to_irq(st->gpio_irq);
+
+	/* undo configuring wakeup */
+	if (atomic_read(&st->opened))
+		irq_set_irq_wake(irq, 0);
+
+	/* reenable irq */
+	enable_irq(irq);
+
+	st->suspended = false;
+	dev_info(st->owner_dev, "resumed\n");
+
 	return 0;
 }
 
-static int athome_radio_remove(struct platform_device *pdev)
+int __exit athome_radio_destroy(struct device *dev)
 {
-	struct athome_state *st = platform_get_drvdata(pdev);
+	struct athome_state *st = dev_get_drvdata(dev);
 
 	if (!st)
 		return 0;
 
+	dev_info(st->owner_dev, "exiting\n");
+
 	disable_irq(gpio_to_irq(st->gpio_irq));
 	free_irq(gpio_to_irq(st->gpio_irq), st);
 
+	/* destroy wakeup source */
+	device_wakeup_disable(st->misc_dev.this_device);
+
 	/* unregister misc device */
-	misc_deregister(&st->dev);
+	misc_deregister(&st->misc_dev);
 
 	/* kill workqueue */
 	if (st->workq) {
@@ -517,9 +633,6 @@ static int athome_radio_remove(struct platform_device *pdev)
 		cancel_work_sync(&st->tx_work);
 		destroy_workqueue(st->workq);
 	}
-
-	/* close transport */
-	athome_transport_close();
 
 	/* free gpios */
 	athome_radio_gpio_free(st);
@@ -530,48 +643,51 @@ static int athome_radio_remove(struct platform_device *pdev)
 	/* free state */
 	kfree(st);
 
-	pr_info(ATHOME_RADIO_MOD_LOG_NAME "exiting\n");
-
 	return 0;
 }
 
-static int __init athome_radio_probe(struct platform_device *pdev)
+
+int __devinit athome_radio_init(struct device *dev,
+                                struct athome_platform_data *pd,
+                                struct athome_transport_ops *ops)
 {
 	struct athome_state *st = NULL;
-	struct athome_platform_data *pd;
 	int ret;
 	size_t cb;
 
-	pr_info("%s: Initializing\n", ATHOME_RADIO_MOD_NAME);
-
-	if (!pdev) {
-		pr_alert("%s: no platform device.\n", ATHOME_RADIO_MOD_NAME);
+	if (!dev) {
+		pr_alert("%s: no device.\n", ATHOME_RADIO_MOD_NAME);
 		return -ENODEV;
 	}
-	pd = pdev->dev.platform_data;
 	if (!pd) {
-		pr_alert("%s: no platform data.\n", ATHOME_RADIO_MOD_NAME);
+		dev_alert(dev, "no platform data.\n");
+		return -ENODEV;
+	}
+	if (!ops) {
+		dev_alert(dev, "no xfer ops.\n");
 		return -ENODEV;
 	}
 
 	/* allocate state  */
 	st = kzalloc(sizeof(struct athome_state), GFP_KERNEL);
 	if (!st) {
-		pr_err("%s: kzalloc failure for state\n", ATHOME_RADIO_MOD_NAME);
+		dev_err(dev, "kzalloc failure for state\n");
 		return -ENOMEM;
 	}
 
 	/* preallocate all data buffers at once */
-	pr_info("%s: max msg size %d\n", ATHOME_RADIO_MOD_NAME, MAX_MSG_SIZE);
+	dev_info(dev, "max msg size %d\n", MAX_MSG_SIZE);
 	cb = (TX_BUF_NUM + RX_BUF_NUM) * MAX_MSG_SIZE;
 	st->buffers = kmalloc(cb, GFP_KERNEL);
 	if (!st->buffers) {
-		pr_err("%s: kmalloc failure for buffers\n", ATHOME_RADIO_MOD_NAME);
+		dev_err(dev, "kmalloc failure for buffers\n");
 		ret = -ENOMEM;
 		goto fail_buffers;
 	}
 
 	atomic_set(&st->opened, 0);
+
+	spin_lock_init(&st->slock);
 
 	mutex_init(&st->rx_lock);
 	mutex_init(&st->tx_lock);
@@ -579,25 +695,22 @@ static int __init athome_radio_probe(struct platform_device *pdev)
 	init_waitqueue_head(&st->rd_waitqh);
 	init_waitqueue_head(&st->wr_waitqh);
 
-	st->dev.minor = MISC_DYNAMIC_MINOR;
-	st->dev.name  = ATHOME_RADIO_MOD_NAME;
-	st->dev.fops  = &athome_radio_fops;
+	st->misc_dev.minor = MISC_DYNAMIC_MINOR;
+	st->misc_dev.name  = ATHOME_RADIO_MOD_NAME;
+	st->misc_dev.fops  = &athome_radio_fops;
 
 	st->gpio_irq  = pd->gpio_num_irq;
 	st->gpio_rst  = pd->gpio_num_rst;
 
+	/* attach device */
+	st->owner_dev = dev;
+	st->xfer_ops  = ops;
+
 	/* grab gpios and put module in reset */
 	ret = athome_radio_gpio_init(st);
 	if (ret) {
-		pr_err("%s: gpio_init failure\n", ATHOME_RADIO_MOD_NAME);
+		dev_err(dev, "gpio_init failure (%d)\n", ret);
 		goto fail_gpio;
-	}
-
-	/* open transport */
-	ret = athome_transport_open(pd);
-	if (ret < 0) {
-		pr_err("%s: transport open failure\n", ATHOME_RADIO_MOD_NAME);
-		goto fail_transport;
 	}
 
 	/* Initialize workqueues */
@@ -605,7 +718,7 @@ static int __init athome_radio_probe(struct platform_device *pdev)
 	INIT_WORK(&st->rx_work, athome_radio_rx_work);
 	st->workq = create_singlethread_workqueue(ATHOME_RADIO_MOD_NAME);
 	if (!st->workq) {
-		pr_err("%s: failed to create workqueue\n", ATHOME_RADIO_MOD_NAME);
+		dev_err(dev, "failed to create workqueue\n");
 		ret = -ENODEV;
 		goto fail_wq;
 	}
@@ -615,21 +728,34 @@ static int __init athome_radio_probe(struct platform_device *pdev)
 			  IRQF_NO_SUSPEND | IRQF_FORCE_RESUME |
 			  IRQF_TRIGGER_LOW, ATHOME_RADIO_MOD_NAME, st);
 	if (ret) {
-		pr_err("%s: failed to register irq handler\n", ATHOME_RADIO_MOD_NAME);
+		dev_err(dev, "failed to register irq handler\n");
 		goto fail_irq;
 	}
 
 	/* register misc device */
-	ret = misc_register(&st->dev);
+	ret = misc_register(&st->misc_dev);
 	if (ret) {
-		pr_err("%s: misc_register failure\n", ATHOME_RADIO_MOD_NAME);
+		dev_err(dev, "misc_register failure\n");
 		goto fail_misc;
 	}
 
-	platform_set_drvdata(pdev, st);
+	/* register wakeup source */
+	ret = device_init_wakeup(st->misc_dev.this_device, true);
+	if (ret) {
+		dev_err(dev, "failed (%d) to init wakeup source\n", ret);
+		goto fail_wakeup;
+	}
 
-	/* take it out of reset */
-	gpio_set_value(st->gpio_rst, 1);
+	/* attach state to device object */
+	dev_set_drvdata(dev, st);
+
+	/* Note: keep radio in reset until user space opens it */
+
+	goto done;
+
+fail_wakeup:
+	if (ret)
+		misc_deregister (&st->misc_dev);
 
 fail_misc:
 	if (ret)
@@ -641,10 +767,6 @@ fail_irq:
 
 fail_wq:
 	if (ret)
-		athome_transport_close();
-
-fail_transport:
-	if (ret)
 		athome_radio_gpio_free(st);
 
 fail_gpio:
@@ -655,39 +777,11 @@ fail_buffers:
 	if (ret)
 		kfree(st);
 
-	pr_info("%s: Init done with return code %d\n",
-	         ATHOME_RADIO_MOD_NAME, ret);
+done:
+	dev_info(dev, "Init done with return code %d\n", ret);
 	return ret;
 }
 
-static struct platform_driver radio_driver = {
-	.driver = {
-		.name   = ATHOME_RADIO_MOD_NAME,
-		.owner  = THIS_MODULE,
-	},
-	.remove   = athome_radio_remove,
-	.suspend  = athome_radio_suspend,
-	.resume   = athome_radio_resume,
-};
-
-static int __init athome_radio_init(void)
-{
-	return platform_driver_probe(&radio_driver, athome_radio_probe);
-}
-
-static void __exit athome_radio_exit(void)
-{
-	return platform_driver_unregister(&radio_driver);
-}
-
-
-module_exit(athome_radio_exit);
-module_init(athome_radio_init);
-
-MODULE_DESCRIPTION("Driver for the @home radio module");
-MODULE_AUTHOR("Dmitry Grinberg <dmitrygr@google.com>");
+MODULE_DESCRIPTION("Common part of the @home radio module driver");
 MODULE_LICENSE("GPL");
-MODULE_VERSION("0.1");
-
-
 

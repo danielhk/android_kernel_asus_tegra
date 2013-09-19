@@ -677,38 +677,10 @@ static struct spi_board_info molly_radio_spi_info[] __initdata = {
 	},
 };
 
-static struct platform_device athome_radio_dev = {
-	.name = ATHOME_RADIO_MOD_NAME,
-	.num_resources = 0,
-	.dev = {
-		.platform_data	 = &radio_pdata,
-	},
-};
-
 static void __init molly_radio_init(void)
 {
-#if 0
-	/* must enable input too or else rx doesn't work when we're master */
-	omap_mux_init_signal("mcspi4_clk", OMAP_MUX_MODE0 | OMAP_PIN_INPUT);
-
-	omap_mux_init_signal("mcspi4_somi", OMAP_MUX_MODE0 | OMAP_PIN_INPUT);
-
-	omap_mux_init_signal("mcspi4_simo", OMAP_MUX_MODE0);
-
-	/* cs is manually controlled by the athome_radio driver because
-	 * it needs to be held low (active low) through the entire
-	 * transaction which may involve multiple spi transfers.
-	 */
-	omap_mux_init_gpio(ATHOME_RADIO_SPI_CS_GPIO, OMAP_PIN_OUTPUT);
-
-	omap_mux_init_gpio(ATHOME_RADIO_INT_GPIO, OMAP_PIN_INPUT_PULLUP);
-	omap_mux_init_gpio(ATHOME_RADIO_RESET_N_GPIO, OMAP_PIN_OUTPUT);
-#endif
-
 	spi_register_board_info(molly_radio_spi_info,
 				ARRAY_SIZE(molly_radio_spi_info));
-
-	platform_device_register(&athome_radio_dev);
 }
 
 static struct platform_device *molly_spi_devices[] __initdata = {

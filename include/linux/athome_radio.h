@@ -55,5 +55,20 @@ struct athome_platform_data {
 	int gpio_spi_cs;
 };
 
+struct athome_transport_ops {
+	int (*xfer_tx)(struct device *dev, const uint8_t *msg, size_t len);
+	int (*xfer_rx)(struct device *dev, uint8_t *buf, size_t len);
+};
+
+#include <linux/device.h>
+#include <linux/pm.h>
+
+int athome_radio_init(struct device *dev,
+                             struct athome_platform_data *pdata,
+                             struct athome_transport_ops *ops);
+int athome_radio_destroy(struct device *dev);
+int athome_radio_suspend(struct device *dev, pm_message_t state);
+int athome_radio_resume(struct device *dev);
+
 #endif
 
