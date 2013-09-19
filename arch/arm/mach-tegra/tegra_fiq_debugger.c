@@ -165,7 +165,11 @@ void tegra_serial_debug_init(unsigned int base, int irq,
 	res[0].flags = IORESOURCE_IRQ;
 	res[0].start = irq;
 	res[0].end = irq;
+#ifdef CONFIG_TEGRA_FIQ_DEBUGGER_USE_UART_IRQ
+	res[0].name = "uart_irq";
+#else
 	res[0].name = "fiq";
+#endif
 
 	res[1].flags = IORESOURCE_IRQ;
 	res[1].start = signal_irq;

@@ -427,6 +427,14 @@ config TEGRA_FIQ_DEBUGGER
 	help
 	  Enables the FIQ serial debugger on Tegra
 
+config TEGRA_FIQ_DEBUGGER_USE_UART_IRQ
+	bool "Configure FIQ debugger to use uart_irq"
+	default n
+	select FIQ_DEBUGGER
+	help
+		Configure the FIQ serial debugger on
+		Tegra to use uart_irq instead of fiq
+
 config TEGRA_P1852_TDM
 	bool "Enable TDM mode for P1852 SKUs"
 	default n
