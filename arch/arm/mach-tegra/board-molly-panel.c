@@ -174,18 +174,65 @@ static int molly_hdmi_hotplug_init(struct device *dev)
 }
 
 static struct tegra_dc_mode hdmi_panel_modes[] = {
+	/* 3840x2160p@29.97Hz/30Hz */
+	{
+		.pclk = 297000000,
+		.h_ref_to_sync = 1,
+		.v_ref_to_sync = 1,
+		.h_sync_width = 88,   /* hsync_len */
+		.v_sync_width = 10,   /* vsync_len */
+		.h_back_porch = 296,  /* left_margin */
+		.v_back_porch = 72,   /* upper_margin */
+		.h_active = 3840,     /* xres */
+		.v_active = 2160,     /* yres */
+		.h_front_porch = 176, /* right_margin */
+		.v_front_porch = 8,   /* lower_margin */
+		.avi_m = TEGRA_DC_MODE_AVI_M_16_9,
+	},
+	/* 1920x1080p@59.94Hz/60Hz CEA mode 16 */
 	{
 		.pclk = 148500000,
 		.h_ref_to_sync = 1,
 		.v_ref_to_sync = 1,
-		.h_sync_width = 44,
-		.v_sync_width = 5,
-		.h_back_porch = 148,
-		.v_back_porch = 36,
-		.h_active = 1920,
-		.v_active = 1080,
-		.h_front_porch = 88,
-		.v_front_porch = 4,
+		.h_sync_width = 44,   /* hsync_len */
+		.v_sync_width = 5,    /* vsync_len */
+		.h_back_porch = 148,  /* left_margin */
+		.v_back_porch = 36,   /* upper_margin */
+		.h_active = 1920,     /* xres */
+		.v_active = 1080,     /* yres */
+		.h_front_porch = 88,  /* right_margin */
+		.v_front_porch = 4,   /* lower_margin */
+		.avi_m = TEGRA_DC_MODE_AVI_M_16_9,
+	},
+	/* 1280x720p@59.94Hz/60Hz CEA mode 4 */
+	{
+		.pclk = 74250000,
+		.h_ref_to_sync = 1,
+		.v_ref_to_sync = 1,
+		.h_sync_width = 40,   /* hsync_len */
+		.v_sync_width = 5,    /* vsync_len */
+		.h_back_porch = 220,  /* left_margin */
+		.v_back_porch = 20,   /* upper_margin */
+		.h_active = 1280,     /* xres */
+		.v_active = 720,      /* yres */
+		.h_front_porch = 110, /* right_margin */
+		.v_front_porch = 5,   /* lower_margin */
+		.avi_m = TEGRA_DC_MODE_AVI_M_16_9,
+	},
+	/* 640x480p@59.94Hz/60Hz CEA mode 1 */
+	{
+		.pclk = 25175000,
+		.h_ref_to_sync = 1,
+		.v_ref_to_sync = 1,
+		.h_sync_width = 96,   /* hsync_len */
+		.v_sync_width = 2,    /* vsync_len */
+		.h_back_porch = 48,   /* left_margin */
+		.v_back_porch = 33,   /* upper_margin */
+		.h_active = 640,      /* xres */
+		.v_active = 480,      /* yres */
+		.h_front_porch = 16,  /* right_margin */
+		.v_front_porch = 10,  /* lower_margin */
+		.avi_m = TEGRA_DC_MODE_AVI_M_4_3,
 	},
 };
 
@@ -233,7 +280,8 @@ struct tegra_hdmi_out molly_hdmi_out = {
 static struct tegra_dc_out molly_disp_out = {
 	.type		= TEGRA_DC_OUT_HDMI,
 	.flags		= TEGRA_DC_OUT_HOTPLUG_HIGH |
-			  TEGRA_DC_OUT_HOTPLUG_WAKE_LP0,
+			  TEGRA_DC_OUT_HOTPLUG_WAKE_LP0 |
+			  TEGRA_DC_OUT_FILTER_ALLOWED_MODES,
 	.parent_clk	= "pll_d2_out0",
 
 	.dcc_bus	= 3,
@@ -245,6 +293,7 @@ static struct tegra_dc_out molly_disp_out = {
 	/* defaults until hotplug occurs */
 	.modes          = hdmi_panel_modes,
 	.n_modes        = ARRAY_SIZE(hdmi_panel_modes),
+	.v_refresh_tolerance = 200, /* +/- 0.2Hz in vertical refresh */
 
 	.align		= TEGRA_DC_ALIGN_MSB,
 	.order		= TEGRA_DC_ORDER_RED_BLUE,
