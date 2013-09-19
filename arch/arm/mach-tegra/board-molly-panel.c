@@ -189,21 +189,6 @@ static struct tegra_dc_mode hdmi_panel_modes[] = {
 	},
 };
 
-static void molly_hdmi_hotplug_report(bool state)
-{
-	if (state) {
-		tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_DDC_SDA,
-						TEGRA_PUPD_PULL_DOWN);
-		tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_DDC_SCL,
-						TEGRA_PUPD_PULL_DOWN);
-	} else {
-		tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_DDC_SDA,
-						TEGRA_PUPD_NORMAL);
-		tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_DDC_SCL,
-						TEGRA_PUPD_NORMAL);
-	}
-}
-
 /* Electrical characteristics for HDMI, all modes must be declared here */
 struct tmds_config molly_tmds_config[] = {
 	{ /* 480p : 27 MHz and below */
@@ -268,7 +253,6 @@ static struct tegra_dc_out molly_disp_out = {
 	.disable	= molly_hdmi_disable,
 	.postsuspend	= molly_hdmi_postsuspend,
 	.hotplug_init	= molly_hdmi_hotplug_init,
-	.hotplug_report	= molly_hdmi_hotplug_report,
 };
 
 static struct tegra_fb_data molly_disp_fb_data = {
