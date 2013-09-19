@@ -30,6 +30,7 @@ struct resource;
 
 int tegra_fb_get_mode(struct tegra_dc *dc);
 int tegra_fb_set_mode(struct tegra_dc *dc, int fps);
+void tegra_fb_dump_modelist(struct tegra_dc *dc);
 
 #ifdef CONFIG_FB_TEGRA
 struct tegra_fb_info *tegra_fb_register(struct platform_device *ndev,

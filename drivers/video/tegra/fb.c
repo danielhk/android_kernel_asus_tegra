@@ -557,6 +557,23 @@ void tegra_fb_update_monspecs(struct tegra_fb_info *fb_info,
 	mutex_unlock(&fb_info->info->lock);
 }
 
+void tegra_fb_dump_modelist(struct tegra_dc *dc)
+{
+	struct fb_info *fb_info = dc->fb->info;
+	struct list_head *pos;
+	struct fb_modelist *modelist;
+	struct fb_videomode *m;
+	mutex_lock(&fb_info->lock);
+	list_for_each(pos, &fb_info->modelist) {
+		modelist = list_entry(pos, struct fb_modelist, list);
+		m = &modelist->mode;
+		pr_info("%ux%u@%u, flag 0x%x, pixclock = %d (%lu KHz)\n",
+			m->xres, m->yres, m->refresh, m->flag,
+			m->pixclock, PICOS2KHZ(m->pixclock));
+	}
+	mutex_unlock(&fb_info->lock);
+}
+
 struct tegra_fb_info *tegra_fb_register(struct platform_device *ndev,
 					struct tegra_dc *dc,
 					struct tegra_fb_data *fb_data,
