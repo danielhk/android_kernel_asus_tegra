@@ -254,6 +254,8 @@ static void handle_check_edid_l(struct tegra_dc_hdmi_data *hdmi)
 
 	tegra_fb_update_monspecs(hdmi->dc->fb, &specs, tegra_dc_hdmi_mode_filter);
 
+	pr_info("filtered modelist:\n");
+	tegra_fb_dump_modelist(hdmi->dc);
 #ifdef CONFIG_SWITCH
 	switch_set_state(&hdmi->hpd_switch, 1);
 	pr_info("Display connected, hpd_switch 1\n");
