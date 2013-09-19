@@ -727,6 +727,103 @@ static bool tegra_dc_check_constraint(const struct fb_videomode *mode)
 		mode->xres >= 16 && mode->yres >= 16;
 }
 
+static int compute_vertical_refresh_millihz_fb(const struct fb_videomode *m)
+{
+	s64 pixclk_millihz  = (s64)PICOS2KHZ(m->pixclock) * 1000000;
+	u32 ppl, lpf, ppf;
+
+	ppl = (m->xres + m->hsync_len + m->left_margin  + m->right_margin);
+	lpf = (m->yres + m->vsync_len + m->upper_margin + m->lower_margin);
+	ppf = lpf * ppl;
+
+	if (!ppf)
+		return 0;
+
+	do_div(pixclk_millihz, ppf);
+	if (pixclk_millihz >= 0xFFFFFFFF)
+		return 0xFFFFFFFF;
+
+	return (int)pixclk_millihz;
+}
+
+static int compute_vertical_refresh_millihz_dc(const struct tegra_dc_mode *m)
+{
+	s64 pixclk_millihz  = (s64)m->pclk * 1000;
+	u32 ppl, lpf, ppf;
+
+	ppl = (m->h_active + m->h_sync_width + m->h_back_porch + m->h_front_porch);
+	lpf = (m->v_active + m->v_sync_width + m->v_back_porch + m->v_front_porch);
+	ppf = lpf * ppl;
+
+	if (!ppf)
+		return 0;
+
+	do_div(pixclk_millihz, ppf);
+	if (pixclk_millihz >= 0xFFFFFFFF)
+		return 0xFFFFFFFF;
+
+	return (int)pixclk_millihz;
+}
+
+static int relaxed_mode_is_equal(const struct tegra_dc_mode *mode1,
+				 const struct fb_videomode *mode2,
+				 u32 refresh_tolerance)
+{
+	u32 ratio1 = 0;
+	u32 ratio2 = mode2->flag & (FB_FLAG_RATIO_4_3 | FB_FLAG_RATIO_16_9);
+	int vrefresh1 = compute_vertical_refresh_millihz_dc(mode1);
+	int vrefresh2 = compute_vertical_refresh_millihz_fb(mode2);
+	int vmode1 = FB_VMODE_NONINTERLACED;
+
+	if (mode1->avi_m == TEGRA_DC_MODE_AVI_M_16_9)
+		ratio1 = FB_FLAG_RATIO_16_9;
+	else if (mode1->avi_m == TEGRA_DC_MODE_AVI_M_4_3)
+		ratio1 = FB_FLAG_RATIO_4_3;
+
+	return (mode1->h_active     == mode2->xres &&
+		mode1->v_active     == mode2->yres &&
+		KHZ2PICOS(mode1->pclk / 1000) <= mode2->pixclock * 201 / 200 &&
+		KHZ2PICOS(mode1->pclk / 1000) >= mode2->pixclock * 200 / 201 &&
+		vrefresh1           <= vrefresh2 + refresh_tolerance &&
+		vrefresh1           >= vrefresh2 - refresh_tolerance &&
+		(!ratio1 || !ratio2 || ratio1 == ratio2) &&
+		(vmode1 & FB_VMODE_INTERLACED) ==
+		(mode2->vmode & FB_VMODE_INTERLACED));
+}
+
+static bool check_mode_with_tolerance(const struct tegra_dc *dc,
+				      struct fb_videomode *vm,
+				      unsigned refresh_tolerance)
+{
+	int i;
+
+	pr_debug("%s: xres = %d, yres = %d, pixclock = %d (%lu KHz)\n",
+		__func__, vm->xres, vm->yres, vm->pixclock,
+		 PICOS2KHZ(vm->pixclock));
+	pr_debug("hsync_len = %d, left_margin = %d, right_margin = %d\n",
+		vm->hsync_len, vm->left_margin, vm->right_margin);
+	pr_debug("vsync_len = %d, upper_margin = %d, lower_margin = %d\n",
+		vm->vsync_len, vm->upper_margin, vm->lower_margin);
+	pr_debug("flag = 0x%x, vmode = 0x%x\n",
+		 vm->flag, vm->vmode);
+
+	for (i = 0; i < dc->out->n_modes; i++) {
+		if (relaxed_mode_is_equal(&dc->out->modes[i], vm,
+					  refresh_tolerance)) {
+			/* save old flag field */
+			u32 flag = vm->flag;
+			tegra_dc_to_fb_videomode(vm, &dc->out->modes[i]);
+			vm->flag = flag;
+			pr_debug("%s: found match dc_mode %d\n",
+				__func__, i);
+			return true;
+		}
+	}
+
+	pr_debug("%s: no match found, rejecting\n", __func__);
+	return false;
+}
+
 bool tegra_dc_hdmi_mode_filter(const struct tegra_dc *dc,
 					struct fb_videomode *mode)
 {
@@ -738,8 +835,8 @@ bool tegra_dc_hdmi_mode_filter(const struct tegra_dc *dc,
 		return false;
 
 #ifdef CONFIG_TEGRA_HDMI_74MHZ_LIMIT
-		if (PICOS2KHZ(mode->pixclock) > 74250)
-			return false;
+	if (PICOS2KHZ(mode->pixclock) > 74250)
+		return false;
 #endif
 
 #if defined(CONFIG_ARCH_TEGRA_11x_SOC)
@@ -753,11 +850,11 @@ bool tegra_dc_hdmi_mode_filter(const struct tegra_dc *dc,
 	/* don't filter any modes due to width - probably not what you want */
 #endif
 
-	/* Check if the mode's pixel clock is more than the max rate*/
+	/* Check if the mode's pixel clock is more than the max rate */
 	if (!tegra_dc_hdmi_valid_pixclock(dc, mode))
 		return false;
 
-	/* Work around for modes that fail the constrait:
+	/* Work around for modes that fail the constraint:
 	 * V_FRONT_PORCH >= V_REF_TO_SYNC + 1 */
 	if (mode->lower_margin == 1) {
 		mode->lower_margin++;
@@ -766,6 +863,14 @@ bool tegra_dc_hdmi_mode_filter(const struct tegra_dc *dc,
 
 	/* even after fix-ups the mode still isn't supported */
 	if (!tegra_dc_check_constraint(mode))
+		return false;
+
+	/* filter modes if board file has a list of modes that
+	 * should be the only ones allowed
+	 */
+	if ((dc->out->flags & TEGRA_DC_OUT_FILTER_ALLOWED_MODES) &&
+	    !check_mode_with_tolerance(dc, mode, 0) &&
+	    !check_mode_with_tolerance(dc, mode, dc->out->v_refresh_tolerance))
 		return false;
 
 	mode->flag |= FB_MODE_IS_DETAILED;
