@@ -403,14 +403,6 @@ int tegra_edid_get_monspecs_test(struct tegra_edid *edid,
 
 	new_data->dc_edid.len = i * 128;
 
-	pr_info("Completed modedb:\n");
-	for (j = 0; j < specs->modedb_len; j++) {
-		pr_info("\tmodedb[%d]: %ux%u@%u, flag 0x%x, pixclock %d\n",
-			j, specs->modedb[j].xres, specs->modedb[j].yres,
-			specs->modedb[j].refresh, specs->modedb[j].flag,
-			specs->modedb[j].pixclock);
-	}
-
 	mutex_lock(&edid->lock);
 	old_data = edid->data;
 	edid->data = new_data;
@@ -491,6 +483,16 @@ int tegra_edid_get_monspecs(struct tegra_edid *edid, struct fb_monspecs *specs)
 	}
 
 	new_data->dc_edid.len = i * 128;
+
+	pr_debug("Completed modedb:\n");
+	for (j = 0; j < specs->modedb_len; j++) {
+		pr_debug("\tmodedb[%d]: %ux%u@%u, flag 0x%x,"
+			 " pixclock %d (%lu KHz)\n",
+			 j, specs->modedb[j].xres, specs->modedb[j].yres,
+			 specs->modedb[j].refresh, specs->modedb[j].flag,
+			 specs->modedb[j].pixclock,
+			 PICOS2KHZ(specs->modedb[j].pixclock));
+	}
 
 	mutex_lock(&edid->lock);
 	old_data = edid->data;
