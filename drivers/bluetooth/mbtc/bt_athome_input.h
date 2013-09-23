@@ -54,6 +54,7 @@ void athome_bt_led_show_event(int event_type);
 
 int athome_bt_input_init(void);
 void athome_bt_input_deinit(void);
+void athome_bt_input_reset_state(void);
 void athome_bt_input_send_touch(unsigned which,
 				int pointer_idx,
 				uint16_t x,

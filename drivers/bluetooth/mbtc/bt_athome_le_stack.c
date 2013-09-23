@@ -1786,6 +1786,8 @@ static int athome_bt_thread(void *unusedData)
 			return -2;
 		}
 		devices_exist = true;
+	} else {
+		athome_bt_input_reset_state();
 	}
 
 	if (athome_bt_host_setup()) {

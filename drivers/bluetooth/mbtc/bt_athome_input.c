@@ -54,17 +54,29 @@ void athome_bt_led_show_event(int event_type)
 #endif /* HACK_DEBUG_USING_LED */
 
 
-static struct {
+struct athome_input_state {
+	/* Values which stay as they are for as long as the module is loaded.
+	 * If any variables are added to this set, they must be restored
+	 * properly in athome_bt_input_reset_state.
+	 */
 	struct input_dev *idev;
-	uint8_t fingers_down;
 	char uniq[16];
+
+	/* Values are reset any time the stack gets reset.  If a reset value
+	 * other than 0 is needed, it must be handled explicitly in
+	 * athome_bt_input_reset_state.
+	 */
+	uint8_t fingers_down;
 	int32_t vx, vy;
 	int32_t px, py;
 	int32_t last_x, last_y;
 	struct timespec last_evt;
 	struct timespec last_touch_evt;
+	bool last_evt_time_valid;
+	bool last_touch_evt_time_valid;
 	uint32_t touch_count; /* cleared on finger up */
-} inputs[ATHOME_RMT_MAX_CONNS];
+};
+static struct athome_input_state inputs[ATHOME_RMT_MAX_CONNS];
 
 static struct {
 	u32 enabled;
@@ -195,12 +207,6 @@ static void athome_bt_input_deinit_debug(void)
 	debugfs_remove_recursive(debugfs_dir);
 }
 
-void athome_bt_input_reset_time(unsigned which)
-{
-	ktime_get_ts(&inputs[which].last_evt);
-	inputs[which].last_touch_evt = inputs[which].last_evt;
-}
-
 int athome_bt_input_init(void)
 {
 	int err;
@@ -212,6 +218,8 @@ int athome_bt_input_init(void)
 	aahlog("touch filter, alpha = %d, beta = %d, enabled = %d\n",
 		filter_params.alpha, filter_params.beta, filter_params.enabled);
 
+	athome_bt_input_reset_state();
+
 	for (i = 0; i < ATHOME_RMT_MAX_CONNS; i++) {
 		scnprintf(inputs[i].uniq, sizeof(inputs[i].uniq),
 						"athome_bt_%d", i);
@@ -220,8 +228,6 @@ int athome_bt_input_init(void)
 		if (err)
 			break;
 		inputs[i].idev->uniq = inputs[i].uniq;
-		inputs[i].fingers_down = 0;
-		athome_bt_input_reset_time(i);
 	}
 	if (i == ATHOME_RMT_MAX_CONNS)
 		return 0;
@@ -242,6 +248,25 @@ void athome_bt_input_deinit(void)
 
 	for(i = 0; i < ATHOME_RMT_MAX_CONNS; i++)
 		athome_bt_input_del_device(inputs[i].idev);
+}
+
+void athome_bt_input_reset_state(void)
+{
+	size_t i;
+	for (i = 0; i < ARRAY_SIZE(inputs); i++) {
+		struct athome_input_state backup;
+		struct athome_input_state *I = inputs + i;
+
+		/* back up the no-reset variables */
+		memcpy(&backup, I, sizeof(backup));
+
+		/* zero out the yes-reset variables */
+		memset(I, 0, sizeof(*I));
+
+		/* restore the no-reset variables */
+		I->idev = backup.idev;
+		memcpy(backup.uniq, I->uniq, sizeof(backup.uniq));
+	}
 }
 
 /* Print touch event log less often as the count goes up. */
@@ -271,8 +296,10 @@ void athome_bt_input_send_touch(unsigned which,
 	wasdown = !!(inputs[which].fingers_down & mask);
 
 	if (is_down && !wasdown) {
+		BUG_ON(!inputs[which].last_evt_time_valid);
 		athome_bt_led_show_event(HACK_LED_EVENT_TOUCH_DOWN);
 		inputs[which].last_touch_evt = inputs[which].last_evt;
+		inputs[which].last_touch_evt_time_valid = true;
 		inputs[which].vx = 0;
 		inputs[which].vy = 0;
 		inputs[which].px = x;
@@ -327,9 +354,13 @@ void athome_apply_ab_filter(unsigned which, uint16_t* x, uint16_t* y) {
 	s32 dt;
 	s32 rx, ry;
 
-	if (!filter_params.enabled) {
+	BUG_ON(which >= ARRAY_SIZE(inputs));
+
+	if (!filter_params.enabled)
 		return;
-	}
+
+	if (!inputs[which].last_touch_evt_time_valid)
+		return;
 
 	delta_timespec = timespec_sub(inputs[which].last_evt,
 			inputs[which].last_touch_evt);
@@ -421,16 +452,20 @@ void athome_bt_input_calculate_time(unsigned which, long usec_since_last)
 {
 	BUG_ON(which >= ARRAY_SIZE(inputs));
 
-	if (usec_since_last == AAH_BT_UNKNOWN_TS_DELTA)
-		athome_bt_input_reset_time(which);
-	else
+	if ((usec_since_last == AAH_BT_UNKNOWN_TS_DELTA) ||
+	    !inputs[which].last_evt_time_valid) {
+		ktime_get_ts(&inputs[which].last_evt);
+		inputs[which].last_evt_time_valid = true;
+	} else {
 		timespec_add_ns(&inputs[which].last_evt,
 				(uint64_t)usec_since_last * NSEC_PER_USEC);
+	}
 }
 
 void athome_bt_input_frame(unsigned which)
 {
 	BUG_ON(which >= ARRAY_SIZE(inputs));
+	BUG_ON(!inputs[which].last_evt_time_valid);
 
 	input_event(inputs[which].idev, EV_MSC, MSC_ANDROID_TIME_SEC,
 					inputs[which].last_evt.tv_sec);
