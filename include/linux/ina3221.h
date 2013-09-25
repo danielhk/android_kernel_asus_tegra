@@ -38,6 +38,9 @@
 #define INA3221_RESET			0x8000
 #define INA3221_POWER_DOWN		0
 #define INA3221_ENABLE_CHAN		(7 << 12) /* enable all 3 channels */
+#define INA3221_ENABLE_CHAN1		(4 << 12) /* enable channel 1 */
+#define INA3221_ENABLE_CHAN2		(2 << 12) /* enable channel 2 */
+#define INA3221_ENABLE_CHAN3		(1 << 12) /* enable channel 3 */
 #define INA3221_AVG			(3 << 9) /* 64 averages */
 #define INA3221_VBUS_CT			(4 << 6) /* Vbus 1.1 mS conv time */
 #define INA3221_VSHUNT_CT		(4 << 3) /* Vshunt 1.1 mS conv time */
