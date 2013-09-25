@@ -27,6 +27,7 @@
 #include <asm/unaligned.h>
 #include "hda_codec.h"
 #include "hda_local.h"
+#include "hda_eld.h"
 
 enum eld_versions {
 	ELD_VER_CEA_861D	= 2,
@@ -60,29 +61,6 @@ static char *eld_connection_type_names[4] = {
 	"DisplayPort",
 	"2-reserved",
 	"3-reserved"
-};
-
-enum cea_audio_coding_types {
-	AUDIO_CODING_TYPE_REF_STREAM_HEADER	=  0,
-	AUDIO_CODING_TYPE_LPCM			=  1,
-	AUDIO_CODING_TYPE_AC3			=  2,
-	AUDIO_CODING_TYPE_MPEG1			=  3,
-	AUDIO_CODING_TYPE_MP3			=  4,
-	AUDIO_CODING_TYPE_MPEG2			=  5,
-	AUDIO_CODING_TYPE_AACLC			=  6,
-	AUDIO_CODING_TYPE_DTS			=  7,
-	AUDIO_CODING_TYPE_ATRAC			=  8,
-	AUDIO_CODING_TYPE_SACD			=  9,
-	AUDIO_CODING_TYPE_EAC3			= 10,
-	AUDIO_CODING_TYPE_DTS_HD		= 11,
-	AUDIO_CODING_TYPE_MLP			= 12,
-	AUDIO_CODING_TYPE_DST			= 13,
-	AUDIO_CODING_TYPE_WMAPRO		= 14,
-	AUDIO_CODING_TYPE_REF_CXT		= 15,
-	/* also include valid xtypes below */
-	AUDIO_CODING_TYPE_HE_AAC		= 15,
-	AUDIO_CODING_TYPE_HE_AAC2		= 16,
-	AUDIO_CODING_TYPE_MPEG_SURROUND		= 17,
 };
 
 enum cea_audio_coding_xtypes {
