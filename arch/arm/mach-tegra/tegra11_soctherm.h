@@ -143,4 +143,6 @@ static inline int tegra11_soctherm_init(struct soctherm_platform_data *data)
 }
 #endif
 
+void soctherm_dump_temps(void);
+
 #endif /* __MACH_TEGRA_11x_SOCTHERM_H */

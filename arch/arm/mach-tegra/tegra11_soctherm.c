@@ -1362,7 +1362,7 @@ static int soctherm_handle_alarm(enum soctherm_throttle_id alarm)
 		break;
 
 	case THROTTLE_OC4:
-		pr_debug("soctherm: Successfully handled OC4 alarm\n");
+		pr_info("soctherm: Successfully handled OC4 alarm\n");
 		/* TODO: add OC4 alarm handling code here */
 		rv = 0;
 
@@ -2069,6 +2069,28 @@ int __init tegra11_soctherm_init(struct soctherm_platform_data *data)
 		return -1;
 
 	return 0;
+}
+
+void soctherm_dump_temps(void)
+{
+	u32 r;
+	u32 cpu_state, gpu_state, pllx_state, mem_state;
+	if (soctherm_suspended) {
+		pr_info("SOC_THERM is SUSPENDED\n");
+		return;
+	}
+
+	r = soctherm_readl(TS_TEMP1);
+	cpu_state = REG_GET(r, TS_TEMP1_CPU_TEMP);
+	gpu_state = REG_GET(r, TS_TEMP1_GPU_TEMP);
+	r = soctherm_readl(TS_TEMP2);
+	pllx_state = REG_GET(r, TS_TEMP2_PLLX_TEMP);
+	mem_state = REG_GET(r, TS_TEMP2_MEM_TEMP);
+	pr_info("soctherm temps: CPU(%ld) GPU(%ld) PLLX(%ld) MEM(%ld)",
+		temp_translate(cpu_state) / 1000,
+		temp_translate(gpu_state) / 1000,
+		temp_translate(pllx_state) / 1000,
+		temp_translate(mem_state) / 1000);
 }
 
 #ifdef CONFIG_DEBUG_FS
