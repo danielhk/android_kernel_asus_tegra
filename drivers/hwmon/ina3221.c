@@ -193,6 +193,12 @@ static s32 show_current(struct device *dev,
 		return -ENODEV;
 	}
 	index = attr->index;
+	if (data->plat_data->shunt_resistor[index] == 0) {
+		DEBUG_INA3221(("Ina3221 zero shunt resistor at index %d\n",
+			       index));
+		ret = -ENODEV;
+		goto error;
+	}
 	shunt_volt_reg_addr = (INA3221_SHUNT_VOL_CHAN1 + (index * 2));
 
 	if (data->mode == TRIGGERED) {
@@ -247,6 +253,15 @@ static s32 __locked_calculate_power(struct i2c_client *client,
 	s32 inverse_shunt_resistor;
 	s32 current_mA;
 	s32 power_mW;
+
+	/* if shunt resistor is 0, assume not connected.
+	 * avoid divide by zero when using the shunt resister value below.
+	 */
+	if (data->plat_data->shunt_resistor[index] == 0) {
+		DEBUG_INA3221(("Ina3221 zero shunt resistor at index %d\n",
+			       index));
+		return -ENODEV;
+	}
 	/* getting voltage readings in micro volts*/
 	voltage_uV =
 		be16_to_cpu(i2c_smbus_read_word_data(client,
