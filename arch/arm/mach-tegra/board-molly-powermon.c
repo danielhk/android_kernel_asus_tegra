@@ -347,20 +347,20 @@ static struct i2c_board_info molly_i2c0_ina219_board_info[] = {
 
 static struct ina3221_platform_data power_mon_info = {
 	.rail_name = {
-		"VIN_5V0",     /* everything except CPU/Core/DDR */
-		"VIN_5V0_CCD", /* CPU/Core/DDR */
+		"VIN_5V0",     /* total system power */
 	},
-	.shunt_resistor = {5, 5}, /* 5 mOhm */
-	/* Enable ch1 and ch2, ch3 is unused */
-	.cont_conf_data = ((6 << 12) | INA3221_AVG | INA3221_VBUS_CT |
-			   INA3221_VSHUNT_CT | INA3221_CONT_MODE),
-	/* Enable ch1 and ch2, ch3 is unused */
-	.trig_conf_data = ((6 << 12) | INA3221_TRIG_MODE),
-	/* ch1 (Total Power) 2800 mA
-	 * ch2 (AP + MEM) 1500 mA
+	.shunt_resistor = {5}, /* 5 mOhm */
+	/* Enable ch1.  ch2, ch3 are unused */
+	.cont_conf_data = (INA3221_ENABLE_CHAN1 | INA3221_AVG |
+			   INA3221_VBUS_CT | INA3221_VSHUNT_CT |
+			   INA3221_CONT_MODE),
+	/* Enable ch1.  ch2, ch3 are unused */
+	.trig_conf_data = (INA3221_ENABLE_CHAN1 | INA3221_TRIG_MODE),
+	/* ch1 (Total Power) 3000 mA = 15W
+	 * ch2 (Unused)
 	 * ch3 (Unused)
 	 */
-	.crit_alert_limit_curr = {2800, 1500},
+	.crit_alert_limit_curr = {3000},
 };
 
 static struct i2c_board_info molly_i2c0_ina3221_board_info[] = {
