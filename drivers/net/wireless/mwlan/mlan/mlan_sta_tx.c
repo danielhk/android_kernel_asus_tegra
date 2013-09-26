@@ -85,8 +85,10 @@ wlan_ops_sta_process_txpd(IN t_void * priv, IN pmlan_buffer pmbuf)
 
 	if (pmbuf->data_offset < (sizeof(TxPD) + INTF_HEADER_LEN +
 				  DMA_ALIGNMENT)) {
-		PRINTM(MERROR, "not enough space for TxPD: %d\n",
-		       pmbuf->data_len);
+		PRINTM(MERROR,
+		       "not enough space for TxPD: headroom=%d pkt_len=%d, required=%d\n",
+		       pmbuf->data_offset, pmbuf->data_len,
+		       sizeof(TxPD) + INTF_HEADER_LEN + DMA_ALIGNMENT);
 		pmbuf->status_code = MLAN_ERROR_PKT_SIZE_INVALID;
 		goto done;
 	}

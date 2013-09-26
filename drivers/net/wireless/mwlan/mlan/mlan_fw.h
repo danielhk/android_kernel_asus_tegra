@@ -653,6 +653,19 @@ typedef enum _WLAN_802_11_WEP_STATUS {
 #define SET_EXTCAP_TDLS(ext_cap) (ext_cap.TDLSSupport = 1)
 /** ExtCap : Reset support TDLS */
 #define RESET_EXTCAP_TDLS(ext_cap) (ext_cap.TDLSSupport = 0)
+/** ExtCap : Support for TDLS UAPSD */
+#define ISSUPP_EXTCAP_TDLS_UAPSD(ext_cap) (ext_cap.TDLSPeerUAPSDSupport)
+/** ExtCap : Set support TDLS UAPSD */
+#define SET_EXTCAP_TDLS_UAPSD(ext_cap) (ext_cap.TDLSPeerUAPSDSupport = 1)
+/** ExtCap : Reset support TDLS UAPSD */
+#define RESET_EXTCAP_TDLS_UAPSD(ext_cap) (ext_cap.TDLSPeerUAPSDSupport = 0)
+/** ExtCap : Support for TDLS CHANNEL SWITCH */
+#define ISSUPP_EXTCAP_TDLS_CHAN_SWITCH(ext_cap) (ext_cap.TDLSChannelSwitching)
+/** ExtCap : Set support TDLS CHANNEL SWITCH */
+#define SET_EXTCAP_TDLS_CHAN_SWITCH(ext_cap) (ext_cap.TDLSChannelSwitching = 1)
+/** ExtCap : Reset support TDLS CHANNEL SWITCH */
+#define RESET_EXTCAP_TDLS_CHAN_SWITCH(ext_cap) (ext_cap.TDLSChannelSwitching = 0)
+
 /** ExtCap : Support for Interworking */
 #define ISSUPP_EXTCAP_INTERWORKING(ext_cap) (ext_cap.Interworking)
 /** ExtCap : Set support Interworking */
@@ -1650,6 +1663,14 @@ typedef MLAN_PACK_START struct _MrvlIEtypes_RatesParamSet_t {
     /** Rates */
 	t_u8 rates[1];
 } MLAN_PACK_END MrvlIEtypes_RatesParamSet_t;
+
+/** _MrvlIEtypes_Bssid_List_t */
+typedef MLAN_PACK_START struct _MrvlIEtypes_Bssid_List_t {
+    /** Header */
+	MrvlIEtypesHeader_t header;
+    /** BSSID */
+	t_u8 bssid[MLAN_MAC_ADDR_LENGTH];
+} MLAN_PACK_END MrvlIEtypes_Bssid_List_t;
 
 /** MrvlIEtypes_SsIdParamSet_t */
 typedef MLAN_PACK_START struct _MrvlIEtypes_SsIdParamSet_t {
@@ -3331,6 +3352,14 @@ typedef MLAN_PACK_START struct _MrvlIETypes_ExtCap_t {
     /** ExtCap_t struct */
 	ExtCap_t ext_cap;
 } MLAN_PACK_END MrvlIETypes_ExtCap_t;
+
+/** Qos Info */
+typedef MLAN_PACK_START struct _MrvlIETypes_qosinfo_t {
+    /** Header */
+	MrvlIEtypesHeader_t header;
+    /** qos_info*/
+	t_u8 qos_info;
+} MLAN_PACK_END MrvlIETypes_qosinfo_t;
 
 /** Overlapping BSS Scan Parameters element */
 typedef MLAN_PACK_START struct _MrvlIETypes_OverlapBSSScanParam_t {

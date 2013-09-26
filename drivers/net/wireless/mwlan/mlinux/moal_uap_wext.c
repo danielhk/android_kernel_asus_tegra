@@ -149,7 +149,7 @@ channel_to_frequency(t_u16 channel, t_u8 band)
 	int i = 0;
 
 	ENTER();
-	for (i = 0; i < sizeof(chan_to_freq) / sizeof(chan_to_freq_t); i++) {
+	for (i = 0; i < ARRAY_SIZE(chan_to_freq); i++) {
 		if (channel == chan_to_freq[i].channel &&
 		    band == chan_to_freq[i].band) {
 			LEAVE();
@@ -1767,10 +1767,9 @@ static const iw_handler woal_private_handler[] = {
 
 /** wlan_handler_def */
 struct iw_handler_def woal_uap_handler_def = {
-num_standard:sizeof(woal_handler) / sizeof(iw_handler),
-num_private:sizeof(woal_private_handler) / sizeof(iw_handler),
-num_private_args:sizeof(woal_uap_priv_args) /
-		sizeof(struct iw_priv_args),
+num_standard:ARRAY_SIZE(woal_handler),
+num_private:ARRAY_SIZE(woal_private_handler),
+num_private_args:ARRAY_SIZE(woal_uap_priv_args),
 standard:(iw_handler *) woal_handler,
 private:(iw_handler *) woal_private_handler,
 private_args:(struct iw_priv_args *)woal_uap_priv_args,

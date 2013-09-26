@@ -409,6 +409,7 @@ woal_config_write(struct file *f, const char __user * buf, size_t count,
 			PRINTM(MERROR, "Recevie debug_dump command\n");
 			woal_mlan_debug_info(priv);
 			woal_moal_debug_info(priv, NULL, MFALSE);
+			woal_dump_firmware_info(handle);
 		}
 	}
 

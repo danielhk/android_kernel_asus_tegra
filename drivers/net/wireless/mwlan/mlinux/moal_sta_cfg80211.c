@@ -281,17 +281,14 @@ t_u8
 is_cfg80211_special_region_code(char *region_string)
 {
 	t_u8 i;
-	t_u8 size = 0;
 	region_code_t cfg80211_special_region_code[] =
 		{ {"00 "}, {"99 "}, {"98 "}, {"97 "} };
-
-	size = sizeof(cfg80211_special_region_code) / sizeof(region_code_t);
 
 	for (i = 0; i < COUNTRY_CODE_LEN && region_string[i]; i++) {
 		region_string[i] = toupper(region_string[i]);
 	}
 
-	for (i = 0; i < size; i++) {
+	for (i = 0; i < ARRAY_SIZE(cfg80211_special_region_code); i++) {
 		if (!memcmp(region_string,
 			    cfg80211_special_region_code[i].region,
 			    COUNTRY_CODE_LEN)) {
@@ -2240,17 +2237,18 @@ woal_cfg80211_disconnect(struct wiphy *wiphy, struct net_device *dev,
 		return -EINVAL;
 	}
 
-	priv->cfg_disconnect = 1;
+	priv->cfg_disconnect = MTRUE;
 
 	if (woal_disconnect(priv, MOAL_IOCTL_WAIT, priv->cfg_bssid) !=
 	    MLAN_STATUS_SUCCESS) {
+		priv->cfg_disconnect = MFALSE;
 		LEAVE();
 		return -EFAULT;
 	}
-
-	PRINTM(MINFO,
-	       "Successfully disconnected from " MACSTR ": Reason code %d\n",
-	       MAC2STR(priv->cfg_bssid), reason_code);
+	priv->cfg_disconnect = MFALSE;
+	PRINTM(MMSG,
+	       "wlan: Successfully disconnected from " MACSTR
+	       ": Reason code %d\n", MAC2STR(priv->cfg_bssid), reason_code);
 
 	memset(priv->cfg_bssid, 0, ETH_ALEN);
 	if (priv->bss_type == MLAN_BSS_TYPE_STA)
@@ -2833,7 +2831,9 @@ woal_cfg80211_remain_on_channel(struct wiphy *wiphy,
 		goto done;
 	}
 	/** cancel previous remain on channel */
-	if (priv->phandle->remain_on_channel) {
+	if (priv->phandle->remain_on_channel &&
+	    ((priv->phandle->chan.center_freq != chan->center_freq)
+	    )) {
 		remain_priv =
 			priv->phandle->priv[priv->phandle->remain_bss_index];
 		if (!remain_priv) {
@@ -2876,39 +2876,52 @@ woal_cfg80211_remain_on_channel(struct wiphy *wiphy,
 		goto done;
 	}
 
-	if (status == 0) {
-		/* remain on channel operation success */
-		/* we need update the value cookie */
+	if (status) {
+		PRINTM(MMSG,
+		       "%s: Set remain on Channel: channel=%d with status=%d\n",
+		       dev->name,
+		       ieee80211_frequency_to_channel(chan->center_freq),
+		       status);
+		if (!priv->phandle->remain_on_channel) {
+			priv->phandle->is_remain_timer_set = MTRUE;
+			woal_mod_timer(&priv->phandle->remain_timer, duration);
+		}
+	}
+
+	/* remain on channel operation success */
+	/* we need update the value cookie */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
-		*cookie = (u64) random32() | 1;
+	*cookie = (u64) random32() | 1;
 #else
-		*cookie = (u64) prandom_u32() | 1;
+	*cookie = (u64) prandom_u32() | 1;
 #endif
-		priv->phandle->remain_on_channel = MTRUE;
-		priv->phandle->remain_bss_index = priv->bss_index;
-		priv->phandle->cookie = *cookie;
+	priv->phandle->remain_on_channel = MTRUE;
+	priv->phandle->remain_bss_index = priv->bss_index;
+	priv->phandle->cookie = *cookie;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
-		priv->phandle->channel_type = channel_type;
+	priv->phandle->channel_type = channel_type;
 #endif
-		memcpy(&priv->phandle->chan, chan,
-		       sizeof(struct ieee80211_channel));
-		cfg80211_ready_on_channel(
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 6, 0)
-						 dev,
-#else
-						 priv->wdev,
-#endif
-						 *cookie, chan,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
-						 channel_type,
-#endif
-						 duration, GFP_KERNEL);
+	memcpy(&priv->phandle->chan, chan, sizeof(struct ieee80211_channel));
+
+	if (status == 0)
 		PRINTM(MIOCTL,
 		       "%s: Set remain on Channel: channel=%d cookie = %#llx\n",
 		       dev->name,
 		       ieee80211_frequency_to_channel(chan->center_freq),
 		       priv->phandle->cookie);
-	}
+
+	cfg80211_ready_on_channel(
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 6, 0)
+					 dev,
+#else
+					 priv->wdev,
+#endif
+					 *cookie, chan,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
+					 channel_type,
+#endif
+					 duration, GFP_KERNEL);
+
 done:
 	LEAVE();
 	return ret;
@@ -3015,7 +3028,7 @@ woal_cfg80211_sched_scan_start(struct wiphy *wiphy,
 	PRINTM(MIOCTL,
 	       "%s sched scan: n_ssids=%d n_match_sets=%d n_channels=%d interval=%d ie_len=%d\n",
 	       priv->netdev->name, request->n_ssids, request->n_match_sets,
-	       request->n_channels, request->interval, request->ie_len);
+	       request->n_channels, request->interval, (int)request->ie_len);
 	/** cancel pending scan */
 	woal_cancel_scan(priv, MOAL_IOCTL_WAIT);
 	for (i = 0; i < request->n_match_sets; i++) {

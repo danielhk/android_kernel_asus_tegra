@@ -186,6 +186,11 @@ Change log:
 #define PRIV_CMD_PB_BYPASS      "pb_bypass"
 #define PRIV_CMD_SD_CMD53_RW        "sdcmd53rw"
 #if defined(WIFI_DIRECT_SUPPORT)
+#if defined(UAP_CFG80211)
+#if LINUX_VERSION_CODE >= WIFI_DIRECT_KERNEL_VERSION
+#define PRIV_CMD_NOA_CFG            "noacfg"
+#endif
+#endif
 #endif
 
 /** Private command ID for Android default commands */
