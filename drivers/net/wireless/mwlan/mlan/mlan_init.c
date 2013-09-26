@@ -24,6 +24,8 @@ Change log:
     10/13/2008: initial version
 ********************************************************/
 
+#include <linux/wlan_plat.h>
+
 #include "mlan.h"
 #ifdef STA_SUPPORT
 #include "mlan_join.h"
@@ -41,6 +43,7 @@ Change log:
 /********************************************************
 			Global Variables
 ********************************************************/
+extern struct wifi_platform_data *wifi_control_data;
 
 /********************************************************
 			Local Functions
@@ -544,9 +547,15 @@ wlan_init_adapter(pmlan_adapter pmadapter)
 	pmadapter->curr_tx_buf_size = MLAN_TX_DATA_BUF_SIZE_2K;
 
 	pmadapter->is_hs_configured = MFALSE;
-	pmadapter->hs_cfg.conditions = HOST_SLEEP_DEF_COND;
-	pmadapter->hs_cfg.gpio = HOST_SLEEP_DEF_GPIO;
-	pmadapter->hs_cfg.gap = HOST_SLEEP_DEF_GAP;
+	if (wifi_control_data && wifi_control_data->host_sleep_cond > 0) {
+		pmadapter->hs_cfg.conditions = wifi_control_data->host_sleep_cond;
+		pmadapter->hs_cfg.gpio = wifi_control_data->host_sleep_gpio;
+		pmadapter->hs_cfg.gap = wifi_control_data->host_sleep_gap;
+	} else {
+		pmadapter->hs_cfg.conditions = HOST_SLEEP_DEF_COND;
+		pmadapter->hs_cfg.gpio = HOST_SLEEP_DEF_GPIO;
+		pmadapter->hs_cfg.gap = HOST_SLEEP_DEF_GAP;
+	}
 	pmadapter->hs_activated = MFALSE;
 	pmadapter->min_wake_holdoff = HOST_SLEEP_DEF_WAKE_HOLDOFF;
 

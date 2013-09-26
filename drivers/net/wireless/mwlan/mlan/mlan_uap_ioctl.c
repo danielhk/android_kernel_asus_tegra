@@ -23,6 +23,8 @@ Change log:
     02/05/2009: initial version
 ********************************************************/
 
+#include <linux/wlan_plat.h>
+
 #include "mlan.h"
 #include "mlan_util.h"
 #include "mlan_fw.h"
@@ -40,6 +42,7 @@ Change log:
 			Global Variables
 ********************************************************/
 extern t_u8 tos_to_tid_inv[];
+extern struct wifi_platform_data *wifi_control_data;
 
 /********************************************************
 			Local Functions
@@ -254,10 +257,15 @@ wlan_uap_bss_ioctl_reset(IN pmlan_adapter pmadapter,
 		pmpriv->aggr_prio_tbl[7].ampdu_user = BA_STREAM_NOT_ALLOWED;
 
 	/* hs_configured, hs_activated are reset by main loop */
-	pmadapter->hs_cfg.conditions = HOST_SLEEP_DEF_COND;
-	pmadapter->hs_cfg.gpio = HOST_SLEEP_DEF_GPIO;
-	pmadapter->hs_cfg.gap = HOST_SLEEP_DEF_GAP;
-
+	if (wifi_control_data && wifi_control_data->host_sleep_cond > 0) {
+		pmadapter->hs_cfg.conditions = wifi_control_data->host_sleep_cond;
+		pmadapter->hs_cfg.gpio = wifi_control_data->host_sleep_gpio;
+		pmadapter->hs_cfg.gap = wifi_control_data->host_sleep_gap;
+	} else {
+		pmadapter->hs_cfg.conditions = HOST_SLEEP_DEF_COND;
+		pmadapter->hs_cfg.gpio = HOST_SLEEP_DEF_GPIO;
+		pmadapter->hs_cfg.gap = HOST_SLEEP_DEF_GAP;
+	}
 	ret = wlan_prepare_cmd(pmpriv,
 			       HOST_CMD_APCMD_SYS_RESET,
 			       HostCmd_ACT_GEN_SET,
