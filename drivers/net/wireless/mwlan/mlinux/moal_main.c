@@ -2451,11 +2451,9 @@ wifi_enable_hostwake_irq(int flag)
 	if (wifi_irqres && irq_registered) {
 		PRINTM(MINTR, "enable_hostwake_irq=%d\n", flag);
 		if (flag) {
-			enable_irq(wifi_irqres->start);
 			enable_irq_wake(wifi_irqres->start);
 		} else {
 			disable_irq_wake(wifi_irqres->start);
-			disable_irq(wifi_irqres->start);
 		}
 	}
 }
@@ -2479,8 +2477,7 @@ wifi_register_hostwake_irq(void *handle)
 			PRINTM(MERROR, "Couldn't acquire WIFI_HOST_WAKE IRQ\n");
 		else {
 			irq_registered = 1;
-			enable_irq_wake(wifi_irqres->start);
-			wifi_enable_hostwake_irq(MFALSE);
+			disable_irq(wifi_irqres->start);
 		}
 	}
 }

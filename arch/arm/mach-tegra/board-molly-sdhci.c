@@ -61,12 +61,15 @@ static struct wifi_platform_data molly_wifi_control = {
 	.set_power	= molly_wifi_power,
 	.set_reset	= molly_wifi_reset,
 	.set_carddetect	= molly_wifi_set_carddetect,
+	.host_sleep_cond = 0x2, /* UNICAST only */
+	.host_sleep_gpio = 16,  /* GPIO 16 */
+	.host_sleep_gap	= 0xff,  /* level trigger */
 };
 
 static struct resource wifi_resource[] = {
 	[0] = {
 		.name	= "mrvl_wlan_irq",
-		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWEDGE,
+		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWLEVEL,
 	},
 };
 
