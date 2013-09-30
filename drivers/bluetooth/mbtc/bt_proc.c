@@ -532,8 +532,7 @@ bt_proc_init(bt_private * priv, struct m_dev *m_dev, int seq)
 		}
 		memcpy((u8 *) priv->dev_proc[seq].pfiles, (u8 *) proc_files,
 		       sizeof(proc_files));
-		priv->dev_proc[seq].num_proc_files =
-			sizeof(proc_files) / sizeof(proc_files[0]);
+		priv->dev_proc[seq].num_proc_files = ARRAY_SIZE(proc_files);
 		for (j = 0; j < priv->dev_proc[seq].num_proc_files; j++)
 			priv->dev_proc[seq].pfiles[j].pdata = NULL;
 		for (j = 0; j < priv->dev_proc[seq].num_proc_files; j++) {
@@ -638,14 +637,14 @@ bt_proc_remove(bt_private * priv)
 		for (i = 0; i < MAX_RADIO_FUNC; i++) {
 			if (!priv->dev_proc[i].proc_entry)
 				continue;
-			for (j = 0;
-			     j < ARRAY_SIZE(proc_files);
-			     j++) {
+			for (j = 0; j < ARRAY_SIZE(proc_files); j++) {
 				remove_proc_entry(proc_files[j].name,
 						  priv->dev_proc[i].proc_entry);
 			}
+
 			remove_proc_entry(priv->bt_dev.m_dev[i].name, proc_mbt);
 			priv->dev_proc[i].proc_entry = NULL;
+
 			if (priv->dev_proc[i].pfiles) {
 				for (j = 0;
 				     j < priv->dev_proc[i].num_proc_files;

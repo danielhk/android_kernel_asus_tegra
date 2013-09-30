@@ -122,6 +122,8 @@ static struct resource *bt_irqres;
 static int irq_registered;
 static void bt_register_hostwake_irq(void *handle);
 
+void mdev_poweroff(struct m_dev *m_dev);
+
 /**
  *  @brief Alloc bt device
  *
@@ -529,7 +531,7 @@ bt_send_reset_command(bt_private * priv)
 		ret = BT_STATUS_FAILURE;
 		goto exit;
 	}
-	pCmd = (BT_HCI_CMD *) skb->tail;
+	pCmd = (BT_HCI_CMD *) skb->data;
 	pCmd->ocf_ogf = (RESET_OGF << 10) | BT_CMD_RESET;
 	pCmd->length = 0x00;
 	pCmd->cmd_type = 0x00;
@@ -588,7 +590,7 @@ bt_send_module_cfg_cmd(bt_private * priv, int subcmd)
 	pCmd->length = 1;
 	pCmd->data[0] = subcmd;
 	bt_cb(skb)->pkt_type = MRVL_VENDOR_PKT;
-	skb_put(skb, sizeof(BT_CMD));
+	skb_put(skb, BT_CMD_HEADER_SIZE + pCmd->length);
 	skb->dev = (void *)(&(priv->bt_dev.m_dev[BT_SEQ]));
 	skb_queue_head(&priv->adapter->tx_queue, skb);
 	priv->bt_dev.sendcmdflag = TRUE;
@@ -651,7 +653,7 @@ bt_enable_ps(bt_private * priv)
 		pCmd->length = 1;
 	}
 	bt_cb(skb)->pkt_type = MRVL_VENDOR_PKT;
-	skb_put(skb, sizeof(BT_CMD));
+	skb_put(skb, BT_CMD_HEADER_SIZE + pCmd->length);
 	skb->dev = (void *)(&(priv->bt_dev.m_dev[BT_SEQ]));
 	skb_queue_head(&priv->adapter->tx_queue, skb);
 	PRINTM(CMD, "Queue PSMODE Command(0x%x):%d\n", pCmd->ocf_ogf,
@@ -697,7 +699,7 @@ bt_send_hscfg_cmd(bt_private * priv)
 	pCmd->data[0] = (priv->bt_dev.gpio_gap & 0xff00) >> 8;
 	pCmd->data[1] = (u8) (priv->bt_dev.gpio_gap & 0x00ff);
 	bt_cb(skb)->pkt_type = MRVL_VENDOR_PKT;
-	skb_put(skb, sizeof(BT_CMD));
+	skb_put(skb, BT_CMD_HEADER_SIZE + pCmd->length);
 	skb->dev = (void *)(&(priv->bt_dev.m_dev[BT_SEQ]));
 	skb_queue_head(&priv->adapter->tx_queue, skb);
 	PRINTM(CMD, "Queue HSCFG Command(0x%x),gpio=0x%x,gap=0x%x\n",
@@ -745,7 +747,7 @@ bt_send_sdio_pull_ctrl_cmd(bt_private * priv)
 	pCmd->data[2] = (priv->bt_dev.sdio_pull_cfg & 0x00ff0000) >> 16;
 	pCmd->data[3] = (priv->bt_dev.sdio_pull_cfg & 0xff000000) >> 24;
 	bt_cb(skb)->pkt_type = MRVL_VENDOR_PKT;
-	skb_put(skb, sizeof(BT_CMD));
+	skb_put(skb, BT_CMD_HEADER_SIZE + pCmd->length);
 	skb->dev = (void *)(&(priv->bt_dev.m_dev[BT_SEQ]));
 	skb_queue_head(&priv->adapter->tx_queue, skb);
 	PRINTM(CMD,
@@ -799,7 +801,7 @@ fm_set_intr_mask(bt_private * priv, u32 mask)
 	memcpy(&pCmd->data[1], &mask, sizeof(mask));
 	PRINTM(CMD, "FM set intr mask=0x%x\n", mask);
 	bt_cb(skb)->pkt_type = HCI_COMMAND_PKT;
-	skb_put(skb, sizeof(BT_CMD));
+	skb_put(skb, BT_CMD_HEADER_SIZE + pCmd->length);
 	skb->dev = (void *)(&(priv->bt_dev.m_dev[FM_SEQ]));
 	skb_queue_head(&priv->adapter->tx_queue, skb);
 	priv->bt_dev.sendcmdflag = TRUE;
@@ -843,7 +845,7 @@ bt_enable_hs(bt_private * priv)
 	pCmd->ocf_ogf = (VENDOR_OGF << 10) | BT_CMD_HOST_SLEEP_ENABLE;
 	pCmd->length = 0;
 	bt_cb(skb)->pkt_type = MRVL_VENDOR_PKT;
-	skb_put(skb, sizeof(BT_CMD));
+	skb_put(skb, BT_CMD_HEADER_SIZE + pCmd->length);
 	skb->dev = (void *)(&(priv->bt_dev.m_dev[BT_SEQ]));
 	skb_queue_head(&priv->adapter->tx_queue, skb);
 	priv->bt_dev.sendcmdflag = TRUE;
@@ -1004,8 +1006,8 @@ bt_set_mac_address(bt_private * priv, u8 * mac)
 	priv->bt_dev.sendcmdflag = TRUE;
 	priv->bt_dev.send_cmd_ocf = BT_CMD_CONFIG_MAC_ADDR;
 	priv->adapter->cmd_complete = FALSE;
-	PRINTM(CMD, "BT: Set mac addr %02x:%02x:%02x:%02x:%02x:%02x (0x%x)\n",
-	       mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], pCmd->ocf_ogf);
+	PRINTM(CMD, "BT: Set mac addr " MACSTR " (0x%x)\n", MAC2STR(mac),
+	       pCmd->ocf_ogf);
 	wake_up_interruptible(&priv->MainThread.waitQ);
 	if (!os_wait_interruptible_timeout
 	    (priv->adapter->cmd_wait_q, priv->adapter->cmd_complete,
@@ -1063,7 +1065,7 @@ bt_load_cal_data(bt_private * priv, u8 * config_data, u8 * mac)
 			pCmd->data[i] = mac[29 - i];
 	}
 	bt_cb(skb)->pkt_type = MRVL_VENDOR_PKT;
-	skb_put(skb, sizeof(BT_CMD));
+	skb_put(skb, BT_CMD_HEADER_SIZE + pCmd->length);
 	skb->dev = (void *)(&(priv->bt_dev.m_dev[BT_SEQ]));
 	skb_queue_head(&priv->adapter->tx_queue, skb);
 	priv->bt_dev.sendcmdflag = TRUE;
@@ -1150,7 +1152,8 @@ bt_restore_tx_queue(bt_private * priv)
 	struct sk_buff *skb = NULL;
 	while (!skb_queue_empty(&priv->adapter->pending_queue)) {
 		skb = skb_dequeue(&priv->adapter->pending_queue);
-		skb_queue_tail(&priv->adapter->tx_queue, skb);
+		if (skb)
+			skb_queue_tail(&priv->adapter->tx_queue, skb);
 	}
 	wake_up_interruptible(&priv->MainThread.waitQ);
 }
@@ -1245,40 +1248,6 @@ SendSinglePacket(bt_private * priv, struct sk_buff *skb)
 	ret = sbi_host_to_card(priv, skb->data, skb->len);
 	LEAVE();
 	return ret;
-}
-
-void
-update_stat_byte_tx(bt_private * priv, struct sk_buff *skb)
-{
-	if (((priv->bt_dev.m_dev[FM_SEQ].dev_pointer) &&
-	     (!strcmp
-	      (((struct m_dev *)skb->dev)->name,
-	       priv->bt_dev.m_dev[FM_SEQ].name))) ||
-	    ((priv->bt_dev.m_dev[NFC_SEQ].dev_pointer) &&
-	     (!strcmp
-	      (((struct m_dev *)skb->dev)->name,
-	       priv->bt_dev.m_dev[NFC_SEQ].name))))
-		((struct m_dev *)skb->dev)->stat.byte_tx += skb->len;
-	else
-		((struct hci_dev *)priv->bt_dev.m_dev[BT_SEQ].dev_pointer)->
-			stat.byte_tx += skb->len;
-}
-
-void
-update_stat_err_tx(bt_private * priv, struct sk_buff *skb)
-{
-	if (((priv->bt_dev.m_dev[FM_SEQ].dev_pointer) &&
-	     (!strcmp
-	      (((struct m_dev *)skb->dev)->name,
-	       priv->bt_dev.m_dev[FM_SEQ].name))) ||
-	    ((priv->bt_dev.m_dev[NFC_SEQ].dev_pointer) &&
-	     (!strcmp
-	      (((struct m_dev *)skb->dev)->name,
-	       priv->bt_dev.m_dev[NFC_SEQ].name))))
-		((struct m_dev *)skb->dev)->stat.err_tx++;
-	else
-		((struct hci_dev *)priv->bt_dev.m_dev[BT_SEQ].dev_pointer)->
-			stat.err_tx++;
 }
 
 /**
@@ -1563,6 +1532,7 @@ init_m_dev(struct m_dev *m_dev)
 	m_dev->ioctl = mdev_ioctl;
 	m_dev->query = mdev_query;
 	m_dev->owner = THIS_MODULE;
+	m_dev->poweroff = mdev_poweroff;
 
 }
 
@@ -1723,6 +1693,75 @@ bt_interrupt(struct m_dev *m_dev)
 	LEAVE();
 }
 
+static void
+char_dev_release_dynamic(struct kobject *kobj)
+{
+	struct char_dev *cdev = container_of(kobj, struct char_dev, kobj);
+	ENTER();
+	PRINTM(INFO, "free char_dev\n");
+	kfree(cdev);
+	LEAVE();
+}
+
+static struct kobj_type ktype_char_dev_dynamic = {
+	.release = char_dev_release_dynamic,
+};
+
+static struct char_dev *
+alloc_char_dev(void)
+{
+	struct char_dev *cdev;
+	ENTER();
+	cdev = kzalloc(sizeof(struct char_dev), GFP_KERNEL);
+	if (cdev) {
+		kobject_init(&cdev->kobj, &ktype_char_dev_dynamic);
+		PRINTM(INFO, "alloc char_dev\n");
+	}
+	return cdev;
+}
+
+static void
+bt_private_dynamic_release(struct kobject *kobj)
+{
+	bt_private *priv = container_of(kobj, bt_private, kobj);
+	ENTER();
+	PRINTM(INFO, "free bt priv\n");
+	kfree(priv);
+	LEAVE();
+}
+
+static struct kobj_type ktype_bt_private_dynamic = {
+	.release = bt_private_dynamic_release,
+};
+
+static bt_private *
+bt_alloc_priv(void)
+{
+	bt_private *priv;
+	ENTER();
+	priv = kzalloc(sizeof(bt_private), GFP_KERNEL);
+	if (priv) {
+		kobject_init(&priv->kobj, &ktype_bt_private_dynamic);
+		PRINTM(INFO, "alloc bt priv\n");
+	}
+	LEAVE();
+	return priv;
+}
+
+struct kobject *
+bt_priv_get(bt_private * priv)
+{
+	PRINTM(INFO, "bt priv get object");
+	return kobject_get(&priv->kobj);
+}
+
+void
+bt_priv_put(bt_private * priv)
+{
+	PRINTM(INFO, "bt priv put object");
+	kobject_put(&priv->kobj);
+}
+
 /**
  *  @brief Module configuration and register device
  *
@@ -1805,7 +1844,7 @@ sbi_register_conf_dpc(bt_private * priv)
 		priv->bt_dev.m_dev[BT_SEQ].dev_type = BT_AMP_TYPE;
 	}
 	/* block all the packet from bluez */
-	if (init_cfg || cal_cfg)
+	if (init_cfg || cal_cfg || bt_mac)
 		priv->adapter->tx_lock = TRUE;
 
 	if (mbt_dev) {
@@ -1823,7 +1862,7 @@ sbi_register_conf_dpc(bt_private * priv)
 		atomic_set(&mbt_dev->promisc, 0);
 
 		/** alloc char dev node */
-		char_dev = kzalloc(sizeof(struct char_dev), GFP_KERNEL);
+		char_dev = alloc_char_dev();
 		if (!char_dev) {
 			class_destroy(chardev_class);
 			ret = -ENOMEM;
@@ -1885,7 +1924,7 @@ sbi_register_conf_dpc(bt_private * priv)
 		priv->bt_dev.m_dev[FM_SEQ].read_continue_flag = 0;
 
 		/** create char device for FM */
-		char_dev = kzalloc(sizeof(struct char_dev), GFP_KERNEL);
+		char_dev = alloc_char_dev();
 		if (!char_dev) {
 			class_destroy(chardev_class);
 			ret = -ENOMEM;
@@ -1942,7 +1981,7 @@ sbi_register_conf_dpc(bt_private * priv)
 		priv->bt_dev.m_dev[NFC_SEQ].read_continue_flag = 0;
 
 		/** create char device for NFC */
-		char_dev = kzalloc(sizeof(struct char_dev), GFP_KERNEL);
+		char_dev = alloc_char_dev();
 		if (!char_dev) {
 			class_destroy(chardev_class);
 			ret = -ENOMEM;
@@ -1997,7 +2036,7 @@ sbi_register_conf_dpc(bt_private * priv)
 		priv->bt_dev.m_dev[DEBUG_SEQ].driver_data = priv;
 
 		/** create char device for Debug */
-		char_dev = kzalloc(sizeof(struct char_dev), GFP_KERNEL);
+		char_dev = alloc_char_dev();
 		if (!char_dev) {
 			class_destroy(chardev_class);
 			ret = -ENOMEM;
@@ -2016,15 +2055,13 @@ sbi_register_conf_dpc(bt_private * priv)
 		debugchar_minor++;
 
 		/** register char dev */
+		priv->bt_dev.m_dev[DEBUG_SEQ].index = char_dev->minor;
+		char_dev->m_dev = &(priv->bt_dev.m_dev[DEBUG_SEQ]);
 		register_char_dev(char_dev, chardev_class, MODULE_NAME,
 				  debug_dev->name);
 
 		/** chmod for debug char device */
 		mbtchar_chmod(dev_file, 0666);
-
-		/** register m_dev to debug char device */
-		priv->bt_dev.m_dev[DEBUG_SEQ].index = char_dev->minor;
-		char_dev->m_dev = &(priv->bt_dev.m_dev[DEBUG_SEQ]);
 
 		/** create proc device */
 		snprintf(priv->bt_dev.m_dev[DEBUG_SEQ].name,
@@ -2051,7 +2088,7 @@ sbi_register_conf_dpc(bt_private * priv)
 			goto done;
 		}
 
-	if (cal_cfg)
+	if (cal_cfg) {
 		if (BT_STATUS_SUCCESS != bt_cal_config(priv, cal_cfg, bt_mac)) {
 			PRINTM(FATAL, "BT: Set cal data failed\n");
 			if (mbt_dev) {
@@ -2067,7 +2104,18 @@ sbi_register_conf_dpc(bt_private * priv)
 			ret = BT_STATUS_FAILURE;
 			goto done;
 		}
-	if (init_cfg || cal_cfg) {
+	} else if (bt_mac) {
+		PRINTM(INFO,
+		       "Set BT mac_addr from insmod parametre bt_mac = %s\n",
+		       bt_mac);
+		if (BT_STATUS_SUCCESS != bt_init_mac_address(priv, bt_mac)) {
+			PRINTM(FATAL,
+			       "BT: Fail to set mac address from insmod parametre\n");
+			ret = BT_STATUS_FAILURE;
+			goto done;
+		}
+	}
+	if (init_cfg || cal_cfg || bt_mac) {
 		priv->adapter->tx_lock = FALSE;
 		bt_restore_tx_queue(priv);
 	}
@@ -2106,7 +2154,7 @@ bt_add_card(void *card)
 
 	ENTER();
 
-	priv = kzalloc(sizeof(bt_private), GFP_KERNEL);
+	priv = bt_alloc_priv();
 	if (!priv) {
 		PRINTM(FATAL, "Can not allocate priv\n");
 		LEAVE();
@@ -2167,7 +2215,7 @@ err_registerdev:
 err_kmalloc:
 	if (priv->adapter)
 		bt_free_adapter(priv);
-	kfree(priv);
+	bt_priv_put(priv);
 	LEAVE();
 	return NULL;
 }
@@ -2257,7 +2305,7 @@ bt_remove_card(void *card)
 	}
 	PRINTM(INFO, "Free Adapter\n");
 	bt_free_adapter(priv);
-	kfree(priv);
+	bt_priv_put(priv);
 
 	LEAVE();
 	return BT_STATUS_SUCCESS;
@@ -2295,6 +2343,19 @@ bt_set_power(int on, unsigned long msec)
 	if (msec)
 		mdelay(msec);
 	return 0;
+}
+
+void
+mdev_poweroff(struct m_dev *m_dev)
+{
+	ENTER();
+
+	if (minicard_pwrup) {
+		bt_set_power(0, 0);
+		bt_set_carddetect(0);
+	}
+
+	LEAVE();
 }
 
 /*

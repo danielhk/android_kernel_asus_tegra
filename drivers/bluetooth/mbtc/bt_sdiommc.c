@@ -386,7 +386,7 @@ int
 sd_verify_fw_download(bt_private * priv, int pollnum)
 {
 	int ret = BT_STATUS_FAILURE;
-	u16 firmwarestat;
+	u16 firmwarestat = 0;
 	int tries;
 
 	ENTER();
@@ -402,7 +402,10 @@ sd_verify_fw_download(bt_private * priv, int pollnum)
 		}
 		mdelay(100);
 	}
-
+	if ((pollnum > 1) && (ret != BT_STATUS_SUCCESS))
+		PRINTM(ERROR,
+		       "Fail to poll firmware status: firmwarestat=0x%x\n",
+		       firmwarestat);
 	LEAVE();
 	return ret;
 }
@@ -445,7 +448,7 @@ sd_init_fw_dpc(bt_private * priv)
 	tv1 = get_utimeofday();
 #endif
 
-	tmpfwbufsz = ALIGN_SZ(BT_UPLD_SIZE, DMA_ALIGNMENT);
+	tmpfwbufsz = BT_UPLD_SIZE + DMA_ALIGNMENT;
 	tmpfwbuf = kmalloc(tmpfwbufsz, GFP_KERNEL);
 	if (!tmpfwbuf) {
 		PRINTM(ERROR,
@@ -1609,9 +1612,11 @@ sbi_host_to_card(bt_private * priv, u8 * payload, u16 nb)
 	}
 	buf = payload;
 
+	blksz = SD_BLOCK_SIZE;
+	buf_block_len = (nb + blksz - 1) / blksz;
 	/* Allocate buffer and copy payload */
 	if ((t_ptr) payload & (DMA_ALIGNMENT - 1)) {
-		tmpbufsz = ALIGN_SZ(nb, DMA_ALIGNMENT);
+		tmpbufsz = buf_block_len * blksz + DMA_ALIGNMENT;
 		tmpbuf = kmalloc(tmpbufsz, GFP_KERNEL);
 		if (!tmpbuf) {
 			LEAVE();
@@ -1622,8 +1627,6 @@ sbi_host_to_card(bt_private * priv, u8 * payload, u16 nb)
 		buf = (u8 *) ALIGN_ADDR(tmpbuf, DMA_ALIGNMENT);
 		memcpy(buf, payload, nb);
 	}
-	blksz = SD_BLOCK_SIZE;
-	buf_block_len = (nb + blksz - 1) / blksz;
 	sdio_claim_host(card->func);
 #define MAX_WRITE_IOMEM_RETRY	2
 	do {

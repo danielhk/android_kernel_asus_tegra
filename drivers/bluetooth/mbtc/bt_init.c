@@ -338,10 +338,8 @@ bt_process_init_cfg(bt_private * priv, u8 * data, u32 size)
 					/* Convert MAC format */
 					bt_mac2u8(bt_mac, bt_addr);
 					PRINTM(CMD,
-					       "HCI: %s new BT Address %02x:%02x:%02x:%02x:%02x:%02x\n",
-					       dev_name, bt_mac[0], bt_mac[1],
-					       bt_mac[2], bt_mac[3], bt_mac[4],
-					       bt_mac[5]);
+					       "HCI: %s new BT Address " MACSTR
+					       "\n", dev_name, MAC2STR(bt_mac));
 					if (BT_STATUS_SUCCESS !=
 					    bt_set_mac_address(priv, bt_mac)) {
 						PRINTM(FATAL,
@@ -509,10 +507,8 @@ bt_process_cal_cfg(bt_private * priv, u8 * data, u32 size, char *mac)
 	if (mac != NULL) {
 		/* Convert MAC format */
 		bt_mac2u8(bt_mac, mac);
-		PRINTM(CMD,
-		       "HCI: new BT Address %02x:%02x:%02x:%02x:%02x:%02x\n",
-		       bt_mac[0], bt_mac[1], bt_mac[2], bt_mac[3], bt_mac[4],
-		       bt_mac[5]);
+		PRINTM(CMD, "HCI: new BT Address " MACSTR "\n",
+		       MAC2STR(bt_mac));
 		mac_data = bt_mac;
 	}
 	if (BT_STATUS_SUCCESS != bt_load_cal_data(priv, cal_data, mac_data)) {
@@ -554,6 +550,32 @@ bt_cal_config(bt_private * priv, char *cal_file, char *mac)
 done:
 	if (cfg)
 		release_firmware(cfg);
+	LEAVE();
+	return ret;
+}
+
+/**
+ *    @brief BT init mac address from bt_mac parametre when insmod
+ *
+ *    @param priv    a pointer to bt_private structure
+ *    @param bt_mac  mac address buf
+ *    @return        BT_STATUS_SUCCESS or BT_STATUS_FAILURE
+ */
+int
+bt_init_mac_address(bt_private * priv, char *mac)
+{
+	u8 bt_mac[ETH_ALEN];
+	int ret = BT_STATUS_FAILURE;
+
+	ENTER();
+	memset(bt_mac, 0, sizeof(bt_mac));
+	bt_mac2u8(bt_mac, mac);
+	PRINTM(CMD, "HCI: New BT Address " MACSTR "\n", MAC2STR(bt_mac));
+	ret = bt_set_mac_address(priv, bt_mac);
+	if (ret != BT_STATUS_SUCCESS)
+		PRINTM(FATAL,
+		       "BT: Fail to set mac address from insmod parametre.\n");
+
 	LEAVE();
 	return ret;
 }

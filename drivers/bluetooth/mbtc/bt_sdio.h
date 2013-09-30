@@ -70,11 +70,13 @@ typedef IRQ_RET_TYPE(*isr_notifier_fn_t) (s32 irq, void *dev_id,
 
 /** Host Control Registers : Host interrupt RSR */
 #define HOST_INT_RSR_REG		0x01
+
 /** Host Control Registers : Upload host interrupt RSR */
 #define UP_LD_HOST_INT_RSR		(0x1U)
 
 /** Host Control Registers : Host interrupt mask */
 #define HOST_INT_MASK_REG		0x02
+
 /** Host Control Registers : Upload host interrupt mask */
 #define UP_LD_HOST_INT_MASK		(0x1U)
 /** Host Control Registers : Download host interrupt mask */
