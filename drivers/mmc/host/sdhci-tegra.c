@@ -2198,15 +2198,13 @@ skip_vcore_override:
 				vcore_lvl = 0;
 			spin_lock(&sdhci->lock);
 
-			if (!vcore_override_failed) {
-				if (voltage == tegra_host->nominal_vcore_mv)
-					tuning_data->nominal_vcore_tun_done =
-						true;
-				if (voltage >=
-					tegra_host->min_vcore_override_mv)
-					tuning_data->override_vcore_tun_done =
-						true;
-			}
+			if (voltage == tegra_host->nominal_vcore_mv)
+				tuning_data->nominal_vcore_tun_done =
+					!vcore_override_failed;
+			if (voltage >= tegra_host->min_vcore_override_mv)
+				tuning_data->override_vcore_tun_done =
+					!vcore_override_failed;
+
 		}
 
 		if (freq_band == CUR_FREQ_LOW) {
