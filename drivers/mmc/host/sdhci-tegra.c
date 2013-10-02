@@ -2077,7 +2077,7 @@ static int sdhci_tegra_execute_tuning(struct sdhci_host *sdhci, u32 opcode)
 		/* Remove any previously set override voltages */
 		if (tegra_host->set_tuning_override) {
 			spin_unlock(&sdhci->lock);
-			tegra_dvfs_override_core_voltage(0);
+			tegra_dvfs_override_core_voltage(pltfm_host->clk, 0);
 			spin_lock(&sdhci->lock);
 			vcore_lvl = 0;
 			tegra_host->set_tuning_override = false;
@@ -2155,7 +2155,8 @@ static int sdhci_tegra_execute_tuning(struct sdhci_host *sdhci, u32 opcode)
 			}
 
 			if (voltage != vcore_lvl) {
-				err = tegra_dvfs_override_core_voltage(voltage);
+				err = tegra_dvfs_override_core_voltage(
+					pltfm_host->clk, voltage);
 				if (err) {
 					vcore_override_failed = true;
 					dev_err(mmc_dev(sdhci->mmc),
@@ -2187,7 +2188,8 @@ skip_vcore_override:
 
 			/* Release the override voltage setting */
 			spin_unlock(&sdhci->lock);
-			err = tegra_dvfs_override_core_voltage(0);
+			err = tegra_dvfs_override_core_voltage(
+				pltfm_host->clk, 0);
 			if (err)
 				dev_err(mmc_dev(sdhci->mmc),
 				"Clearing tuning override voltage failed %d\n",
@@ -2281,7 +2283,7 @@ out:
 			"Nominal core voltage being set until retuning\n");
 		spin_unlock(&sdhci->lock);
 		err = tegra_dvfs_override_core_voltage(
-				tegra_host->nominal_vcore_mv);
+				pltfm_host->clk, tegra_host->nominal_vcore_mv);
 		if (err)
 			dev_err(mmc_dev(sdhci->mmc),
 				"Setting tuning override voltage failed %d\n",
