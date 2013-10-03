@@ -236,6 +236,28 @@ static struct tegra_dc_mode hdmi_panel_modes[] = {
 	},
 };
 
+/* The level shifter's definition of a "low" is higher than what
+ * the Tegra's i2c defintion of "low" is.  This causes intermitent failures.
+ * So we add pull downs to make sure the Tegra i2c sees lows correctly.
+ * This causes increased power draw because the level shifter has internal
+ * pull-ups, creating path from 5V to ground through the pulls, so we
+ * turn off the pull-down when no HPD.
+ */
+static void molly_hdmi_hotplug_report(bool state)
+{
+	if (state) {
+		tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_DDC_SDA,
+					    TEGRA_PUPD_PULL_DOWN);
+		tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_DDC_SCL,
+					    TEGRA_PUPD_PULL_DOWN);
+	} else {
+		tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_DDC_SDA,
+					    TEGRA_PUPD_NORMAL);
+		tegra_pinmux_set_pullupdown(TEGRA_PINGROUP_DDC_SCL,
+					    TEGRA_PUPD_NORMAL);
+	}
+}
+
 /* Electrical characteristics for HDMI, all modes must be declared here */
 struct tmds_config molly_tmds_config[] = {
 	{ /* 480p : 27 MHz and below */
@@ -302,6 +324,7 @@ static struct tegra_dc_out molly_disp_out = {
 	.disable	= molly_hdmi_disable,
 	.postsuspend	= molly_hdmi_postsuspend,
 	.hotplug_init	= molly_hdmi_hotplug_init,
+	.hotplug_report = molly_hdmi_hotplug_report,
 };
 
 static struct tegra_fb_data molly_disp_fb_data = {
