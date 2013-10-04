@@ -1291,7 +1291,8 @@ static void hdmi_present_sense(struct hdmi_spec_per_pin *per_pin, int repoll)
 
 	/* Status unchanged? We might already be using the ELD data, so
 	 * don't mess with it */
-	if (eld->monitor_present == (!!(present & AC_PINSENSE_PRESENCE))) {
+	if (eld->monitor_present == (!!(present & AC_PINSENSE_PRESENCE)) &&
+	    eld->eld_valid == (!!(present & AC_PINSENSE_ELDV))) {
 		mutex_unlock(&eld_mutex);
 		return;
 	}
