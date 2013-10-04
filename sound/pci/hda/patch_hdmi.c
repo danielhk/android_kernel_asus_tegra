@@ -1062,7 +1062,6 @@ static void hdmi_intrinsic_event(struct hda_codec *codec, unsigned int res)
 		return;
 
 	hdmi_present_sense(&spec->pins[pin_idx], 1);
-
 	snd_hda_jack_report_sync(codec);
 }
 
@@ -1317,19 +1316,6 @@ static void hdmi_present_sense(struct hdmi_spec_per_pin *per_pin, int repoll)
 					   msecs_to_jiffies(300));
 		}
 	}
-
-#ifdef CONFIG_SND_HDA_PLATFORM_NVIDIA_TEGRA
-	if ((codec->preset->id == 0x10de0020) ||
-		(codec->preset->id == 0x10de0022)) {
-		/*
-		 * HDMI sink's ELD info cannot always be retrieved for now, e.g.
-		 * in console or for audio devices. Assume the highest speakers
-		 * configuration, to _not_ prohibit multi-channel audio playback
-		 */
-		if (!eld->spk_alloc)
-			eld->spk_alloc = 0xffff;
-	}
-#endif
 	mutex_unlock(&eld_mutex);
 }
 
