@@ -1302,17 +1302,25 @@ static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 		if ((host->flags & SDHCI_NEEDS_RETUNING) &&
 		    !(present_state & (SDHCI_DOING_WRITE | SDHCI_DOING_READ))) {
 			if (mmc->card) {
-				/* eMMC uses cmd21 but sd and sdio use cmd19 */
-				tuning_opcode =
-					mmc->card->type == MMC_TYPE_MMC ?
-					MMC_SEND_TUNING_BLOCK_HS200 :
-					MMC_SEND_TUNING_BLOCK;
-				spin_unlock_irqrestore(&host->lock, flags);
-				sdhci_execute_tuning(mmc, tuning_opcode);
-				spin_lock_irqsave(&host->lock, flags);
+				/* some SDIO cards (e.g. for Wifi/BT) might
+				 * enter low power mode and do not response for
+				 * tuning commands when there is no data
+				 * transfers
+				 */
+				if ((mmc->card->type != MMC_TYPE_SDIO)
+					|| mrq->data) {
+					/* eMMC uses cmd21 but sd and sdio use cmd19 */
+					tuning_opcode =
+						mmc->card->type == MMC_TYPE_MMC ?
+						MMC_SEND_TUNING_BLOCK_HS200 :
+						MMC_SEND_TUNING_BLOCK;
+					spin_unlock_irqrestore(&host->lock, flags);
+					sdhci_execute_tuning(mmc, tuning_opcode);
+					spin_lock_irqsave(&host->lock, flags);
 
-				/* Restore original mmc_request structure */
-				host->mrq = mrq;
+					/* Restore original mmc_request structure */
+					host->mrq = mrq;
+				}
 			}
 		}
 
