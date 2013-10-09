@@ -35,6 +35,9 @@
 #include <linux/mutex.h>
 #include <sound/core.h>
 #include <sound/jack.h>
+#ifdef CONFIG_SWITCH
+#include <linux/switch.h>
+#endif
 
 #ifdef CONFIG_SND_HDA_PLATFORM_NVIDIA_TEGRA
 #include <mach/hdmi-audio.h>
@@ -114,6 +117,10 @@ struct hdmi_spec {
 	 */
 	struct hda_multi_out multiout;
 	const struct hda_pcm_stream *pcm_playback;
+
+#ifdef CONFIG_SWITCH
+	struct switch_dev hdmi_audio_switch;
+#endif
 };
 
 
@@ -1057,6 +1064,13 @@ static void hdmi_intrinsic_event(struct hda_codec *codec, unsigned int res)
 		codec->addr, pin_nid,
 		!!(res & AC_UNSOL_RES_PD), !!(res & AC_UNSOL_RES_ELDV));
 
+#ifdef CONFIG_SWITCH
+	if (!(res & AC_UNSOL_RES_ELDV)) {
+		pr_info("%s: HDMI audio switch set to 0\n", __func__);
+		switch_set_state(&spec->hdmi_audio_switch, 0);
+	}
+#endif
+
 	pin_idx = pin_nid_to_pin_index(spec, pin_nid);
 	if (pin_idx < 0)
 		return;
@@ -1182,8 +1196,10 @@ static int hdmi_pcm_open(struct hda_pcm_stream *hinfo,
 
 		/* From here ELD should be ready. If it's not, ask user-space
 		 * to try again later */
-		if (!eld->lpcm_sad_ready)
+		if (!eld->lpcm_sad_ready) {
+			pr_info("%s: ELD not ready, returning -EAGAIN\n", __func__);
 			return -EAGAIN;
+		}
 	}
 #endif
 
@@ -1309,14 +1325,24 @@ static void hdmi_present_sense(struct hdmi_spec_per_pin *per_pin, int repoll)
 
 	eld->eld_valid = false;
 	if (eld_valid) {
-		if (!snd_hdmi_get_eld(eld, codec, pin_nid))
+		if (!snd_hdmi_get_eld(eld, codec, pin_nid)) {
+#ifdef CONFIG_SWITCH
+			/* eld data has been processed successfully,
+			 * notify userland they can start using audio now
+			 */
+			struct hdmi_spec *spec = codec->spec;
+			pr_info("%s: HDMI audio switch set to 1\n", __func__);
+			switch_set_state(&spec->hdmi_audio_switch, 1);
+#endif
+
 			snd_hdmi_show_eld(eld);
-		else if (repoll) {
+		} else if (repoll) {
 			queue_delayed_work(codec->bus->workq,
 					   &per_pin->work,
 					   msecs_to_jiffies(300));
 		}
 	}
+
 	mutex_unlock(&eld_mutex);
 }
 
@@ -1658,6 +1684,12 @@ static int generic_hdmi_init(struct hda_codec *codec)
 		snd_hda_eld_proc_new(codec, eld, pin_idx);
 	}
 	snd_hda_jack_report_sync(codec);
+
+#ifdef CONFIG_SWITCH
+	spec->hdmi_audio_switch.name = "hdmi_audio";
+	pin_idx = switch_dev_register(&spec->hdmi_audio_switch);
+	BUG_ON(pin_idx != 0);
+#endif
 	return 0;
 }
 
@@ -1675,6 +1707,9 @@ static void generic_hdmi_free(struct hda_codec *codec)
 	}
 
 	flush_workqueue(codec->bus->workq);
+#ifdef CONFIG_SWITCH
+	switch_dev_unregister(&spec->hdmi_audio_switch);
+#endif
 	kfree(spec);
 }
 
