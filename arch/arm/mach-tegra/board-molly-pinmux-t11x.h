@@ -64,7 +64,8 @@ static __initdata struct tegra_pingroup_config molly_pinmux_common[] = {
 	/* GPIO pinmux, for ubik */
 	GPIO_PINMUX(SDMMC3_CMD, NORMAL, NORMAL, OUTPUT, DISABLE), /* CS */
 	GPIO_PINMUX(SDMMC3_DAT2, NORMAL, NORMAL, OUTPUT, DISABLE), /* RESET_N */
-	GPIO_PINMUX(SDMMC3_DAT3, PULL_UP, NORMAL, INPUT, DISABLE), /* INT_N */
+	GPIO_PINMUX(SDMMC3_DAT3, PULL_UP, NORMAL, INPUT, DISABLE), /* INT_N_3V3 */
+	GPIO_PINMUX(KB_ROW10, PULL_UP, NORMAL, INPUT, DISABLE), /* INT_N */
 	/* UARTA pinmux, for ubik */
 	DEFAULT_PINMUX(GPIO_PU0,      UARTA,       NORMAL,    NORMAL,   OUTPUT),
 	DEFAULT_PINMUX(GPIO_PU1,      UARTA,       NORMAL,    TRISTATE, INPUT),
@@ -80,11 +81,6 @@ static __initdata struct tegra_pingroup_config molly_pinmux_common[] = {
 	DEFAULT_PINMUX(SDMMC4_DAT5,   SDMMC4,      PULL_UP,   NORMAL,   INPUT),
 	DEFAULT_PINMUX(SDMMC4_DAT6,   SDMMC4,      PULL_UP,   NORMAL,   INPUT),
 	DEFAULT_PINMUX(SDMMC4_DAT7,   SDMMC4,      PULL_UP,   NORMAL,   INPUT),
-
-	/* SPI2 (SWD) pinmux */
-	DEFAULT_PINMUX(KB_COL0,       SPI2,        NORMAL,    NORMAL,   OUTPUT),
-	DEFAULT_PINMUX(KB_COL1,       SPI2,        PULL_UP,   NORMAL,   INPUT),
-	DEFAULT_PINMUX(KB_ROW5,       SPI2,        NORMAL,    NORMAL,   OUTPUT),
 
 	/* I2CPWR pinmux */
 	I2C_PINMUX(PWR_I2C_SCL, I2CPWR, NORMAL, NORMAL,
@@ -147,6 +143,8 @@ static __initdata struct tegra_pingroup_config molly_pinmux_common[] = {
 	GPIO_PINMUX(CLK2_REQ, NORMAL, NORMAL, OUTPUT, DISABLE),
 	/* ENET_PHY_INT_N_3V3 */
 	GPIO_PINMUX(SDMMC3_CLK_LB_OUT, PULL_UP, NORMAL, INPUT, DISABLE),
+	/* ENET_PHY_INT_N */
+	GPIO_PINMUX(KB_ROW4, PULL_UP, NORMAL, INPUT, DISABLE),
 	/* ENET_RESET_N_3V3 */
 	GPIO_PINMUX(SDMMC3_CLK_LB_IN, NORMAL, NORMAL, OUTPUT, DISABLE),
 	/* UI_SWITCH */
@@ -176,6 +174,17 @@ static __initdata struct tegra_pingroup_config molly_pinmux_common[] = {
 	DEFAULT_PINMUX(KB_ROW2, KBC, PULL_UP, NORMAL, INPUT),
 #endif
 
+};
+
+static __initdata struct tegra_pingroup_config molly_pinmux_override_dvt1[] = {
+	/* SPI2 (SWD) pinmux */
+	DEFAULT_PINMUX(KB_COL0,       SPI2,        NORMAL,    NORMAL,   OUTPUT),
+	DEFAULT_PINMUX(KB_COL1,       SPI2,        PULL_UP,   NORMAL,   INPUT),
+	DEFAULT_PINMUX(KB_ROW5,       SPI2,        NORMAL,    NORMAL,   OUTPUT),
+
+	UNUSED_PINMUX(KB_ROW4),
+	UNUSED_PINMUX(KB_ROW7),
+	UNUSED_PINMUX(KB_ROW10),
 };
 
 static __initdata struct tegra_pingroup_config unused_pins_lowpower[] = {
@@ -257,6 +266,8 @@ static __initdata struct tegra_pingroup_config unused_pins_lowpower[] = {
 	UNUSED_PINMUX(GMI_RST_N),
 	UNUSED_PINMUX(GMI_WAIT),
 	UNUSED_PINMUX(SDMMC1_WP_N),
+	UNUSED_PINMUX(KB_COL0),
+	UNUSED_PINMUX(KB_COL1),
 	UNUSED_PINMUX(KB_COL2),
 	/* BOARD_ID0 - make unused (pull_down) to save power,
 	   we read in bootloader */
@@ -273,7 +284,6 @@ static __initdata struct tegra_pingroup_config unused_pins_lowpower[] = {
 
 	UNUSED_PINMUX(KB_ROW0),
 	UNUSED_PINMUX(KB_ROW1),
-	UNUSED_PINMUX(KB_ROW10),
 #if MOLLY_ON_DALMORE == 0
 	/* #if 0 to be removed once we are off of dalmore. for
 	 * now, this is our UI_SWITCH on dalmore so this pin
@@ -282,9 +292,13 @@ static __initdata struct tegra_pingroup_config unused_pins_lowpower[] = {
 	UNUSED_PINMUX(KB_ROW2),
 #endif
 	UNUSED_PINMUX(KB_ROW3),
-	UNUSED_PINMUX(KB_ROW4),
+
+	/* ENET_PME_SEL is connected on EVT2 but is not used */
+	UNUSED_PINMUX(KB_ROW5),
+	/* ENET_PME is connected on EVT2 but is not used */
+	DEFAULT_PINMUX(KB_ROW7, RSVD1, NORMAL, NORMAL, INPUT),
+
 	UNUSED_PINMUX(KB_ROW6),
-	UNUSED_PINMUX(KB_ROW7),
 	UNUSED_PINMUX(KB_ROW8),
 	UNUSED_PINMUX(KB_ROW9),
 	UNUSED_PINMUX(SDMMC3_CD_N),
@@ -357,10 +371,8 @@ static struct gpio_init_pin_info init_gpio_mode_molly_common[] = {
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PQ6, true, 0), /* BOARD_ID3 */
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PQ7, true, 0), /* BOARD_ID4 */
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PR3, true, 0),
-	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PR4, true, 0),
-	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PR5, false, 0),
+	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PR4, true, 0), /* ENET_PHY_INT_N */
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PR6, true, 0),
-	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PR7, true, 0),
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PS0, true, 0),
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PEE1, false, 1), /* CLK3_REQ - BT_WL_OSC_SLP */
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PU2, true, 0),
@@ -373,7 +385,8 @@ static struct gpio_init_pin_info init_gpio_mode_molly_common[] = {
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PW5, false, 1), /* CLK2_OUT - WL_BT_RST_N */
 
 	/* ubik GPIOs */
-	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PB4, true, 0), /* INT_N, input */
+	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PB4, true, 0), /* INT_N_3V3, input */
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PB5, false, 0), /* RESET_N, output */
 	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PA7, false, 0), /* cs, output */
+	GPIO_INIT_PIN_MODE(TEGRA_GPIO_PS2, true, 0), /* INT_N, input */
 };

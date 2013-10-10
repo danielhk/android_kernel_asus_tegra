@@ -144,5 +144,14 @@ int __init molly_pinmux_init(void)
 	tegra_pinmux_config_table(manual_config_pinmux,
 		ARRAY_SIZE(manual_config_pinmux));
 
+	switch (molly_hw_rev) {
+	case MOLLY_REV_PROTO1:
+	case MOLLY_REV_PROTO2:
+	case MOLLY_REV_EVT1:
+	case MOLLY_REV_DVT1:
+		tegra_pinmux_config_table(molly_pinmux_override_dvt1,
+				ARRAY_SIZE(molly_pinmux_override_dvt1));
+	};
+
 	return 0;
 }

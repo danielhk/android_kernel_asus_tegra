@@ -603,11 +603,18 @@ static void __init molly_xusb_init(void)
  * TODO: How to use the phy_int_n signal?  SMSC driver doesn't take
  * platform data.  Maybe just hook up here as a irq for wake?
  */
-#define GPIO_ETHERNET_PHY_INT_N  TEGRA_GPIO_PEE4 /* SDMMC3_CLK_LB_OUT/GPIO_PEE4 */
-#define GPIO_ETHERNET_RESET_N    TEGRA_GPIO_PEE5 /* SDMMC3_CLK_LB_IN/GPIO_PEE5 */
+#define GPIO_ETHERNET_PHY_INT_N     TEGRA_GPIO_PR4  /* KB_ROW4/GPIO_PR4 */
+#define GPIO_ETHERNET_PHY_INT_N_3V3 TEGRA_GPIO_PEE4 /* SDMMC3_CLK_LB_OUT/GPIO_PEE4 */
+#define GPIO_ETHERNET_RESET_N       TEGRA_GPIO_PEE5 /* SDMMC3_CLK_LB_IN/GPIO_PEE5 */
 
 static struct gpio ethernet_gpios[] __initdata = {
 	{GPIO_ETHERNET_PHY_INT_N, GPIOF_IN,           "ethernet_phy_int_n" },
+	{GPIO_ETHERNET_PHY_INT_N_3V3, GPIOF_IN,       "ethernet_phy_int_n_3v3" },
+	{GPIO_ETHERNET_RESET_N,   GPIOF_OUT_INIT_LOW, "ethernet_reset_n" },
+};
+
+static struct gpio ethernet_gpios_dvt1[] __initdata = {
+	{GPIO_ETHERNET_PHY_INT_N_3V3, GPIOF_IN,       "ethernet_phy_int_n" },
 	{GPIO_ETHERNET_RESET_N,   GPIOF_OUT_INIT_LOW, "ethernet_reset_n" },
 };
 
@@ -629,7 +636,19 @@ static void __init molly_hsic_init(void)
 {
 	int ret;
 
-	ret = gpio_request_array(ethernet_gpios, ARRAY_SIZE(ethernet_gpios));
+	switch (molly_hw_rev) {
+	case MOLLY_REV_PROTO1:
+	case MOLLY_REV_PROTO2:
+	case MOLLY_REV_EVT1:
+	case MOLLY_REV_DVT1:
+		ret = gpio_request_array(ethernet_gpios_dvt1,
+				ARRAY_SIZE(ethernet_gpios_dvt1));
+		break;
+	default:
+		ret = gpio_request_array(ethernet_gpios,
+				ARRAY_SIZE(ethernet_gpios));
+	};
+
 	if (ret) {
 		pr_warn("%s:gpio request failed\n", __func__);
 		return;
@@ -645,12 +664,19 @@ static void __init molly_hsic_init(void)
 	platform_device_register(&tegra_ehci2_device);
 }
 
-#define ATHOME_RADIO_INT_GPIO     TEGRA_GPIO_PB4 /* SDMMC3_DAT3/GPIO_PB4 */
+#define ATHOME_RADIO_INT_GPIO     TEGRA_GPIO_PS2 /* KB_ROW10/GPIO_PS2 */
+#define ATHOME_RADIO_INT_3V3_GPIO TEGRA_GPIO_PB4 /* SDMMC3_DAT3/GPIO_PB4 */
 #define ATHOME_RADIO_RESET_N_GPIO TEGRA_GPIO_PB5 /* SDMMC3_DAT2/GPIO_PB5 */
 #define ATHOME_RADIO_SPI_CS_GPIO  TEGRA_GPIO_PA7 /* SDMMC3_CMD/GPIO_PA7 */
 
 static struct athome_platform_data radio_pdata = {
 	.gpio_num_irq = ATHOME_RADIO_INT_GPIO,
+	.gpio_num_rst = ATHOME_RADIO_RESET_N_GPIO,
+	.gpio_spi_cs  = ATHOME_RADIO_SPI_CS_GPIO,
+};
+
+static struct athome_platform_data radio_pdata_dvt1 = {
+	.gpio_num_irq = ATHOME_RADIO_INT_3V3_GPIO,
 	.gpio_num_rst = ATHOME_RADIO_RESET_N_GPIO,
 	.gpio_spi_cs  = ATHOME_RADIO_SPI_CS_GPIO,
 };
@@ -679,6 +705,14 @@ static struct spi_board_info molly_radio_spi_info[] __initdata = {
 
 static void __init molly_radio_init(void)
 {
+	switch (molly_hw_rev) {
+	case MOLLY_REV_PROTO1:
+	case MOLLY_REV_PROTO2:
+	case MOLLY_REV_EVT1:
+	case MOLLY_REV_DVT1:
+		molly_radio_spi_info[0].platform_data = &radio_pdata_dvt1;
+	};
+
 	spi_register_board_info(molly_radio_spi_info,
 				ARRAY_SIZE(molly_radio_spi_info));
 }
