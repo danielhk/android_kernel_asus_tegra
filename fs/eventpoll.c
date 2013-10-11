@@ -1126,7 +1126,28 @@ static int ep_create_wakeup_source(struct epitem *epi)
 	}
 
 	name = epi->ffd.file->f_path.dentry->d_name.name;
-	epi->ws = wakeup_source_register(name);
+	if (epi->ffd.file->f_path.dentry->d_name.len > 0)
+		epi->ws = wakeup_source_register(name);
+	else {
+		/* sockets have a name length of 0, so
+		 * we use the full pathname, which looks
+		 * something like "socket:[3331]"
+		 */
+		char *tmp = (char*)__get_free_page(GFP_TEMPORARY);
+		char *pathname;
+
+		if (tmp) {
+			pathname = d_path(&epi->ffd.file->f_path,
+					  tmp, PAGE_SIZE);
+			if (IS_ERR(pathname))
+				name = "unknown eventpoll fd";
+			else
+				name = pathname;
+		}
+		epi->ws = wakeup_source_register(name);
+		if (tmp)
+			free_page((unsigned long)tmp);
+	}
 	if (!epi->ws)
 		return -ENOMEM;
 
