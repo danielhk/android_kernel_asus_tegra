@@ -540,8 +540,6 @@ static void __init molly_wake_sources_init(void)
 {
 	/* Set HDMI HPD GPIO as wakeup source */
 	tegra_set_wake_gpio(4, MOLLY_HDMI_HPD);
-	/* Disable external PMU wakeup */
-	tegra_set_wake_irq(18, -EAGAIN);
 }
 
 static void __init molly_usb_init(void)
