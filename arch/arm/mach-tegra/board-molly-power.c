@@ -132,7 +132,11 @@ static struct regulator_consumer_supply palmas_smps9_supply[] = {
 #endif
 };
 
-/* smps10 is unused */
+/* vdd_hdmi_5v0 */
+static struct regulator_consumer_supply palmas_smps10_supply[] = {
+	/* 5V_SYS of HDMI level shifer, always on */
+        REGULATOR_SUPPLY("vdd_hdmi_5v0", "tegradc.0"),
+};
 
 /* ldo1 - va_pllx */
 static struct regulator_consumer_supply palmas_ldo1_supply[] = {
@@ -239,6 +243,9 @@ PALMAS_REGS_PDATA(smps8, 1800,  1800, NULL, 1, 1, 1, NORMAL,
 /* vdd_sys_2v9 - always on, emmc power */
 PALMAS_REGS_PDATA(smps9, 2900,  2900, NULL, 1, 0, 1, NORMAL,
 		  0, 0, 0, 0, 0);
+/* vdd_hdmi_5v0 - always on, hdmi level shifter */
+PALMAS_REGS_PDATA(smps10, 5000, 5000, palmas_rails(smps6), 1, 0, 1, 0,
+                  0, 0, 0, 0, 0);
 
 /* va_pllx - boot on? - 1.05V, should be always on */
 PALMAS_REGS_PDATA(ldo1, 1050,  1050, palmas_rails(smps7), 1, 0, 1, 0,
@@ -282,7 +289,7 @@ static struct regulator_init_data *molly_reg_data[PALMAS_NUM_REGS] = {
 	PALMAS_REG_PDATA(smps7),
 	PALMAS_REG_PDATA(smps8),
 	PALMAS_REG_PDATA(smps9),
-	NULL,
+	PALMAS_REG_PDATA(smps10),
 	PALMAS_REG_PDATA(ldo1),
 	PALMAS_REG_PDATA(ldo2),
 	PALMAS_REG_PDATA(ldo3),
@@ -312,7 +319,7 @@ static struct palmas_reg_init *molly_reg_init[PALMAS_NUM_REGS] = {
 	PALMAS_REG_INIT_DATA(smps7), /* SMPS7 */
 	PALMAS_REG_INIT_DATA(smps8), /* SMPS8 */
 	PALMAS_REG_INIT_DATA(smps9), /* SMPS9 */
-	NULL, /* SMPS10 */
+	PALMAS_REG_INIT_DATA(smps10), /* SMPS10 */
 	PALMAS_REG_INIT_DATA(ldo1),
 	PALMAS_REG_INIT_DATA(ldo2),
 	PALMAS_REG_INIT_DATA(ldo3),
