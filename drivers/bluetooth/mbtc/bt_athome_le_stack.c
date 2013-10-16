@@ -975,10 +975,16 @@ static int athome_bt_data_rx(int which, uint8_t *in_data, uint32_t len)
 
 	switch (type) {
 	case ATHOME_PKT_RX_INPUT:
+		i = inp->info & ATHOME_INPUT_INFO_MASK_TIMESTAMP;
+
 		if (LOG_INPUT_SPEW)
 			aahlog("[%d] input event with time %d and data: {\n",
-				which,
-				inp->info & ATHOME_INPUT_INFO_MASK_TIMESTAMP);
+				which, i);
+
+		athome_bt_input_calculate_time(which,
+				i == ATHOME_INPUT_INFO_MASK_TIMESTAMP
+				? AAH_BT_UNKNOWN_TS_DELTA
+				: ((long)i * 10000));
 
 		if (inp->info & ATHOME_INPUT_INFO_MASK_HAS_BTN)
 			inp_btn = (struct athome_pkt_rx_input_btn*)(inp + 1);
@@ -1031,12 +1037,7 @@ static int athome_bt_data_rx(int which, uint8_t *in_data, uint32_t len)
 
 		if (LOG_INPUT_SPEW)
 			aahlog("}\n");
-		i = inp->info & ATHOME_INPUT_INFO_MASK_TIMESTAMP;
 
-		athome_bt_input_calculate_time(which,
-				i == ATHOME_INPUT_INFO_MASK_TIMESTAMP
-				? AAH_BT_UNKNOWN_TS_DELTA
-				: ((long)i * 10000));
 		athome_bt_input_frame(which);
 		break;
 
