@@ -61,12 +61,12 @@ typedef struct {
 
 /**
  *  @brief This function processes received packet and forwards it
- *  		to kernel/upper layer
+ *          to kernel/upper layer
  *
  *  @param pmadapter A pointer to mlan_adapter
- *  @param pmbuf     A pointer to mlan_buffer which includes the received packet
+ *  @param pmbuf   A pointer to mlan_buffer which includes the received packet
  *
- *  @return 	   MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
+ *  @return        MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
 mlan_status
 wlan_process_rx_packet(pmlan_adapter pmadapter, pmlan_buffer pmbuf)
@@ -94,9 +94,9 @@ wlan_process_rx_packet(pmlan_adapter pmadapter, pmlan_buffer pmbuf)
 /** Size of debugging structure */
 #define SIZE_OF_DBG_STRUCT 4
 	if (prx_pd->rx_pkt_type == PKT_TYPE_DEBUG) {
-		t_u8 dbgType;
-		dbgType = *(t_u8 *) & prx_pkt->eth803_hdr;
-		if (dbgType == DBG_TYPE_SMALL) {
+		t_u8 dbg_type;
+		dbg_type = *(t_u8 *) & prx_pkt->eth803_hdr;
+		if (dbg_type == DBG_TYPE_SMALL) {
 			PRINTM(MFW_D, "\n");
 			DBG_HEXDUMP(MFW_D, "FWDBG",
 				    (char *)((t_u8 *) & prx_pkt->eth803_hdr +
@@ -191,9 +191,8 @@ wlan_process_rx_packet(pmlan_adapter pmadapter, pmlan_buffer pmbuf)
 		       "STA Rx Error: moal_recv_packet returned error\n");
 	}
 done:
-	if (ret != MLAN_STATUS_PENDING) {
+	if (ret != MLAN_STATUS_PENDING)
 		wlan_free_mlan_buffer(pmadapter, pmbuf);
-	}
 	LEAVE();
 
 	return ret;

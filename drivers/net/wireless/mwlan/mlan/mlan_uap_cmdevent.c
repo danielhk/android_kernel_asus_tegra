@@ -74,7 +74,7 @@ uap_process_cmdresp_error(mlan_private * pmpriv, HostCmd_DS_COMMAND * resp,
 
 /**
  *  @brief This function will return the pointer to station entry in station list
- *  		table which matches the give mac address
+ *          table which matches the give mac address
  *
  *  @param priv    A pointer to mlan_private
  *
@@ -311,8 +311,8 @@ wlan_process_tx_pause_event(pmlan_private priv, pmlan_buffer pevent)
 /**
  *  @brief This function prepares command for config uap settings
  *
- *  @param pmpriv		A pointer to mlan_private structure
- *  @param cmd	   		A pointer to HostCmd_DS_COMMAND structure
+ *  @param pmpriv       A pointer to mlan_private structure
+ *  @param cmd          A pointer to HostCmd_DS_COMMAND structure
  *  @param cmd_action   the action: GET or SET
  *  @param pioctl_buf   A pointer to mlan_ioctl_req structure
  *  @return         MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
@@ -1055,8 +1055,8 @@ wlan_uap_cmd_ap_config(pmlan_private pmpriv,
 /**
  *  @brief This function prepares command of sys_config
  *
- *  @param pmpriv		A pointer to mlan_private structure
- *  @param cmd	   		A pointer to HostCmd_DS_COMMAND structure
+ *  @param pmpriv       A pointer to mlan_private structure
+ *  @param cmd          A pointer to HostCmd_DS_COMMAND structure
  *  @param cmd_action   the action: GET or SET
  *  @param pioctl_buf   A pointer to mlan_ioctl_req structure
  *  @return         MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
@@ -2004,8 +2004,8 @@ wlan_uap_ret_sys_config(IN pmlan_private pmpriv,
 /**
  *  @brief This function prepares command of snmp_mib
  *
- *  @param pmpriv		A pointer to mlan_private structure
- *  @param cmd	   		A pointer to HostCmd_DS_COMMAND structure
+ *  @param pmpriv       A pointer to mlan_private structure
+ *  @param cmd          A pointer to HostCmd_DS_COMMAND structure
  *  @param cmd_action   the action: GET or SET
  *  @param cmd_oid      Cmd oid: treated as sub command
  *  @param pioctl_buf   A pointer to mlan_ioctl_req structure
@@ -2243,8 +2243,8 @@ wlan_uap_ret_snmp_mib(IN pmlan_private pmpriv,
 /**
  *  @brief This function prepares command of deauth station
  *
- *  @param pmpriv		A pointer to mlan_private structure
- *  @param cmd	   		A pointer to HostCmd_DS_COMMAND structure
+ *  @param pmpriv       A pointer to mlan_private structure
+ *  @param cmd          A pointer to HostCmd_DS_COMMAND structure
  *  @param pdata_buf    A pointer to data buffer
  *  @return         MLAN_STATUS_SUCCESS
  */
@@ -2357,11 +2357,10 @@ wlan_uap_cmd_key_material(IN pmlan_private pmpriv,
 		PRINTM(MCMND, "Set WEP Key\n");
 		goto done;
 	}
-	if (pkey->key_flags & KEY_FLAG_GROUP_KEY) {
+	if (pkey->key_flags & KEY_FLAG_GROUP_KEY)
 		pkey_material->key_param_set.key_info |= KEY_INFO_MCAST_KEY;
-	} else {
+	else
 		pkey_material->key_param_set.key_info |= KEY_INFO_UCAST_KEY;
-	}
 	if (pkey->key_flags & KEY_FLAG_AES_MCAST_IGTK)
 		pkey_material->key_param_set.key_info = KEY_INFO_CMAC_AES_KEY;
 	if (pkey->key_flags & KEY_FLAG_SET_TX_KEY)
@@ -2653,8 +2652,8 @@ wlan_check_uap_capability(pmlan_private priv, pmlan_buffer pevent)
 		(MrvlIEtypesHeader_t *) (pevent->pbuf + pevent->data_offset +
 					 BSS_START_EVENT_FIX_SIZE);
 	const t_u8 wmm_oui[4] = { 0x00, 0x50, 0xf2, 0x02 };
-	IEEEtypes_WmmParameter_t WmmParamIe;
-	MrvlIEtypes_channel_band_t *pChanInfo;
+	IEEEtypes_WmmParameter_t wmm_param_ie;
+	MrvlIEtypes_channel_band_t *pchan_info;
 	priv->wmm_enabled = MFALSE;
 	priv->pkt_fwd = MFALSE;
 	priv->is_11n_enabled = MFALSE;
@@ -2686,13 +2685,13 @@ wlan_check_uap_capability(pmlan_private priv, pmlan_buffer pevent)
 				priv->wmm_enabled = MFALSE;
 				wlan_wmm_setup_ac_downgrade(priv);
 				priv->wmm_enabled = MTRUE;
-				memcpy(priv->adapter, &WmmParamIe,
+				memcpy(priv->adapter, &wmm_param_ie,
 				       ((t_u8 *) tlv + 2),
 				       sizeof(IEEEtypes_WmmParameter_t));
-				WmmParamIe.vend_hdr.len = (t_u8) tlv_len;
-				WmmParamIe.vend_hdr.element_id = WMM_IE;
+				wmm_param_ie.vend_hdr.len = (t_u8) tlv_len;
+				wmm_param_ie.vend_hdr.element_id = WMM_IE;
 				wlan_wmm_setup_queue_priorities(priv,
-								&WmmParamIe);
+								&wmm_param_ie);
 			}
 		}
 		if (tlv_type == TLV_TYPE_UAP_PKT_FWD_CTL) {
@@ -2710,8 +2709,8 @@ wlan_check_uap_capability(pmlan_private priv, pmlan_buffer pevent)
 		if (tlv_type == TLV_TYPE_UAP_CHAN_BAND_CONFIG) {
 			DBG_HEXDUMP(MCMD_D, "chan_band_config tlv", tlv,
 				    tlv_len + sizeof(MrvlIEtypesHeader_t));
-			pChanInfo = (MrvlIEtypes_channel_band_t *) tlv;
-			priv->uap_channel = pChanInfo->channel;
+			pchan_info = (MrvlIEtypes_channel_band_t *) tlv;
+			priv->uap_channel = pchan_info->channel;
 			PRINTM(MCMND, "uap_channel FW: 0x%x\n",
 			       priv->uap_channel);
 		}
@@ -2785,7 +2784,7 @@ wlan_update_wapi_info_tlv(pmlan_private priv, pmlan_buffer pevent)
 
 /**
  *  @brief This function send sta_assoc_event to moal
- *  	   payload with sta mac address and assoc ie.
+ *          payload with sta mac address and assoc ie.
  *
  *  @param priv    A pointer to mlan_private
  *  @param pevent  A pointer to mlan_event buffer
@@ -3361,7 +3360,7 @@ wlan_ops_uap_process_event(IN t_void * priv)
 		wlan_delete_station_list(pmpriv);
 		break;
 	case EVENT_PS_AWAKE:
-		PRINTM(MINFO, "EVENT: AWAKE \n");
+		PRINTM(MINFO, "EVENT: AWAKE\n");
 		PRINTM(MEVENT, "||");
 		/* Handle unexpected PS AWAKE event */
 		if (pmadapter->ps_state == PS_STATE_SLEEP_CFM)
@@ -3568,10 +3567,10 @@ done:
 /**
  *  @brief  This function issues commands to initialize firmware
  *
- *  @param priv     	A pointer to mlan_private structure
- *  @param first_bss	flag for first BSS
+ *  @param priv         A pointer to mlan_private structure
+ *  @param first_bss    flag for first BSS
  *
- *  @return		MLAN_STATUS_SUCCESS or MLAN_STATUS_PENDING or MLAN_STATUS_FAILURE
+ *  @return   MLAN_STATUS_SUCCESS or MLAN_STATUS_PENDING or MLAN_STATUS_FAILURE
  */
 mlan_status
 wlan_ops_uap_init_cmd(IN t_void * priv, IN t_u8 first_bss)

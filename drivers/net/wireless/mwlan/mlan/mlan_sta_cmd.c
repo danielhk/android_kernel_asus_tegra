@@ -1298,11 +1298,11 @@ wlan_cmd_mgmt_ie_list(IN pmlan_private pmpriv,
 /**
  *  @brief This function prepares system clock cfg command
  *
- *  @param pmpriv    	A pointer to mlan_private structure
- *  @param cmd	   	A pointer to HostCmd_DS_COMMAND structure
- *  @param cmd_action 	The action: GET or SET
- *  @param pdata_buf 	A pointer to data buffer
- *  @return 	   	MLAN_STATUS_SUCCESS
+ *  @param pmpriv       A pointer to mlan_private structure
+ *  @param cmd          A pointer to HostCmd_DS_COMMAND structure
+ *  @param cmd_action   The action: GET or SET
+ *  @param pdata_buf    A pointer to data buffer
+ *  @return             MLAN_STATUS_SUCCESS
  */
 static mlan_status
 wlan_cmd_sysclock_cfg(IN pmlan_private pmpriv,
@@ -1335,7 +1335,7 @@ wlan_cmd_sysclock_cfg(IN pmlan_private pmpriv,
 /**
  *  @brief This function prepares command of subscribe event.
  *
- *  @param pmpriv    	A pointer to mlan_private structure
+ *  @param pmpriv       A pointer to mlan_private structure
  *  @param cmd          A pointer to HostCmd_DS_COMMAND structure
  *  @param cmd_action   the action: GET or SET
  *  @param pdata_buf    A pointer to data buffer
@@ -1538,7 +1538,7 @@ done:
 /**
  *  @brief This function prepares command of OTP user data.
  *
- *  @param pmpriv    	A pointer to mlan_private structure
+ *  @param pmpriv       A pointer to mlan_private structure
  *  @param cmd          A pointer to HostCmd_DS_COMMAND structure
  *  @param cmd_action   the action: GET or SET
  *  @param pdata_buf    A pointer to data buffer

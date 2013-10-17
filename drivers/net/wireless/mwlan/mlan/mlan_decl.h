@@ -27,7 +27,7 @@ Change log:
 #define _MLAN_DECL_H_
 
 /** MLAN release version */
-#define MLAN_RELEASE_VERSION		"434"
+#define MLAN_RELEASE_VERSION		"438"
 
 /** Re-define generic data types for MLAN/MOAL */
 /** Signed char (1-byte) */
@@ -71,7 +71,7 @@ typedef t_s32 t_sval;
 /** Structure packing begins */
 #define MLAN_PACK_START
 /** Structure packeing end */
-#define MLAN_PACK_END  __attribute__ ((packed))
+#define MLAN_PACK_END  __attribute__((packed))
 #else /* !__GNUC__ */
 #ifdef PRAGMA_PACK
 /** Structure packing begins */
@@ -117,7 +117,7 @@ typedef t_s32 t_sval;
 
 /** Macros for Data Alignment : address */
 #define ALIGN_ADDR(p, a)    \
-    ((((t_ptr)(p)) + (((t_ptr)(a)) - 1)) & ~(((t_ptr)(a)) - 1))
+	((((t_ptr)(p)) + (((t_ptr)(a)) - 1)) & ~(((t_ptr)(a)) - 1))
 
 /** Return the byte offset of a field in the given structure */
 #define MLAN_FIELD_OFFSET(type, field) ((t_u32)(t_ptr)&(((type *)0)->field))
@@ -221,9 +221,9 @@ typedef t_u8 mlan_802_11_mac_addr[MLAN_MAC_ADDR_LENGTH];
 #define MLAN_FRAG_MAX_VALUE             (2346)
 
 /** Minimum tx retry count */
-#define MLAN_TX_RETRY_MIN 		(0)
+#define MLAN_TX_RETRY_MIN		(0)
 /** Maximum tx retry count */
-#define MLAN_TX_RETRY_MAX 		(14)
+#define MLAN_TX_RETRY_MAX		(14)
 
 /** define SDIO block size for data Tx/Rx */
 /* We support up to 480-byte block size due to FW buffer limitation. */

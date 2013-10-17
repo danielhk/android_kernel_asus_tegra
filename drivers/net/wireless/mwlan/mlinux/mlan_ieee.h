@@ -28,7 +28,7 @@ Change log:
 #define _MLAN_IEEE_H_
 
 /** FIX IES size in beacon buffer */
-#define WLAN_802_11_FIXED_IE_SIZE 			12
+#define WLAN_802_11_FIXED_IE_SIZE           12
 /** WLAN supported rates */
 #define WLAN_SUPPORTED_RATES                14
 
@@ -1071,19 +1071,31 @@ typedef MLAN_PACK_START struct {
 **/
 typedef MLAN_PACK_START struct {
 #ifdef BIG_ENDIAN_SUPPORT
-	t_u8 rsvd5_7:3;		   /**< Reserved */
-	t_u8 unmeasured:1;	   /**< Channel is unmeasured */
-	t_u8 radar:1;		   /**< Radar detected on channel */
-	t_u8 unidentified_sig:1;   /**< Unidentified signal found on channel */
-	t_u8 ofdm_preamble:1;	   /**< OFDM preamble detected on channel */
-	t_u8 bss:1;		   /**< At least one valid MPDU received on channel */
+    /**< Reserved */
+	t_u8 rsvd5_7:3;
+    /**< Channel is unmeasured */
+	t_u8 unmeasured:1;
+    /**< Radar detected on channel */
+	t_u8 radar:1;
+    /**< Unidentified signal found on channel */
+	t_u8 unidentified_sig:1;
+    /**< OFDM preamble detected on channel */
+	t_u8 ofdm_preamble:1;
+    /**< At least one valid MPDU received on channel */
+	t_u8 bss:1;
 #else
-	t_u8 bss:1;		   /**< At least one valid MPDU received on channel */
-	t_u8 ofdm_preamble:1;	   /**< OFDM preamble detected on channel */
-	t_u8 unidentified_sig:1;   /**< Unidentified signal found on channel */
-	t_u8 radar:1;		   /**< Radar detected on channel */
-	t_u8 unmeasured:1;	   /**< Channel is unmeasured */
-	t_u8 rsvd5_7:3;		   /**< Reserved */
+    /**< At least one valid MPDU received on channel */
+	t_u8 bss:1;
+    /**< OFDM preamble detected on channel */
+	t_u8 ofdm_preamble:1;
+    /**< Unidentified signal found on channel */
+	t_u8 unidentified_sig:1;
+    /**< Radar detected on channel */
+	t_u8 radar:1;
+    /**< Channel is unmeasured */
+	t_u8 unmeasured:1;
+    /**< Reserved */
+	t_u8 rsvd5_7:3;
 #endif				/* BIG_ENDIAN_SUPPORT */
 
 } MLAN_PACK_END MeasRptBasicMap_t;

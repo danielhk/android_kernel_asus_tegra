@@ -103,8 +103,8 @@ static struct sdio_driver REFDATA wlan_sdio = {
 ********************************************************/
 /**  @brief This function dump the sdio register
  *
- *  @param handle  A Pointer to the moal_handle structure
- *  @return 	   N/A
+ *  @param handle   A Pointer to the moal_handle structure
+ *  @return         N/A
  */
 void
 woal_dump_sdio_reg(moal_handle * handle)
@@ -135,10 +135,10 @@ woal_dump_sdio_reg(moal_handle * handle)
 ********************************************************/
 /**  @brief This function updates the SDIO card types
  *
- *  @param handle  A Pointer to the moal_handle structure
- *  @param card    A Pointer to card
+ *  @param handle   A Pointer to the moal_handle structure
+ *  @param card     A Pointer to card
  *
- *  @return 	   N/A
+ *  @return         N/A
  */
 t_void
 woal_sdio_update_card_type(moal_handle * handle, t_void * card)
@@ -155,8 +155,8 @@ woal_sdio_update_card_type(moal_handle * handle, t_void * card)
 /**
  *  @brief This function handles the interrupt.
  *
- *  @param func	   A pointer to the sdio_func structure
- *  @return 	   N/A
+ *  @param func     A pointer to the sdio_func structure
+ *  @return         N/A
  */
 static void
 woal_sdio_interrupt(struct sdio_func *func)
@@ -184,9 +184,9 @@ woal_sdio_interrupt(struct sdio_func *func)
 
 /**  @brief This function handles client driver probe.
  *
- *  @param func	   A pointer to sdio_func structure.
- *  @param id	   A pointer to sdio_device_id structure.
- *  @return 	   MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE/error code
+ *  @param func     A pointer to sdio_func structure.
+ *  @param id       A pointer to sdio_device_id structure.
+ *  @return         MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE/error code
  */
 int
 woal_sdio_probe(struct sdio_func *func, const struct sdio_device_id *id)
@@ -246,8 +246,8 @@ woal_sdio_probe(struct sdio_func *func, const struct sdio_device_id *id)
 
 /**  @brief This function handles client driver remove.
  *
- *  @param func	   A pointer to sdio_func structure.
- *  @return 	   N/A
+ *  @param func     A pointer to sdio_func structure.
+ *  @return         N/A
  */
 void
 woal_sdio_remove(struct sdio_func *func)
@@ -274,8 +274,8 @@ woal_sdio_remove(struct sdio_func *func)
 #ifdef MMC_PM_FUNC_SUSPENDED
 /**  @brief This function tells lower driver that WLAN is suspended
  *
- *  @param handle  A Pointer to the moal_handle structure
- *  @return 	   N/A
+ *  @param handle   A Pointer to the moal_handle structure
+ *  @return         N/A
  */
 void
 woal_wlan_is_suspended(moal_handle * handle)
@@ -292,8 +292,8 @@ woal_wlan_is_suspended(moal_handle * handle)
 
 /**  @brief This function handles client driver suspend
  *
- *  @param dev	   A pointer to device structure
- *  @return 	   MLAN_STATUS_SUCCESS or error code
+ *  @param dev      A pointer to device structure
+ *  @return         MLAN_STATUS_SUCCESS or error code
  */
 int
 woal_sdio_suspend(struct device *dev)
@@ -360,8 +360,8 @@ woal_sdio_suspend(struct device *dev)
 #endif
 		if (hs_actived) {
 #ifdef MMC_PM_SKIP_RESUME_PROBE
-			PRINTM(MCMND, "suspend with MMC_PM_KEEP_POWER and "
-			       "MMC_PM_SKIP_RESUME_PROBE\n");
+			PRINTM(MCMND,
+			       "suspend with MMC_PM_KEEP_POWER and MMC_PM_SKIP_RESUME_PROBE\n");
 			ret = sdio_set_host_pm_flags(func, MMC_PM_KEEP_POWER |
 						     MMC_PM_SKIP_RESUME_PROBE);
 #else
@@ -389,8 +389,8 @@ done:
 
 /**  @brief This function handles client driver resume
  *
- *  @param dev	   A pointer to device structure
- *  @return 	   MLAN_STATUS_SUCCESS
+ *  @param dev      A pointer to device structure
+ *  @return         MLAN_STATUS_SUCCESS
  */
 int
 woal_sdio_resume(struct device *dev)
@@ -441,7 +441,7 @@ woal_sdio_resume(struct device *dev)
  *  @param reg      Register offset
  *  @param data     Value
  *
- *  @return    		MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
+ *  @return         MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
 mlan_status
 woal_write_reg(moal_handle * handle, t_u32 reg, t_u32 data)
@@ -465,7 +465,7 @@ woal_write_reg(moal_handle * handle, t_u32 reg, t_u32 data)
  *  @param reg      Register offset
  *  @param data     Value
  *
- *  @return    		MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
+ *  @return         MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
 mlan_status
 woal_read_reg(moal_handle * handle, t_u32 reg, t_u32 * data)
@@ -489,11 +489,11 @@ woal_read_reg(moal_handle * handle, t_u32 reg, t_u32 * data)
  *  @brief This function writes multiple bytes into card memory
  *
  *  @param handle   A Pointer to the moal_handle structure
- *  @param pmbuf	Pointer to mlan_buffer structure
- *  @param port		Port
- *  @param timeout 	Time out value
+ *  @param pmbuf    Pointer to mlan_buffer structure
+ *  @param port     Port
+ *  @param timeout  Time out value
  *
- *  @return    		MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
+ *  @return         MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
 mlan_status
 woal_write_data_sync(moal_handle * handle, mlan_buffer * pmbuf, t_u32 port,
@@ -532,11 +532,11 @@ woal_write_data_sync(moal_handle * handle, mlan_buffer * pmbuf, t_u32 port,
  *  @brief This function reads multiple bytes from card memory
  *
  *  @param handle   A Pointer to the moal_handle structure
- *  @param pmbuf	Pointer to mlan_buffer structure
- *  @param port		Port
- *  @param timeout 	Time out value
+ *  @param pmbuf    Pointer to mlan_buffer structure
+ *  @param port     Port
+ *  @param timeout  Time out value
  *
- *  @return    		MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
+ *  @return         MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
 mlan_status
 woal_read_data_sync(moal_handle * handle, mlan_buffer * pmbuf, t_u32 port,
@@ -599,7 +599,7 @@ woal_bus_register(void)
 /**
  *  @brief This function de-registers the IF module in bus driver
  *
- *  @return 	   N/A
+ *  @return         N/A
  */
 void
 woal_bus_unregister(void)
@@ -616,7 +616,7 @@ woal_bus_unregister(void)
  *  @brief This function de-registers the device
  *
  *  @param handle A pointer to moal_handle structure
- *  @return 	  N/A
+ *  @return         N/A
  */
 void
 woal_unregister_dev(moal_handle * handle)
@@ -642,7 +642,7 @@ woal_unregister_dev(moal_handle * handle)
  *  @brief This function registers the device
  *
  *  @param handle  A pointer to moal_handle structure
- *  @return 	   MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
+ *  @return         MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
 mlan_status
 woal_register_dev(moal_handle * handle)
@@ -692,9 +692,9 @@ release_host:
 /**
  *  @brief This function set bus clock on/off
  *
- *  @param handle    A pointer to moal_handle structure
- *  @param option    TRUE--on , FALSE--off
- *  @return 	   MLAN_STATUS_SUCCESS
+ *  @param handle   A pointer to moal_handle structure
+ *  @param option   TRUE--on , FALSE--off
+ *  @return         MLAN_STATUS_SUCCESS
  */
 int
 woal_sdio_set_bus_clock(moal_handle * handle, t_u8 option)
@@ -722,11 +722,11 @@ woal_sdio_set_bus_clock(moal_handle * handle, t_u8 option)
 /**
  *  @brief This function updates card reg based on the Cmd52 value in dev structure
  *
- *  @param handle  	A pointer to moal_handle structure
- *  @param func    	A pointer to store func variable
- *  @param reg    	A pointer to store reg variable
- *  @param val    	A pointer to store val variable
- *  @return 	   	MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
+ *  @param handle   A pointer to moal_handle structure
+ *  @param func     A pointer to store func variable
+ *  @param reg      A pointer to store reg variable
+ *  @param val      A pointer to store val variable
+ *  @return         MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
 int
 woal_sdio_read_write_cmd52(moal_handle * handle, int func, int reg, int val)

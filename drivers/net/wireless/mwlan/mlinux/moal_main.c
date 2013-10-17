@@ -47,6 +47,10 @@ Change log:
 #include <linux/wlan_plat.h>
 #include "moal_eth_ioctl.h"
 
+#include <linux/if_ether.h>
+#include <linux/in.h>
+#include <linux/tcp.h>
+#include <net/tcp.h>
 #include <net/dsfield.h>
 
 /********************************************************
@@ -375,9 +379,8 @@ woal_ssid_valid(mlan_802_11_ssid * pssid)
 /**
  *  @brief GO timeout function
  *
- *
- *  @param context	A pointer to context
- *  @return		N/A
+ *  @param context  A pointer to context
+ *  @return         N/A
  */
 void
 woal_go_timer_func(void *context)
@@ -396,9 +399,8 @@ woal_go_timer_func(void *context)
 /**
  *  @brief Remain on Channel timeout function
  *
- *
- *  @param context	A pointer to context
- *  @return		N/A
+ *  @param context  A pointer to context
+ *  @return         N/A
  */
 void
 woal_remain_timer_func(void *context)
@@ -434,8 +436,8 @@ woal_remain_timer_func(void *context)
 
 /**
  *  @brief check if we already connect to the AP.
- *  @param priv                 A pointer to moal_private structure
- *  @param ssid_bssid           A pointer to mlan_ssid_bssid structure
+ *  @param priv         A pointer to moal_private structure
+ *  @param ssid_bssid   A pointer to mlan_ssid_bssid structure
  *
  *  @return             MTRUE/MFALSE;
  */
@@ -568,7 +570,7 @@ woal_get_mode(moal_private * priv, t_u8 wait_option)
 		}
 	}
 done:
-	if (req && (status != MLAN_STATUS_PENDING))
+	if (status != MLAN_STATUS_PENDING)
 		kfree(req);
 	LEAVE();
 	return mode;
@@ -728,10 +730,8 @@ woal_update_drv_tbl(moal_handle * handle, int drv_mode_local)
 #endif
 #endif
 	/* Clear existing table, if any */
-	if (handle->drv_mode.bss_attr != NULL) {
-		kfree(handle->drv_mode.bss_attr);
-		handle->drv_mode.bss_attr = NULL;
-	}
+	kfree(handle->drv_mode.bss_attr);
+	handle->drv_mode.bss_attr = NULL;
 
 	/* Create moal_drv_mode entry */
 	handle->drv_mode.drv_mode = drv_mode;
@@ -768,9 +768,9 @@ done:
 /**
  *  @brief This function initializes software
  *
- *  @param handle A pointer to moal_handle structure
+ *  @param handle   A pointer to moal_handle structure
  *
- *  @return 	   MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
+ *  @return         MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
 static mlan_status
 woal_init_sw(moal_handle * handle)
@@ -956,7 +956,7 @@ woal_init_sw(moal_handle * handle)
  *
  *  @param handle   A pointer to moal_handle structure
  *
- *  @return 	    N/A
+ *  @return         N/A
  */
 static void
 woal_free_moal_handle(moal_handle * handle)
@@ -989,10 +989,8 @@ woal_free_moal_handle(moal_handle * handle)
 		mlan_unregister(handle->pmlan_adapter);
 
 	/* Free BSS attribute table */
-	if (handle->drv_mode.bss_attr != NULL) {
-		kfree(handle->drv_mode.bss_attr);
-		handle->drv_mode.bss_attr = NULL;
-	}
+	kfree(handle->drv_mode.bss_attr);
+	handle->drv_mode.bss_attr = NULL;
 	PRINTM(MINFO, "Free Adapter\n");
 	if (atomic_read(&handle->lock_count) ||
 	    atomic_read(&handle->malloc_count) ||
@@ -1073,15 +1071,12 @@ woal_process_regrdwr(moal_handle * handle, t_u8 * type_string,
 		goto done;
 	}
 
-	if (MLAN_STATUS_SUCCESS != woal_atoi(&type, type_string)) {
+	if (MLAN_STATUS_SUCCESS != woal_atoi(&type, type_string))
 		goto done;
-	}
-	if (MLAN_STATUS_SUCCESS != woal_atoi(&offset, offset_string)) {
+	if (MLAN_STATUS_SUCCESS != woal_atoi(&offset, offset_string))
 		goto done;
-	}
-	if (MLAN_STATUS_SUCCESS != woal_atoi(&value, value_string)) {
+	if (MLAN_STATUS_SUCCESS != woal_atoi(&value, value_string))
 		goto done;
-	}
 
 	ioctl_req->req_id = MLAN_IOCTL_REG_MEM;
 	ioctl_req->action = MLAN_ACT_SET;
@@ -1099,16 +1094,14 @@ woal_process_regrdwr(moal_handle * handle, t_u8 * type_string,
 
 	/* request ioctl for STA */
 	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(handle->priv[0], ioctl_req, MOAL_IOCTL_WAIT)) {
+	    woal_request_ioctl(handle->priv[0], ioctl_req, MOAL_IOCTL_WAIT))
 		goto done;
-	}
 	PRINTM(MINFO, "Register type: %d, offset: 0x%x, value: 0x%x\n", type,
 	       offset, value);
 	ret = MLAN_STATUS_SUCCESS;
 
 done:
-	if (ioctl_req)
-		kfree(ioctl_req);
+	kfree(ioctl_req);
 	LEAVE();
 	return ret;
 }
@@ -1278,9 +1271,8 @@ woal_process_init_cfg(moal_handle * handle, t_u8 * data, t_size size)
 		}
 	}
 
-	if (index == 0) {
+	if (index == 0)
 		PRINTM(MINFO, "Can't find any matching MAC Address");
-	}
 	ret = MLAN_STATUS_SUCCESS;
 
 done:
@@ -1352,11 +1344,10 @@ woal_process_hostcmd_cfg(moal_handle * handle, t_u8 * data, t_size size)
 
 		if (start_raw == MFALSE) {
 			intf_s = strchr(pos, '=');
-			if (intf_s) {
+			if (intf_s)
 				intf_e = strchr(intf_s, '{');
-			} else {
+			else
 				intf_e = NULL;
-			}
 
 			if (intf_s && intf_e) {
 				start_raw = MTRUE;
@@ -1380,8 +1371,7 @@ woal_process_hostcmd_cfg(moal_handle * handle, t_u8 * data, t_size size)
 	}
 
 done:
-	if (buf)
-		kfree(buf);
+	kfree(buf);
 	LEAVE();
 	return ret;
 }
@@ -1605,9 +1595,9 @@ woal_init_fw_dpc(moal_handle * handle)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 32)
 	sdio_release_host(((struct sdio_mmc_card *)handle->card)->func);
 #endif
-	if (ret == MLAN_STATUS_FAILURE) {
+	if (ret == MLAN_STATUS_FAILURE)
 		goto done;
-	} else if (ret == MLAN_STATUS_SUCCESS) {
+	else if (ret == MLAN_STATUS_SUCCESS) {
 		handle->hardware_status = HardwareStatusReady;
 		goto done;
 	}
@@ -1692,7 +1682,7 @@ done:
  * @param firmware  A pointer to firmware image
  * @param context   A pointer to moal_handle structure
  *
- * @return        N/A
+ * @return          N/A
  */
 static void
 woal_request_fw_callback(const struct firmware *firmware, void *context)
@@ -1770,9 +1760,9 @@ woal_request_fw(moal_handle * handle)
 /**
  *  @brief This function initializes firmware
  *
- *  @param handle  A pointer to moal_handle structure
+ *  @param handle   A pointer to moal_handle structure
  *
- *  @return 	   MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
+ *  @return         MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
 static mlan_status
 woal_init_fw(moal_handle * handle)
@@ -1890,12 +1880,12 @@ const struct net_device_ops woal_netdev_ops = {
 
 /**
  *  @brief This function initializes the private structure
- *  		and dev structure for station mode
+ *          and dev structure for station mode
  *
- *  @param dev     A pointer to net_device structure
- *  @param priv    A pointer to moal_private structure
+ *  @param dev      A pointer to net_device structure
+ *  @param priv     A pointer to moal_private structure
  *
- *  @return 	   MLAN_STATUS_SUCCESS
+ *  @return         MLAN_STATUS_SUCCESS
  */
 mlan_status
 woal_init_sta_dev(struct net_device *dev, moal_private * priv)
@@ -1967,12 +1957,12 @@ const struct net_device_ops woal_uap_netdev_ops = {
 
 /**
  *  @brief This function initializes the private structure
- *  		and dev structure for uap mode
+ *          and dev structure for uap mode
  *
- *  @param dev     A pointer to net_device structure
- *  @param priv    A pointer to moal_private structure
+ *  @param dev      A pointer to net_device structure
+ *  @param priv     A pointer to moal_private structure
  *
- *  @return 	   MLAN_STATUS_SUCCESS
+ *  @return         MLAN_STATUS_SUCCESS
  */
 mlan_status
 woal_init_uap_dev(struct net_device *dev, moal_private * priv)
@@ -2026,7 +2016,7 @@ woal_init_uap_dev(struct net_device *dev, moal_private * priv)
 
 /**
  * @brief This function adds a new interface. It will
- * 		allocate, initialize and register the device.
+ *      allocate, initialize and register the device.
  *
  *  @param handle    A pointer to moal_handle structure
  *  @param bss_index BSS index number
@@ -2057,11 +2047,10 @@ woal_add_interface(moal_handle * handle, t_u8 bss_index, t_u8 bss_type)
 	/* Allocate device name */
 #ifdef STA_SUPPORT
 	memset(name, 0, sizeof(name));
-	if (sta_name) {
+	if (sta_name)
 		snprintf(name, sizeof(name), "%s%%d", sta_name);
-	} else {
+	else
 		sprintf(name, "mlan%%d");
-	}
 	if ((bss_type == MLAN_BSS_TYPE_STA) && (dev_alloc_name(dev, name) < 0)) {
 		PRINTM(MERROR, "Could not allocate mlan device name\n");
 		goto error;
@@ -2069,11 +2058,10 @@ woal_add_interface(moal_handle * handle, t_u8 bss_index, t_u8 bss_type)
 #endif
 #ifdef UAP_SUPPORT
 	memset(name, 0, sizeof(name));
-	if (uap_name) {
+	if (uap_name)
 		snprintf(name, sizeof(name), "%s%%d", uap_name);
-	} else {
+	else
 		sprintf(name, "uap%%d");
-	}
 	if ((bss_type == MLAN_BSS_TYPE_UAP) && (dev_alloc_name(dev, name) < 0)) {
 		PRINTM(MERROR, "Could not allocate uap device name\n");
 		goto error;
@@ -2081,11 +2069,10 @@ woal_add_interface(moal_handle * handle, t_u8 bss_index, t_u8 bss_type)
 #endif
 #if defined(WIFI_DIRECT_SUPPORT)
 	memset(name, 0, sizeof(name));
-	if (wfd_name) {
+	if (wfd_name)
 		snprintf(name, sizeof(name), "%s%%d", wfd_name);
-	} else {
+	else
 		sprintf(name, "wfd%%d");
-	}
 	if ((bss_type == MLAN_BSS_TYPE_WIFIDIRECT) &&
 	    (dev_alloc_name(dev, name) < 0)) {
 		PRINTM(MERROR, "Could not allocate wifidirect device name\n");
@@ -2231,9 +2218,8 @@ error:
 #if defined(STA_CFG80211) || defined(UAP_CFG80211)
 	/* Unregister wiphy device and free */
 	if (priv) {
-		if (priv->wdev && IS_STA_OR_UAP_CFG80211(cfg80211_wext)) {
+		if (priv->wdev && IS_STA_OR_UAP_CFG80211(cfg80211_wext))
 			priv->wdev = NULL;
-		}
 	}
 #endif
 	if (dev && dev->reg_state == NETREG_REGISTERED)
@@ -2247,10 +2233,10 @@ error:
 /**
  *  @brief This function removes an interface.
  *
- *  @param handle    A pointer to the moal_handle structure
- *  @param bss_index  BSS index number
+ *  @param handle       A pointer to the moal_handle structure
+ *  @param bss_index    BSS index number
  *
- *  @return        N/A
+ *  @return             N/A
  */
 void
 woal_remove_interface(moal_handle * handle, t_u8 bss_index)
@@ -2301,9 +2287,8 @@ woal_remove_interface(moal_handle * handle, t_u8 bss_index)
 
 #if defined(STA_CFG80211) || defined(UAP_CFG80211)
 	/* Unregister wiphy device and free */
-	if (priv->wdev && IS_STA_OR_UAP_CFG80211(cfg80211_wext)) {
+	if (priv->wdev && IS_STA_OR_UAP_CFG80211(cfg80211_wext))
 		priv->wdev = NULL;
-	}
 #endif
 
 	/* Clear the priv in handle */
@@ -2319,10 +2304,11 @@ error:
 /**
  *  @brief Send FW shutdown command to MLAN
  *
- *  @param priv          A pointer to moal_private structure
- *  @param wait_option   Wait option
+ *  @param priv         A pointer to moal_private structure
+ *  @param wait_option  Wait option
  *
- *  @return              MLAN_STATUS_SUCCESS/MLAN_STATUS_PENDING -- success, otherwise fail
+ *  @return             MLAN_STATUS_SUCCESS/MLAN_STATUS_PENDING -- success,
+ *                          otherwise fail
  */
 static mlan_status
 woal_shutdown_fw(moal_private * priv, t_u8 wait_option)
@@ -2353,8 +2339,7 @@ woal_shutdown_fw(moal_private * priv, t_u8 wait_option)
 	/* add 100 ms delay to avoid back to back init/shutdown */
 	mdelay(100);
 done:
-	if (req)
-		kfree(req);
+	kfree(req);
 	LEAVE();
 	return status;
 }
@@ -2362,9 +2347,9 @@ done:
 /**
  *  @brief Return hex value of a give character
  *
- *  @param chr	    Character to be converted
+ *  @param chr      Character to be converted
  *
- *  @return 	    The converted character if chr is a valid hex, else 0
+ *  @return         The converted character if chr is a valid hex, else 0
  */
 static int
 woal_hexval(char chr)
@@ -2422,10 +2407,9 @@ static int
 wifi_set_carddetect(int on)
 {
 	ENTER();
-	PRINTM(MMSG, "%s = %d\n", __FUNCTION__, on);
-	if (wifi_control_data && wifi_control_data->set_carddetect) {
+	PRINTM(MMSG, "%s = %d\n", __func__, on);
+	if (wifi_control_data && wifi_control_data->set_carddetect)
 		wifi_control_data->set_carddetect(on);
-	}
 	LEAVE();
 	return 0;
 }
@@ -2443,10 +2427,9 @@ static int
 wifi_set_power(int on, unsigned long msec)
 {
 	ENTER();
-	PRINTM(MMSG, "%s = %d\n", __FUNCTION__, on);
-	if (wifi_control_data && wifi_control_data->set_power) {
+	PRINTM(MMSG, "%s = %d\n", __func__, on);
+	if (wifi_control_data && wifi_control_data->set_power)
 		wifi_control_data->set_power(on);
-	}
 	if (msec)
 		mdelay(msec);
 	LEAVE();
@@ -2759,9 +2742,9 @@ done:
 /**
  *  @brief Check driver status
  *
- *  @param handle    A pointer to moal_handle
+ *  @param handle   A pointer to moal_handle
  *
- *  @return 	   MTRUE/MFALSE
+ *  @return         MTRUE/MFALSE
  */
 t_u8
 woal_check_driver_status(moal_handle * handle)
@@ -2790,7 +2773,7 @@ woal_check_driver_status(moal_handle * handle)
 	}
 	if (info.num_cmd_timeout) {
 		PRINTM(MERROR, "num_cmd_timeout = %d\n", info.num_cmd_timeout);
-		PRINTM(MERROR, "Timeout cmd id = 0x%x, act = 0x%x \n",
+		PRINTM(MERROR, "Timeout cmd id = 0x%x, act = 0x%x\n",
 		       info.timeout_cmd_id, info.timeout_cmd_act);
 		LEAVE();
 		return MTRUE;
@@ -2831,7 +2814,7 @@ woal_check_driver_status(moal_handle * handle)
  *
  *  @param priv     A pointer to moal_private
  *
- *  @return 	   N/A
+ *  @return         N/A
  */
 void
 woal_mlan_debug_info(moal_private * priv)
@@ -2860,23 +2843,19 @@ woal_mlan_debug_info(moal_private * priv)
 	       info.timeout_cmd_id, info.timeout_cmd_act);
 
 	PRINTM(MERROR, "last_cmd_index = %d\n", info.last_cmd_index);
-	for (s = str, i = 0; i < DBG_CMD_NUM; i++) {
+	for (s = str, i = 0; i < DBG_CMD_NUM; i++)
 		s += sprintf(s, "0x%x ", info.last_cmd_id[i]);
-	}
 	PRINTM(MERROR, "last_cmd_id = %s\n", str);
-	for (s = str, i = 0; i < DBG_CMD_NUM; i++) {
+	for (s = str, i = 0; i < DBG_CMD_NUM; i++)
 		s += sprintf(s, "0x%x ", info.last_cmd_act[i]);
-	}
 	PRINTM(MERROR, "last_cmd_act = %s\n", str);
 	PRINTM(MERROR, "last_cmd_resp_index = %d\n", info.last_cmd_resp_index);
-	for (s = str, i = 0; i < DBG_CMD_NUM; i++) {
+	for (s = str, i = 0; i < DBG_CMD_NUM; i++)
 		s += sprintf(s, "0x%x ", info.last_cmd_resp_id[i]);
-	}
 	PRINTM(MERROR, "last_cmd_resp_id = %s\n", str);
 	PRINTM(MERROR, "last_event_index = %d\n", info.last_event_index);
-	for (s = str, i = 0; i < DBG_CMD_NUM; i++) {
+	for (s = str, i = 0; i < DBG_CMD_NUM; i++)
 		s += sprintf(s, "0x%x ", info.last_event[i]);
-	}
 	PRINTM(MERROR, "last_event = %s", str);
 
 	PRINTM(MERROR, "num_data_h2c_failure = %d\n",
@@ -2946,7 +2925,7 @@ woal_mlan_debug_info(moal_private * priv)
 
 /**
  *  @brief This function handles the timeout of packet
- *  		transmission
+ *          transmission
  *
  *  @param dev     A pointer to net_device structure
  *
@@ -3311,11 +3290,11 @@ done:
 /**
  *  @brief Convert ascii string to Hex integer
  *
- *  @param d   		A pointer to integer buf
- *  @param s   		A pointer to ascii string
- *  @param dlen		The byte number of ascii string in hex
+ *  @param d        A pointer to integer buf
+ *  @param s        A pointer to ascii string
+ *  @param dlen     The byte number of ascii string in hex
  *
- *  @return    		Number of integer
+ *  @return         Number of integer
  */
 int
 woal_ascii2hex(t_u8 * d, char *s, t_u32 dlen)
@@ -3392,9 +3371,9 @@ woal_atoi(int *data, char *a)
 /**
  *  @brief Return hex value of a given ascii string
  *
- *  @param a	    String to be converted to ascii
+ *  @param a        String to be converted to ascii
  *
- *  @return 	    The converted character if a is a valid hex, else 0
+ *  @return         The converted character if a is a valid hex, else 0
  */
 int
 woal_atox(char *a)
@@ -3412,7 +3391,7 @@ woal_atox(char *a)
 
 /**
  *  @brief Extension of strsep lib command. This function will also take care
- *	   escape character
+ *      escape character
  *
  *  @param s         A pointer to array of chars to process
  *  @param delim     The delimiter character to end the string
@@ -3470,7 +3449,7 @@ woal_strsep(char **s, char delim, char esc)
  *  @param mac_addr The buffer to store the mac address in.
  *  @param buf      The source of mac address which is a string.
  *
- *  @return 	    N/A
+ *  @return         N/A
  */
 void
 woal_mac2u8(t_u8 * mac_addr, char *buf)
@@ -3509,12 +3488,12 @@ woal_set_multicast_list(struct net_device *dev)
 
 /**
  *  @brief This function initializes the private structure
- *  		and set default value to the member of moal_private.
+ *          and set default value to the member of moal_private.
  *
  *  @param priv             A pointer to moal_private structure
  *  @param wait_option      Wait option
  *
- *  @return 	   N/A
+ *  @return                 N/A
  */
 void
 woal_init_priv(moal_private * priv, t_u8 wait_option)
@@ -3539,9 +3518,8 @@ woal_init_priv(moal_private * priv, t_u8 wait_option)
 	}
 #endif /* STA_SUPPORT */
 #ifdef UAP_SUPPORT
-	if (GET_BSS_ROLE(priv) == MLAN_BSS_ROLE_UAP) {
+	if (GET_BSS_ROLE(priv) == MLAN_BSS_ROLE_UAP)
 		priv->bss_started = MFALSE;
-	}
 #endif
 	priv->media_connected = MFALSE;
 
@@ -3599,7 +3577,7 @@ woal_init_priv(moal_private * priv, t_u8 wait_option)
 
 /**
  *  @brief Reset all interfaces if all_intf flag is TRUE,
- *  	   otherwise specified interface only
+ *          otherwise specified interface only
  *
  *  @param priv          A pointer to moal_private structure
  *  @param wait_option   Wait option
@@ -3765,14 +3743,14 @@ woal_alloc_mlan_buffer(moal_handle * handle, int size)
 
 	pmbuf = kmalloc(sizeof(mlan_buffer), flag);
 	if (!pmbuf) {
-		PRINTM(MERROR, "%s: Fail to alloc mlan buffer\n", __FUNCTION__);
+		PRINTM(MERROR, "%s: Fail to alloc mlan buffer\n", __func__);
 		LEAVE();
 		return NULL;
 	}
 	memset((t_u8 *) pmbuf, 0, sizeof(mlan_buffer));
 	skb = __dev_alloc_skb(size, flag);
 	if (!skb) {
-		PRINTM(MERROR, "%s: No free skb\n", __FUNCTION__);
+		PRINTM(MERROR, "%s: No free skb\n", __func__);
 		kfree(pmbuf);
 		LEAVE();
 		return NULL;
@@ -3804,8 +3782,7 @@ woal_alloc_mlan_ioctl_req(int size)
 		kmalloc((sizeof(mlan_ioctl_req) + size + sizeof(int) +
 			 sizeof(wait_queue)), flag);
 	if (!req) {
-		PRINTM(MERROR, "%s: Fail to alloc ioctl buffer\n",
-		       __FUNCTION__);
+		PRINTM(MERROR, "%s: Fail to alloc ioctl buffer\n", __func__);
 		LEAVE();
 		return NULL;
 	}
@@ -3850,10 +3827,10 @@ woal_free_mlan_buffer(moal_handle * handle, pmlan_buffer pmbuf)
 /**
  *  @brief This function handles events generated by firmware
  *
- *  @param priv    A pointer to moal_private structure
- *  @param payload A pointer to payload buffer
- *  @param len	   Length of the payload
- *  @return 	   MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
+ *  @param priv     A pointer to moal_private structure
+ *  @param payload  A pointer to payload buffer
+ *  @param len      Length of the payload
+ *  @return         MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
 mlan_status
 woal_broadcast_event(moal_private * priv, t_u8 * payload, t_u32 len)
@@ -4198,8 +4175,7 @@ woal_reassociation_thread(void *data)
 						LEAVE();
 						return MLAN_STATUS_FAILURE;
 					}
-					if (req)
-						kfree(req);
+					kfree(req);
 				}
 			}
 
@@ -4213,7 +4189,7 @@ woal_reassociation_thread(void *data)
 			handle->is_reassoc_timer_set = MTRUE;
 			if (priv && (priv->set_asynced_essid_flag == MTRUE)) {
 				PRINTM(MERROR,
-				       "Set Async ESSID: No AP found or assoc failed. \n");
+				       "Set Async ESSID: No AP found or assoc failed.\n");
 				priv->set_asynced_essid_flag = MFALSE;
 			} else {
 				PRINTM(MEVENT,
@@ -4239,8 +4215,8 @@ woal_reassociation_thread(void *data)
  *  @brief This function triggers re-association by waking up
  *  re-assoc thread.
  *
- *  @param context	A pointer to context
- *  @return		N/A
+ *  @param context  A pointer to context
+ *  @return         N/A
  */
 void
 woal_reassoc_timer_func(void *context)
@@ -4266,7 +4242,7 @@ woal_reassoc_timer_func(void *context)
  *  @brief Sends disconnect event
  *
  *  @param priv A pointer to moal_private struct
- *  @return		N/A
+ *  @return     N/A
  */
 t_void
 woal_send_disconnect_to_system(moal_private * priv)
@@ -4294,8 +4270,9 @@ woal_send_disconnect_to_system(moal_private * priv)
 	if (IS_STA_CFG80211(cfg80211_wext)) {
 		if (!priv->cfg_disconnect && !priv->cfg_connect &&
 		    priv->wdev && priv->wdev->iftype != NL80211_IFTYPE_ADHOC) {
-			PRINTM(MMSG, "wlan: Disconnected from " MACSTR ":"
-			       " Reason code %d\n", MAC2STR(priv->cfg_bssid),
+			PRINTM(MMSG,
+			       "wlan: Disconnected from " MACSTR
+			       ": Reason code %d\n", MAC2STR(priv->cfg_bssid),
 			       WLAN_REASON_DEAUTH_LEAVING);
 			/* This function must be called only when disconnect
 			   issued by the FW, i.e. disconnected by AP. For IBSS
@@ -4710,17 +4687,19 @@ woal_dump_moal_hex(moal_handle * phandle, t_u8 * buf)
 	}
 
 	ptr += sprintf(ptr, "<--moal_handle-->\n");
-	ptr += sprintf(ptr, "moal_handle=%p, size=%d(0x%x)\n", phandle,
-		       sizeof(*phandle), sizeof(*phandle));
+	ptr += sprintf(ptr, "moal_handle=%p, size=%ld(0x%lx)\n", phandle,
+		       (long int)sizeof(*phandle),
+		       (long unsigned int)sizeof(*phandle));
 	ptr += woal_save_hex_dump(ROW_SIZE_16, phandle, sizeof(*phandle), MTRUE,
 				  ptr);
 	ptr += sprintf(ptr, "<--moal_handle End-->\n");
 
 	for (i = 0; i < phandle->priv_num; i++) {
 		ptr += sprintf(ptr, "<--moal_private(%d)-->\n", i);
-		ptr += sprintf(ptr, "moal_private=%p, size=%d(0x%x)\n",
-			       phandle->priv[i], sizeof(*(phandle->priv[i])),
-			       sizeof(*(phandle->priv[i])));
+		ptr += sprintf(ptr, "moal_private=%p, size=%ld(0x%lx)\n",
+			       phandle->priv[i],
+			       (long int)sizeof(*(phandle->priv[i])),
+			       (long unsigned int)sizeof(*(phandle->priv[i])));
 		ptr += woal_save_hex_dump(ROW_SIZE_16, phandle->priv[i],
 					  sizeof(*(phandle->priv[i])), MTRUE,
 					  ptr);
@@ -4733,21 +4712,20 @@ woal_dump_moal_hex(moal_handle * phandle, t_u8 * buf)
 /**
  *  @brief This function dump mlan hex to file
  *
- *  @param phandle   A pointer to moal_handle
+ *  @param priv   A pointer to moal_private structure
  *  @param buf       A pointer to buffer
  *
  *  @return          The length of this log
  */
 static int
-woal_dump_mlan_hex(moal_handle * phandle, t_u8 * buf)
+woal_dump_mlan_hex(moal_private * priv, t_u8 * buf)
 {
 	char *ptr = (char *)buf;
 	int i;
 
 	ENTER();
 
-	if (!phandle || !buf ||
-	    woal_get_debug_info(phandle->pmlan_adapter, MOAL_CMD_WAIT, &info)) {
+	if (!buf || !priv || woal_get_debug_info(priv, MOAL_CMD_WAIT, &info)) {
 		PRINTM(MMSG, "%s: can't retreive info\n", __func__);
 		LEAVE();
 		return 0;
@@ -4806,10 +4784,11 @@ woal_dump_drv_info(moal_handle * phandle)
 				       (phandle, MLAN_BSS_ROLE_ANY), pos);
 
 	pos += woal_dump_moal_hex(phandle, pos);
-	pos += woal_dump_mlan_hex(phandle, pos);
+	pos += woal_dump_mlan_hex(woal_get_priv(phandle, MLAN_BSS_ROLE_ANY),
+				  pos);
 
-	PRINTM(MMSG, "Drv info total bytes = %d (0x%x)\n", pos - drv_buf,
-	       pos - drv_buf);
+	PRINTM(MMSG, "Drv info total bytes = %ld (0x%lx)\n",
+	       (long int)(pos - drv_buf), (long unsigned int)(pos - drv_buf));
 
 	pfile = filp_open("/data/file_drv_info", O_CREAT | O_RDWR, 0644);
 	if (IS_ERR(pfile)) {
@@ -4852,7 +4831,6 @@ done:
 /**
  *  @brief This function dump firmware memory to file
  *
-
  *  @param phandle   A pointer to moal_handle
  *
  *  @return         N/A
@@ -5362,7 +5340,7 @@ woal_interrupt(moal_handle * handle)
 
 /**
  * @brief This function adds the card. it will probe the
- * 		card, allocate the mlan_private and initialize the device.
+ *      card, allocate the mlan_private and initialize the device.
  *
  *  @param card    A pointer to card
  *
@@ -5527,9 +5505,8 @@ woal_add_card(void *card)
 	woal_create_thread(woal_reassociation_thread,
 			   &handle->reassoc_thread, "woal_reassoc_service");
 
-	while (!handle->reassoc_thread.pid) {
+	while (!handle->reassoc_thread.pid)
 		woal_sched_timeout(2);
-	}
 #endif /* REASSOCIATION */
 
 	/* Register the device. Fill up the private data structure with
@@ -5565,20 +5542,17 @@ err_init_fw:
 err_registerdev:
 	handle->surprise_removed = MTRUE;
 #ifdef REASSOCIATION
-	if (handle->reassoc_thread.pid) {
+	if (handle->reassoc_thread.pid)
 		wake_up_interruptible(&handle->reassoc_thread.wait_q);
-	}
 	/* waiting for main thread quit */
-	while (handle->reassoc_thread.pid) {
+	while (handle->reassoc_thread.pid)
 		woal_sched_timeout(2);
-	}
 #endif /* REASSOCIATION */
 	woal_terminate_workqueue(handle);
 err_kmalloc:
 	woal_free_moal_handle(handle);
-	if (index < MAX_MLAN_ADAPTER) {
+	if (index < MAX_MLAN_ADAPTER)
 		m_handle[index] = NULL;
-	}
 	((struct sdio_mmc_card *)card)->handle = NULL;
 err_handle:
 	MOAL_REL_SEMAPHORE(&AddRemoveCardSem);
@@ -5682,9 +5656,8 @@ woal_remove_card(void *card)
 		wake_up_interruptible(&handle->reassoc_thread.wait_q);
 
 	/* waiting for main thread quit */
-	while (handle->reassoc_thread.pid) {
+	while (handle->reassoc_thread.pid)
 		woal_sched_timeout(2);
-	}
 #endif /* REASSOCIATION */
 
 #ifdef CONFIG_PROC_FS
@@ -5714,7 +5687,7 @@ exit_sem_err:
 /**
  *  @brief This function switch the drv_mode
  *
- *  @param handle    A pointer to moal_handle structure
+ *  @param handle   A pointer to moal_handle structure
  *  @param mode     new drv_mode to switch.
  *
  *  @return        MLAN_STATUS_SUCCESS /MLAN_STATUS_FAILURE /MLAN_STATUS_PENDING
@@ -5822,9 +5795,8 @@ woal_init_module(void)
 
 	PRINTM(MMSG, "wlan: Loading MWLAN driver\n");
 	/* Init the wlan_private pointer array first */
-	for (index = 0; index < MAX_MLAN_ADAPTER; index++) {
+	for (index = 0; index < MAX_MLAN_ADAPTER; index++)
 		m_handle[index] = NULL;
-	}
 	/* Init mutex */
 	MOAL_INIT_SEMAPHORE(&AddRemoveCardSem);
 

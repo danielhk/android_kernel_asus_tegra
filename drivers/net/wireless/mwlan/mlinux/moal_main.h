@@ -246,15 +246,15 @@ woal_initialize_timer(pmoal_drv_timer timer,
  *  @brief Modify timer
  *
  *  @param timer		Timer structure
- *  @param MillisecondPeriod	Time period in millisecond
+ *  @param millisecondperiod	Time period in millisecond
  *
  *  @return			N/A
  */
 static inline void
-woal_mod_timer(pmoal_drv_timer timer, t_u32 MillisecondPeriod)
+woal_mod_timer(pmoal_drv_timer timer, t_u32 millisecondperiod)
 {
-	timer->time_period = MillisecondPeriod;
-	mod_timer(&timer->tl, jiffies + (MillisecondPeriod * HZ) / 1000);
+	timer->time_period = millisecondperiod;
+	mod_timer(&timer->tl, jiffies + (millisecondperiod * HZ) / 1000);
 	timer->timer_is_canceled = MFALSE;
 }
 
@@ -448,9 +448,8 @@ in4_pton(const char *src, int srclen, u8 * dst, int delim, const char **end)
 			goto cont;
 		}
 		w = (w * 10) + c;
-		if ((w & 0xffff) > 255) {
+		if ((w & 0xffff) > 255)
 			goto out;
-		}
 cont:
 		if (i >= 4)
 			goto out;
@@ -481,14 +480,14 @@ out:
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 37)
 /** Initialize semaphore */
-#define MOAL_INIT_SEMAPHORE(x)    	init_MUTEX(x)
+#define MOAL_INIT_SEMAPHORE(x)      init_MUTEX(x)
 /** Initialize semaphore */
-#define MOAL_INIT_SEMAPHORE_LOCKED(x) 	init_MUTEX_LOCKED(x)
+#define MOAL_INIT_SEMAPHORE_LOCKED(x)   init_MUTEX_LOCKED(x)
 #else
 /** Initialize semaphore */
-#define MOAL_INIT_SEMAPHORE(x)    	sema_init(x, 1)
+#define MOAL_INIT_SEMAPHORE(x)      sema_init(x, 1)
 /** Initialize semaphore */
-#define MOAL_INIT_SEMAPHORE_LOCKED(x) 	sema_init(x, 0)
+#define MOAL_INIT_SEMAPHORE_LOCKED(x)   sema_init(x, 0)
 #endif
 
 /** Acquire semaphore and with blocking */
@@ -496,7 +495,7 @@ out:
 /** Acquire semaphore without blocking */
 #define MOAL_ACQ_SEMAPHORE_NOBLOCK(x)	down_trylock(x)
 /** Release semaphore */
-#define MOAL_REL_SEMAPHORE(x) 		up(x)
+#define MOAL_REL_SEMAPHORE(x)       up(x)
 
 /** Request FW timeout in second */
 #define REQUEST_FW_TIMEOUT		30
@@ -620,7 +619,7 @@ out:
 #define NL_MULTICAST_GROUP  1
 
 /** MAX Tx Pending count */
-#define MAX_TX_PENDING    	100
+#define MAX_TX_PENDING      100
 
 /** LOW Tx Pending count */
 #define LOW_TX_PENDING      80
@@ -1178,9 +1177,8 @@ woal_set_trans_start(struct net_device *dev)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 31)
 	unsigned int i;
-	for (i = 0; i < dev->num_tx_queues; i++) {
+	for (i = 0; i < dev->num_tx_queues; i++)
 		netdev_get_tx_queue(dev, i)->trans_start = jiffies;
-	}
 #endif
 	dev->trans_start = jiffies;
 }
@@ -1312,20 +1310,20 @@ woal_print(t_u32 level, char *fmt, ...)
 #define MASSERT(cond)                   \
 do {                                    \
 	if (!(cond)) {                      \
-	    PRINTM(MFATAL, "ASSERT: %s: %i\n", __FUNCTION__, __LINE__); \
+	    PRINTM(MFATAL, "ASSERT: %s: %i\n", __func__, __LINE__); \
 	    panic("Assert failed: Panic!"); \
 	}                                   \
 } while (0)
 
 /** Log entry point for debugging */
 #define	ENTER()			PRINTM(MENTRY, "Enter: %s\n", \
-									__FUNCTION__)
+									__func__)
 /** Log exit point for debugging */
 #define	LEAVE()			PRINTM(MENTRY, "Leave: %s\n", \
-									__FUNCTION__)
+									__func__)
 
 #ifdef DEBUG_LEVEL1
-#define DBG_DUMP_BUF_LEN 	64
+#define DBG_DUMP_BUF_LEN	64
 #define MAX_DUMP_PER_LINE	16
 
 static inline void
@@ -1863,9 +1861,9 @@ mlan_status woal_set_sleeppd(moal_private * priv, char *psleeppd);
 int woal_set_scan_cfg(moal_private * priv, char *buf, int length);
 
 /* EVENT: BCN_RSSI_LOW */
-#define EVENT_BCN_RSSI_LOW 		   0x0001
+#define EVENT_BCN_RSSI_LOW			0x0001
 /* EVENT: PRE_BCN_LOST */
-#define EVENT_PRE_BCN_LOST		   0x0002
+#define EVENT_PRE_BCN_LOST			0x0002
 mlan_status woal_set_rssi_low_threshold(moal_private * priv, char *rssi,
 					t_u8 wait_option);
 mlan_status woal_set_rssi_threshold(moal_private * priv, t_u32 event_id,

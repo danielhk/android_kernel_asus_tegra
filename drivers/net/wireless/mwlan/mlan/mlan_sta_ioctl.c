@@ -47,9 +47,9 @@ Change log:
 /**
  *  @brief enable adhoc aes key
  *
- *  @param pmpriv	A pointer to mlan_private structure
+ *  @param pmpriv   A pointer to mlan_private structure
  *
- *  @return		N/A
+ *  @return         N/A
  */
 static void
 wlan_enable_aes_key(pmlan_private pmpriv)
@@ -506,8 +506,9 @@ wlan_radio_ioctl_band_cfg(IN pmlan_adapter pmadapter,
 						DEFAULT_AD_HOC_CHANNEL_A;
 				}
 			}
-		} else {	/* Return error if adhoc_band and adhoc_channel
-				   combination is invalid */
+		} else {
+			/* Return error if adhoc_band and adhoc_channel
+			   combination is invalid */
 			if (!wlan_find_cfp_by_band_and_channel
 			    (pmadapter, pmadapter->adhoc_start_band,
 			     (t_u16) adhoc_channel)) {
@@ -527,25 +528,20 @@ wlan_radio_ioctl_band_cfg(IN pmlan_adapter pmadapter,
 			pmadapter->adhoc_11n_enabled = MFALSE;
 		}
 	} else {
-		radio_cfg->param.band_cfg.config_bands = pmpriv->config_bands;	/* Infra
-										   Bands
-										 */
-		radio_cfg->param.band_cfg.adhoc_start_band = pmadapter->adhoc_start_band;	/* Adhoc
-												   Band
-												 */
-		radio_cfg->param.band_cfg.adhoc_channel = pmpriv->adhoc_channel;	/* Adhoc
-											   Channel
-											 */
-		radio_cfg->param.band_cfg.fw_bands = pmadapter->fw_bands;	/* FW
-										   support
-										   Bands
-										 */
+		/* Infra Bands */
+		radio_cfg->param.band_cfg.config_bands = pmpriv->config_bands;
+		/* Adhoc Band */
+		radio_cfg->param.band_cfg.adhoc_start_band =
+			pmadapter->adhoc_start_band;
+		/* Adhoc Channel */
+		radio_cfg->param.band_cfg.adhoc_channel = pmpriv->adhoc_channel;
+		/* FW support Bands */
+		radio_cfg->param.band_cfg.fw_bands = pmadapter->fw_bands;
 		PRINTM(MINFO, "Global config band = %d\n",
 		       pmadapter->config_bands);
-		radio_cfg->param.band_cfg.sec_chan_offset = pmadapter->chan_bandwidth;	/* adhoc
-											   channel
-											   bandwidth
-											 */
+		/* adhoc channel bandwidth */
+		radio_cfg->param.band_cfg.sec_chan_offset =
+			pmadapter->chan_bandwidth;
 
 	}
 
@@ -2025,9 +2021,8 @@ wlan_pm_ioctl_inactivity_timeout(IN pmlan_adapter pmadapter,
 
 	pmcfg = (mlan_ds_pm_cfg *) pioctl_req->pbuf;
 	cmd_action = HostCmd_ACT_GEN_GET;
-	if (pioctl_req->action == MLAN_ACT_SET) {
+	if (pioctl_req->action == MLAN_ACT_SET)
 		cmd_action = HostCmd_ACT_GEN_SET;
-	}
 
 	/* Send request to firmware */
 	ret = wlan_prepare_cmd(pmpriv,
@@ -2045,7 +2040,7 @@ wlan_pm_ioctl_inactivity_timeout(IN pmlan_adapter pmadapter,
 /**
  *  @brief Enable/Disable Auto Deep Sleep
  *
- *  @param pmadapter 	A pointer to mlan_adapter structure
+ *  @param pmadapter	A pointer to mlan_adapter structure
  *  @param pioctl_req	A pointer to ioctl request buffer
  *
  *  @return		MLAN_STATUS_PENDING --success, otherwise fail
@@ -2235,9 +2230,8 @@ wlan_set_get_sleep_params(IN pmlan_adapter pmadapter,
 
 	pm_cfg = (mlan_ds_pm_cfg *) pioctl_req->pbuf;
 	cmd_action = HostCmd_ACT_GEN_GET;
-	if (pioctl_req->action == MLAN_ACT_SET) {
+	if (pioctl_req->action == MLAN_ACT_SET)
 		cmd_action = HostCmd_ACT_GEN_SET;
-	}
 
 	/* Send command to firmware */
 	ret = wlan_prepare_cmd(pmpriv, HostCmd_CMD_802_11_SLEEP_PARAMS,
@@ -2380,7 +2374,7 @@ wlan_set_wpa_ie_helper(mlan_private * priv, t_u8 * ie_data_ptr, t_u16 ie_len)
 
 	if (ie_len) {
 		if (ie_len > sizeof(priv->wpa_ie)) {
-			PRINTM(MERROR, "failed to copy, WPA IE is too big \n");
+			PRINTM(MERROR, "failed to copy, WPA IE is too big\n");
 			LEAVE();
 			return MLAN_STATUS_FAILURE;
 		}
@@ -2425,7 +2419,7 @@ wlan_set_wapi_ie(mlan_private * priv, t_u8 * ie_data_ptr, t_u16 ie_len)
 	ENTER();
 	if (ie_len) {
 		if (ie_len > sizeof(priv->wapi_ie)) {
-			PRINTM(MWARN, "failed to copy, WAPI IE is too big \n");
+			PRINTM(MWARN, "failed to copy, WAPI IE is too big\n");
 			LEAVE();
 			return MLAN_STATUS_FAILURE;
 		}
@@ -2471,9 +2465,8 @@ wlan_sec_ioctl_wapi_enable(IN pmlan_adapter pmadapter,
 		else
 			sec->param.wapi_enabled = MFALSE;
 	} else {
-		if (sec->param.wapi_enabled == MFALSE) {
+		if (sec->param.wapi_enabled == MFALSE)
 			wlan_set_wapi_ie(pmpriv, MNULL, 0);
-		}
 	}
 	pioctl_req->data_read_written = sizeof(t_u32) + MLAN_SUB_COMMAND_SIZE;
 	LEAVE();
@@ -2654,9 +2647,8 @@ wlan_sec_ioctl_wpa_enable(IN pmlan_adapter pmadapter,
 		else
 			sec->param.wpa_enabled = MFALSE;
 	} else {
-		if (sec->param.wpa_enabled == MFALSE) {
+		if (sec->param.wpa_enabled == MFALSE)
 			wlan_set_wpa_ie_helper(pmpriv, MNULL, 0);
-		}
 		/** clear adhoc aes flag, when WPA enabled */
 		pmpriv->adhoc_aes_enabled = MFALSE;
 		pmpriv->aes_key.key_len = 0;
@@ -3998,9 +3990,8 @@ wlan_misc_ioctl_warm_reset(IN pmlan_adapter pmadapter,
 	ENTER();
 
     /** Init all the head nodes and free all the locks here */
-	for (i = 0; i < pmadapter->priv_num; i++) {
+	for (i = 0; i < pmadapter->priv_num; i++)
 		wlan_free_priv(pmadapter->priv[i]);
-	}
 
 	while ((pmbuf =
 		(pmlan_buffer) util_dequeue_list(pmadapter->pmoal_handle,
@@ -4018,9 +4009,8 @@ wlan_misc_ioctl_warm_reset(IN pmlan_adapter pmadapter,
 
 	/* Initialize private structures */
 	for (i = 0; i < pmadapter->priv_num; i++) {
-		if (pmadapter->priv[i]) {
+		if (pmadapter->priv[i])
 			wlan_init_priv(pmadapter->priv[i]);
-		}
 	}
 
 	/* Restart the firmware */
@@ -4324,11 +4314,10 @@ wlan_misc_ioctl_subscribe_evt(IN pmlan_adapter pmadapter,
 	ENTER();
 
 	misc = (mlan_ds_misc_cfg *) pioctl_req->pbuf;
-	if (pioctl_req->action == MLAN_ACT_SET) {
+	if (pioctl_req->action == MLAN_ACT_SET)
 		cmd_action = HostCmd_ACT_GEN_SET;
-	} else {
+	else
 		cmd_action = HostCmd_ACT_GEN_GET;
-	}
 
 	/* Send command to firmware */
 	ret = wlan_prepare_cmd(pmpriv,

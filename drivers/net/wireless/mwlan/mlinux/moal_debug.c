@@ -40,17 +40,17 @@ extern mlan_debug_info info;
 /** Get info item size */
 #define item_size(n) (sizeof(info.n))
 /** Get info item address */
-#define item_addr(n) ((t_ptr) & (info.n))
+#define item_addr(n) ((t_ptr) &(info.n))
 
 /** Get moal_private member size */
-#define item_priv_size(n) (sizeof ((moal_private *)0)->n)
+#define item_priv_size(n) (sizeof((moal_private *)0)->n)
 /** Get moal_private member address */
-#define item_priv_addr(n) ((t_ptr) & ((moal_private *)0)->n)
+#define item_priv_addr(n) ((t_ptr) &((moal_private *)0)->n)
 
 /** Get moal_handle member size */
-#define item_handle_size(n) (sizeof ((moal_handle *)0)->n)
+#define item_handle_size(n) (sizeof((moal_handle *)0)->n)
 /** Get moal_handle member address */
-#define item_handle_addr(n) ((t_ptr) & ((moal_handle *)0)->n)
+#define item_handle_addr(n) ((t_ptr) &((moal_handle *)0)->n)
 
 #ifdef STA_SUPPORT
 static struct debug_data items[] = {
@@ -780,8 +780,7 @@ woal_debug_remove(moal_private * priv)
 {
 	ENTER();
 
-	if (priv->items_priv.items)
-		kfree(priv->items_priv.items);
+	kfree(priv->items_priv.items);
 	/* Remove proc entry */
 	remove_proc_entry("debug", priv->proc_entry);
 

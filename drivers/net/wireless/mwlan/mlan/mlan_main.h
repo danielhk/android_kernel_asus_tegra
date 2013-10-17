@@ -146,13 +146,13 @@ do {                \
 /** Log entry point for debugging */
 #define ENTER()     \
 do {                \
-	PRINTM(MENTRY, "Enter: %s\n", __FUNCTION__);   \
+	PRINTM(MENTRY, "Enter: %s\n", __func__);   \
 } while (0)
 
 /** Log exit point for debugging */
 #define LEAVE()     \
 do {                \
-	PRINTM(MENTRY, "Leave: %s\n", __FUNCTION__);   \
+	PRINTM(MENTRY, "Leave: %s\n", __func__);   \
 } while (0)
 
 /** Find minimum */
@@ -228,7 +228,7 @@ do {                \
 	     (t_u64)(((t_u64)(x) & 0x000000ff00000000ULL) >>  8) | \
 	     (t_u64)(((t_u64)(x) & 0x0000ff0000000000ULL) >> 24) | \
 	     (t_u64)(((t_u64)(x) & 0x00ff000000000000ULL) >> 40) | \
-	     (t_u64)(((t_u64)(x) & 0xff00000000000000ULL) >> 56) ))
+	     (t_u64)(((t_u64)(x) & 0xff00000000000000ULL) >> 56)))
 
 #ifdef BIG_ENDIAN_SUPPORT
 /** Convert ulong n/w to host */
@@ -304,7 +304,7 @@ extern t_void(*assert_callback) (IN t_void * pmoal_handle, IN t_u32 cond);
 #define MASSERT(cond)                   \
 do {                                    \
 	if (!(cond)) {                      \
-	    PRINTM(MFATAL, "ASSERT: %s: %i\n", __FUNCTION__, __LINE__); \
+	    PRINTM(MFATAL, "ASSERT: %s: %i\n", __func__, __LINE__); \
 	    if (assert_callback) {          \
 			assert_callback(MNULL, (t_ptr)(cond)); \
 	    } else {                        \
@@ -321,7 +321,7 @@ do {                                    \
 
 #ifdef STA_SUPPORT
 /** Maximum buffer size for ARP filter */
-#define ARP_FILTER_MAX_BUF_SIZE     	68
+#define ARP_FILTER_MAX_BUF_SIZE         68
 #endif /* STA_SUPPORT */
 
 /** 60 seconds */
@@ -408,13 +408,19 @@ do {                                    \
  */
 #define SCAN_BEACON_ENTRY_PAD          6
 
-/** Scan time specified in the channel TLV for each channel for passive scans */
+/** Scan time specified in the channel TLV
+ *  for each channel for passive scans
+ */
 #define MRVDRV_PASSIVE_SCAN_CHAN_TIME       200
 
-/** Scan time specified in the channel TLV for each channel for active scans */
+/** Scan time specified in the channel TLV
+ *  for each channel for active scans
+ */
 #define MRVDRV_ACTIVE_SCAN_CHAN_TIME        200
 
-/** Scan time specified in the channel TLV for each channel for specific scans */
+/** Scan time specified in the channel TLV
+ *  for each channel for specific scans
+ */
 #define MRVDRV_SPECIFIC_SCAN_CHAN_TIME      110
 
 /**
@@ -1303,7 +1309,9 @@ typedef struct {
 	t_bool dfs_radar_found;
     /** Channel radar is being checked on.  BAND_A is assumed. */
 	t_u8 dfs_check_channel;
-    /** Timestamp when we got last report, to determine if data is old or not. */
+    /** Timestamp when we got last report,
+     * to determine if data is old or not.
+     */
 	t_u32 dfs_report_time_sec;
     /** List for holding dfs_timestamps for NOP/CAC events */
 	mlan_list_head dfs_ts_head;
@@ -1853,9 +1861,9 @@ typedef struct _mlan_adapter {
 /** Ethernet packet type for EAPOL */
 #define MLAN_ETHER_PKT_TYPE_EAPOL	(0x888E)
 /** Ethernet packet type for WAPI */
-#define MLAN_ETHER_PKT_TYPE_WAPI 	(0x88B4)
+#define MLAN_ETHER_PKT_TYPE_WAPI	(0x88B4)
 /** Ethernet packet type offset */
-#define MLAN_ETHER_PKT_TYPE_OFFSET  (12)
+#define MLAN_ETHER_PKT_TYPE_OFFSET	(12)
 
 mlan_status wlan_init_lock_list(IN pmlan_adapter pmadapter);
 t_void wlan_free_lock_list(IN pmlan_adapter pmadapter);
@@ -1896,7 +1904,7 @@ mlan_status wlan_prepare_cmd(IN pmlan_private priv,
 			     IN t_void * pioctl_buf, IN t_void * pdata_buf);
 
 /** cmd timeout handler */
-t_void wlan_cmd_timeout_func(t_void * FunctionContext);
+t_void wlan_cmd_timeout_func(t_void * function_context);
 /** process host cmd */
 mlan_status wlan_misc_ioctl_host_cmd(IN pmlan_adapter pmadapter,
 				     IN pmlan_ioctl_req pioctl_req);
@@ -2437,7 +2445,7 @@ t_u8 wlan_is_wmm_ie_present(pmlan_adapter pmadapter, t_u8 * pbuf,
  *  @param priv     A pointer to mlan_private
  *  @param ra       Address of the receiver STA
  *
- *  @return 	    MTRUE or MFALSE
+ *  @return         MTRUE or MFALSE
  */
 static int INLINE
 wlan_is_tx_pause(mlan_private * priv, t_u8 * ra)
@@ -2548,9 +2556,9 @@ mlan_status wlan_misc_ioctl_txcontrol(IN pmlan_adapter pmadapter,
 /**
  *  @brief RA based queueing
  *
- *  @param priv                 A pointer to mlan_private structure
+ *  @param priv             A pointer to mlan_private structure
  *
- *  @return 	   	        MTRUE or MFALSE
+ *  @return                 MTRUE or MFALSE
  */
 static INLINE t_u8
 queuing_ra_based(pmlan_private priv)
@@ -2569,12 +2577,12 @@ queuing_ra_based(pmlan_private priv)
 /**
  *  @brief Copy Rates
  *
- *  @param dest                 A pointer to Dest Buf
+ *  @param dest             A pointer to Dest Buf
  *  @param pos		        The position for copy
  *  @param src		        A pointer to Src Buf
- *  @param len                  The len of Src Buf
+ *  @param len              The len of Src Buf
  *
- *  @return 	   	        Number of Rates copied
+ *  @return                 Number of Rates copied
  */
 static INLINE t_u32
 wlan_copy_rates(t_u8 * dest, t_u32 pos, t_u8 * src, int len)
@@ -2595,7 +2603,7 @@ wlan_copy_rates(t_u8 * dest, t_u32 pos, t_u8 * src, int len)
  *
  *  @param str		        A pointer to string
  *
- *  @return 	   	        Length of string
+ *  @return                 Length of string
  */
 static INLINE t_u32
 wlan_strlen(const char *str)
@@ -2652,10 +2660,11 @@ t_void wlan_delay_func(mlan_adapter * pmadapter, t_u32 delay, t_delay_unit u);
 #define wlan_udelay(p, n)  wlan_delay_func(p, n, USEC)
 
 /** Function to check if any command is pending in the queue */
-#define IS_COMMAND_PENDING(pmadapter) ((cmd_ctrl_node *)util_peek_list(pmadapter->pmoal_handle, \
-										&pmadapter->cmd_pending_q,\
-										pmadapter->callbacks.moal_spin_lock,\
-										pmadapter->callbacks.moal_spin_unlock))
+#define IS_COMMAND_PENDING(pmadapter) \
+			((cmd_ctrl_node *)util_peek_list(pmadapter->pmoal_handle, \
+			&pmadapter->cmd_pending_q,\
+			pmadapter->callbacks.moal_spin_lock,\
+			pmadapter->callbacks.moal_spin_unlock))
 
 /** Get BSS number from priv */
 #define GET_BSS_NUM(priv)   ((priv)->bss_num)
@@ -2814,9 +2823,8 @@ wlan_get_privs_by_cond(mlan_adapter * pmadapter,
 	for (i = 0; i < pmadapter->priv_num; i++) {
 		pmpriv = pmadapter->priv[i];
 		if (pmpriv) {
-			if (check_cond(pmpriv)) {
+			if (check_cond(pmpriv))
 				ppriv_list[count++] = pmpriv;
-			}
 		}
 	}
 
@@ -2861,13 +2869,11 @@ wlan_get_privs_by_two_cond(mlan_adapter * pmadapter,
 		pmpriv = pmadapter->priv[i];
 		if (pmpriv) {
 			if (and_conditions) {
-				if (check_cond(pmpriv) && check_cond_2(pmpriv)) {
+				if (check_cond(pmpriv) && check_cond_2(pmpriv))
 					ppriv_list[count++] = pmpriv;
-				}
 			} else {
-				if (check_cond(pmpriv) || check_cond_2(pmpriv)) {
+				if (check_cond(pmpriv) || check_cond_2(pmpriv))
 					ppriv_list[count++] = pmpriv;
-				}
 			}
 		}
 	}

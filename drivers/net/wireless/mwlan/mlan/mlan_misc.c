@@ -58,7 +58,7 @@ extern t_u8 ac_to_tid[4][2];
 /** Custom IE mask for delete operation */
 #define	MLAN_CUSTOM_IE_DELETE_MASK      0
 /** Custom IE mask for create new index */
-#define MLAN_CUSTOM_IE_NEW_MASK      	0x8000
+#define MLAN_CUSTOM_IE_NEW_MASK         0x8000
 /** Custom IE header size */
 #define	MLAN_CUSTOM_IE_HDR_SIZE         (sizeof(custom_ie)-MAX_IE_SIZE)
 
@@ -914,11 +914,10 @@ wlan_delay_func(mlan_adapter * pmadapter, t_u32 delay, t_delay_unit u)
 	ENTER();
 
 	if (pcb->moal_udelay) {
-		if (u == SEC) {
+		if (u == SEC)
 			delay *= 1000000;
-		} else if (u == MSEC) {
+		else if (u == MSEC)
 			delay *= 1000;
-		}
 		pcb->moal_udelay(pmadapter->pmoal_handle, delay);
 	} else {
 
@@ -1150,9 +1149,8 @@ wlan_misc_ioctl_custom_ie_list(IN pmlan_adapter pmadapter,
 						 index);
 					/* if IE to delete is not found, return
 					   error */
-					if (ret == MLAN_STATUS_FAILURE) {
+					if (ret == MLAN_STATUS_FAILURE)
 						goto done;
-					}
 					index = ie_data->ie_index;
 					memset(pmadapter, ie_data, 0,
 					       sizeof(custom_ie) *
@@ -1267,9 +1265,8 @@ wlan_misc_ioctl_custom_ie_list(IN pmlan_adapter pmadapter,
 						 index);
 					/* if IE to delete is not found, return
 					   error */
-					if (ret == MLAN_STATUS_FAILURE) {
+					if (ret == MLAN_STATUS_FAILURE)
 						goto done;
-					}
 					memset(pmadapter, ie_data, 0,
 					       sizeof(custom_ie) *
 					       MAX_MGMT_IE_INDEX_TO_FW);
@@ -1535,7 +1532,7 @@ wlan_is_station_list_empty(mlan_private * priv)
 
 /**
  *  @brief This function will return the pointer to station entry in station list
- *  		table which matches the give mac address
+ *          table which matches the give mac address
  *
  *  @param priv    A pointer to mlan_private
  *  @param mac     mac address to find in station list table
@@ -1578,7 +1575,7 @@ wlan_get_station_entry(mlan_private * priv, t_u8 * mac)
 
 /**
  *  @brief This function will add a pointer to station entry in station list
- *  		table with the give mac address, if it does not exist already
+ *          table with the give mac address, if it does not exist already
  *
  *  @param priv    A pointer to mlan_private
  *  @param mac     mac address to find in station list table

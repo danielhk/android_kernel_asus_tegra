@@ -597,14 +597,14 @@ mlan_init_fw(IN t_void * pmlan_adapter)
 /**
  *  @brief Shutdown firmware
  *
- *  @param pmlan_adapter	A pointer to mlan_adapter structure
+ *  @param pmlan_adapter    A pointer to mlan_adapter structure
  *
- *  @return			MLAN_STATUS_SUCCESS
- *                      		The firmware shutdown call succeeded.
- *				MLAN_STATUS_PENDING
- *      	                	The firmware shutdown call is pending.
- *				MLAN_STATUS_FAILURE
- *      	                	The firmware shutdown call failed.
+ *  @return     MLAN_STATUS_SUCCESS
+ *                              The firmware shutdown call succeeded.
+ *	            MLAN_STATUS_PENDING
+ *                              The firmware shutdown call is pending.
+ *	            MLAN_STATUS_FAILURE
+ *                              The firmware shutdown call failed.
  */
 mlan_status
 mlan_shutdown_fw(IN t_void * pmlan_adapter)
@@ -640,9 +640,8 @@ mlan_shutdown_fw(IN t_void * pmlan_adapter)
 
 	/* Clean up priv structures */
 	for (i = 0; i < pmadapter->priv_num; i++) {
-		if (pmadapter->priv[i]) {
+		if (pmadapter->priv[i])
 			wlan_free_priv(pmadapter->priv[i]);
-		}
 	}
 
 	pcb = &pmadapter->callbacks;

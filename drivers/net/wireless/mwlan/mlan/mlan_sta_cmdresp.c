@@ -408,12 +408,10 @@ wlan_get_power_level(pmlan_private pmpriv, void *pdata_buf)
 		}
 		while (length) {
 			pg++;
-			if (max_power < pg->power_max) {
+			if (max_power < pg->power_max)
 				max_power = pg->power_max;
-			}
-			if (min_power > pg->power_min) {
+			if (min_power > pg->power_min)
 				min_power = pg->power_min;
-			}
 			length -= sizeof(Power_Group_t);
 		}
 		if (ppg_tlv->length > 0) {

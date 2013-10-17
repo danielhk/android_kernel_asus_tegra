@@ -153,7 +153,7 @@ search_oui_in_ie(mlan_adapter * pmadapter, IEBody * ie_body, t_u8 * oui)
 		}
 	}
 
-	PRINTM(MINFO, "The OUI %x:%x:%x:%x is not found in PTK \n", oui[0],
+	PRINTM(MINFO, "The OUI %x:%x:%x:%x is not found in PTK\n", oui[0],
 	       oui[1], oui[2], oui[3]);
 	LEAVE();
 	return MLAN_OUI_NOT_PRESENT;
@@ -863,13 +863,11 @@ wlan_scan_channel_list(IN mlan_private * pmpriv,
 
 	LEAVE();
 
-	if (ptlv_temp) {
+	if (ptlv_temp)
 		pcb->moal_mfree(pmadapter->pmoal_handle, ptlv_temp);
-	}
 
-	if (ret) {
+	if (ret)
 		return MLAN_STATUS_FAILURE;
-	}
 
 	return MLAN_STATUS_SUCCESS;
 }
@@ -1042,9 +1040,8 @@ wlan_scan_setup_scan_config(IN mlan_private * pmpriv,
 			       pwildcard_ssid_tlv->ssid,
 			       pwildcard_ssid_tlv->max_ssid_length);
 
-			if (ssid_len) {
+			if (ssid_len)
 				ssid_filter = MTRUE;
-			}
 		}
 
 		/*
@@ -1479,11 +1476,10 @@ wlan_interpret_bss_desc_with_ie(IN pmlan_adapter pmadapter,
 		pbss_entry->privacy = Wlan802_11PrivFilterAcceptAll;
 	}
 
-	if (pcap_info->ibss == 1) {
+	if (pcap_info->ibss == 1)
 		pbss_entry->bss_mode = MLAN_BSS_MODE_IBSS;
-	} else {
+	else
 		pbss_entry->bss_mode = MLAN_BSS_MODE_INFRA;
-	}
 
 	if (pcap_info->spectrum_mgmt == 1) {
 		PRINTM(MINFO, "InterpretIE: 11h- Spectrum Management "
@@ -3105,9 +3101,8 @@ wlan_scan_networks(IN mlan_private * pmpriv,
 		return MLAN_STATUS_FAILURE;
 	}
 
-	if (puser_scan_in) {
+	if (puser_scan_in)
 		keep_previous_scan = puser_scan_in->keep_previous_scan;
-	}
 
 	if (keep_previous_scan == MFALSE) {
 		memset(pmadapter, pmadapter->pscan_table, 0x00,
@@ -3265,11 +3260,10 @@ wlan_ret_802_11_scan(IN mlan_private * pmpriv,
 	pcb = (pmlan_callbacks) & pmadapter->callbacks;
 
 	is_bgscan_resp = (resp->command == HostCmd_CMD_802_11_BG_SCAN_QUERY);
-	if (is_bgscan_resp) {
+	if (is_bgscan_resp)
 		pscan_rsp = &resp->params.bg_scan_query_resp.scan_resp;
-	} else {
+	else
 		pscan_rsp = &resp->params.scan_resp;
-	}
 
 	if (pscan_rsp->number_of_sets > MRVDRV_MAX_BSSID_LIST) {
 		PRINTM(MERROR,
@@ -3445,11 +3439,10 @@ wlan_ret_802_11_scan(IN mlan_private * pmpriv,
 			if (bss_idx == num_in_table) {
 				/* Range check the bss_idx, keep it limited to
 				   the last entry */
-				if (bss_idx == MRVDRV_MAX_BSSID_LIST) {
+				if (bss_idx == MRVDRV_MAX_BSSID_LIST)
 					bss_idx--;
-				} else {
+				else
 					num_in_table++;
-				}
 			}
 
 			/*
@@ -3893,11 +3886,10 @@ wlan_parse_ext_scan_result(IN mlan_private * pmpriv,
 			if (bss_idx == num_in_table) {
 				/* Range check the bss_idx, keep it limited to
 				   the last entry */
-				if (bss_idx == MRVDRV_MAX_BSSID_LIST) {
+				if (bss_idx == MRVDRV_MAX_BSSID_LIST)
 					bss_idx--;
-				} else {
+				else
 					num_in_table++;
-				}
 			}
 
 			/*
@@ -4617,9 +4609,8 @@ wlan_find_ssid_in_list(IN mlan_private * pmpriv,
 						net = i;
 					}
 				} else {
-					if (net == -1) {
+					if (net == -1)
 						net = j;
-					}
 				}
 				break;
 			case MLAN_BSS_MODE_AUTO:
