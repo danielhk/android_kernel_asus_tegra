@@ -1197,8 +1197,8 @@ static int hdmi_pcm_open(struct hda_pcm_stream *hinfo,
 		/* From here ELD should be ready. If it's not, ask user-space
 		 * to try again later */
 		if (!eld->lpcm_sad_ready) {
-			pr_info("%s: ELD not ready, returning -EAGAIN\n", __func__);
-			return -EAGAIN;
+			pr_info("%s: ELD not ready, returning -EBUSY\n", __func__);
+			return -EBUSY;
 		}
 	}
 #endif
