@@ -32,6 +32,7 @@ struct tegra_cec {
 	unsigned int		rx_wake;
 	unsigned int		tx_wake;
 	atomic_t            init_done;
+	u16			logical_addr;
 	struct work_struct	work;
 };
 static int tegra_cec_remove(struct platform_device *pdev);
@@ -53,14 +54,14 @@ static int tegra_cec_remove(struct platform_device *pdev);
 #define TEGRA_CEC_HW_DEBUG_RX	 0X038
 #define TEGRA_CEC_HW_DEBUG_TX	 0X03C
 
-#define TEGRA_CEC_LOGICAL_ADDR	0x10
-
-#define TEGRA_CEC_HW_CONTROL_RX_LOGICAL_ADDRS_MASK	0
-#define TEGRA_CEC_HW_CONTROL_RX_SNOOP 			(1<<15)
-#define TEGRA_CEC_HW_CONTROL_RX_NAK_MODE 		(1<<16)
-#define TEGRA_CEC_HW_CONTROL_TX_NAK_MODE		(1<<24)
-#define TEGRA_CEC_HW_CONTROL_FAST_SIM_MODE 		(1<<30)
-#define TEGRA_CEC_HW_CONTROL_TX_RX_MODE			(1<<31)
+#define TEGRA_CEC_HWCTRL_RX_LADDR_UNREG		(1<<15)
+#define TEGRA_CEC_HWCTRL_RX_LADDR_MASK		0xFFFF
+#define TEGRA_CEC_HWCTRL_RX_LADDR(x)		(x<<0)
+#define TEGRA_CEC_HWCTRL_RX_SNOOP 		(1<<15)
+#define TEGRA_CEC_HWCTRL_RX_NAK_MODE 		(1<<16)
+#define TEGRA_CEC_HWCTRL_TX_NAK_MODE		(1<<24)
+#define TEGRA_CEC_HWCTRL_FAST_SIM_MODE 		(1<<30)
+#define TEGRA_CEC_HWCTRL_TX_RX_MODE		(1<<31)
 
 #define TEGRA_CEC_INPUT_FILTER_MODE		(1<<31)
 #define TEGRA_CEC_INPUT_FILTER_FIFO_LENGTH_MASK	0

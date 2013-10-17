@@ -39,19 +39,31 @@
 
 #include "tegra_cec.h"
 
+static ssize_t cec_logical_addr_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count);
+
+static ssize_t cec_logical_addr_show(struct device *dev,
+		struct device_attribute *attr, char *buf);
+
+static DEVICE_ATTR(cec_logical_addr_config, S_IWUSR | S_IRUGO,
+		cec_logical_addr_show, cec_logical_addr_store);
 
 int tegra_cec_open(struct inode *inode, struct file *file)
 {
 	struct miscdevice *miscdev = file->private_data;
 	struct tegra_cec *cec = container_of(miscdev,
 		struct tegra_cec, misc_dev);
+	int ret = 0;
+
 	dev_dbg(cec->dev, "%s\n", __func__);
 
-	wait_event_interruptible(cec->init_waitq,
+	ret = wait_event_interruptible(cec->init_waitq,
 	    atomic_read(&cec->init_done) == 1);
+	if (ret)
+		return ret;
 	file->private_data = cec;
 
-	return 0;
+	return ret;
 }
 
 int tegra_cec_release(struct inode *inode, struct file *file)
@@ -68,11 +80,14 @@ ssize_t tegra_cec_write(struct file *file, const char __user *buffer,
 {
 	struct tegra_cec *cec = file->private_data;
 	unsigned long write_buff;
+	ssize_t ret;
 
 	count = 4;
 
-	wait_event_interruptible(cec->init_waitq,
+	ret = wait_event_interruptible(cec->init_waitq,
 	    atomic_read(&cec->init_done) == 1);
+	if (ret)
+		return ret;
 
 	if (copy_from_user(&write_buff, buffer, count))
 		return -EFAULT;
@@ -107,10 +122,13 @@ ssize_t tegra_cec_read(struct file *file, char  __user *buffer,
 {
 	struct tegra_cec *cec = file->private_data;
 	unsigned short rx_buffer;
+	ssize_t ret;
 	count = 2;
 
-	wait_event_interruptible(cec->init_waitq,
+	ret = wait_event_interruptible(cec->init_waitq,
 	    atomic_read(&cec->init_done) == 1);
+	if (ret)
+		return ret;
 
 	if (cec->rx_wake == 0)
 		if (file->f_flags & O_NONBLOCK)
@@ -196,12 +214,13 @@ static void tegra_cec_init(struct tegra_cec *cec)
 
 	writel(0x00, cec->cec_base + TEGRA_CEC_SW_CONTROL);
 
-	writel(((TEGRA_CEC_LOGICAL_ADDR<<TEGRA_CEC_HW_CONTROL_RX_LOGICAL_ADDRS_MASK)&
-	   (~TEGRA_CEC_HW_CONTROL_RX_SNOOP) &
-	   (~TEGRA_CEC_HW_CONTROL_RX_NAK_MODE) &
-	   (~TEGRA_CEC_HW_CONTROL_TX_NAK_MODE) &
-	   (~TEGRA_CEC_HW_CONTROL_FAST_SIM_MODE)) |
-	   (TEGRA_CEC_HW_CONTROL_TX_RX_MODE),
+	cec->logical_addr = TEGRA_CEC_HWCTRL_RX_LADDR_UNREG;
+	writel((TEGRA_CEC_HWCTRL_RX_LADDR(cec->logical_addr) &
+	   (~TEGRA_CEC_HWCTRL_RX_SNOOP) &
+	   (~TEGRA_CEC_HWCTRL_RX_NAK_MODE) &
+	   (~TEGRA_CEC_HWCTRL_TX_NAK_MODE) &
+	   (~TEGRA_CEC_HWCTRL_FAST_SIM_MODE)) |
+	   (TEGRA_CEC_HWCTRL_TX_RX_MODE),
 	   cec->cec_base + TEGRA_CEC_HW_CONTROL);
 
 	writel(0x00, cec->cec_base + TEGRA_CEC_INPUT_FILTER);
@@ -257,6 +276,49 @@ static void tegra_cec_init_worker(struct work_struct *work)
 	struct tegra_cec *cec = container_of(work, struct tegra_cec, work);
 
 	tegra_cec_init(cec);
+}
+
+static ssize_t cec_logical_addr_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct tegra_cec *cec = dev_get_drvdata(dev);
+
+	if (!atomic_read(&cec->init_done))
+		return -EAGAIN;
+
+	if (buf)
+		return sprintf(buf, "0x%x\n", (u32)cec->logical_addr);
+	return 1;
+}
+
+static ssize_t cec_logical_addr_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	ssize_t ret;
+	u32 state;
+	u16 addr;
+	struct tegra_cec *cec;
+
+	if (!buf || !count)
+		return -EINVAL;
+
+	cec = dev_get_drvdata(dev);
+	if (!atomic_read(&cec->init_done))
+		return -EAGAIN;
+
+	ret = kstrtou16(buf, 0, &addr);
+	if (ret)
+		return ret;
+
+
+	printk(KERN_INFO "tegra_cec: set logical address: %x\n", (u32)addr);
+	cec->logical_addr = addr;
+	state = readl(cec->cec_base + TEGRA_CEC_HW_CONTROL);
+	state &= ~TEGRA_CEC_HWCTRL_RX_LADDR_MASK;
+	state |= TEGRA_CEC_HWCTRL_RX_LADDR(cec->logical_addr);
+	writel(state, cec->cec_base + TEGRA_CEC_HW_CONTROL);
+
+	return count;
 }
 
 static int __devinit tegra_cec_probe(struct platform_device *pdev)
@@ -347,6 +409,14 @@ static int __devinit tegra_cec_probe(struct platform_device *pdev)
 	if (ret) {
 		dev_err(&pdev->dev,
 			"Unable to request interrupt for device (err=%d).\n", ret);
+		goto cec_error;
+	}
+
+	ret = sysfs_create_file(
+		&pdev->dev.kobj, &dev_attr_cec_logical_addr_config.attr);
+	printk(KERN_INFO "cec_add_sysfs ret=%d\n", ret);
+	if (ret != 0) {
+		dev_err(&pdev->dev, "Failed to add sysfs: %d\n", ret);
 		goto cec_error;
 	}
 
