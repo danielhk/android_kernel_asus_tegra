@@ -400,8 +400,8 @@ static void hdmi_state_machine_worker(struct work_struct *work)
 	spin_lock_irqsave(&work_lock, irqstate);
 	pending_hpd_evt = work_state.pending_hpd_evt;
 	work_state.pending_hpd_evt = 0;
-	cur_hpd = tegra_dc_hpd(work_state.hdmi->dc);
 	spin_unlock_irqrestore(&work_lock, irqstate);
+	cur_hpd = tegra_dc_hpd(work_state.hdmi->dc);
 
 	pr_info("%s (tid %p): state %d (%s), hpd %d, pending_hpd_evt %d\n",
 		__func__, current, work_state.state,
