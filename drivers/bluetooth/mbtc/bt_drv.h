@@ -40,19 +40,19 @@ typedef u32 t_ptr;
 #endif
 
 /** Define drv_mode bit */
-#define DRV_MODE_BT         BIT(0)
-#define DRV_MODE_FM        BIT(1)
-#define DRV_MODE_NFC       BIT(2)
+#define DRV_MODE_BT	   BIT(0)
+#define DRV_MODE_FM	   BIT(1)
+#define DRV_MODE_NFC	   BIT(2)
 
 /** Define devFeature bit */
-#define DEV_FEATURE_BT     BIT(0)
-#define DEV_FEATURE_BTAMP     BIT(1)
-#define DEV_FEATURE_BLE     BIT(2)
-#define DEV_FEATURE_FM     BIT(3)
-#define DEV_FEATURE_NFC     BIT(4)
+#define DEV_FEATURE_BT	   BIT(0)
+#define DEV_FEATURE_BTAMP  BIT(1)
+#define DEV_FEATURE_BLE	   BIT(2)
+#define DEV_FEATURE_FM	   BIT(3)
+#define DEV_FEATURE_NFC	   BIT(4)
 
 /** Define maximum number of radio func supported */
-#define MAX_RADIO_FUNC     4
+#define MAX_RADIO_FUNC	   4
 
 /** MAC address print format */
 #ifndef MACSTR
@@ -65,80 +65,92 @@ typedef u32 t_ptr;
 #endif
 
 /** Debug level : Message */
-#define	DBG_MSG			BIT(0)
+#define DBG_MSG		BIT(0)
 /** Debug level : Fatal */
-#define DBG_FATAL		BIT(1)
+#define DBG_FATAL	BIT(1)
 /** Debug level : Error */
-#define DBG_ERROR		BIT(2)
+#define DBG_ERROR	BIT(2)
 /** Debug level : Data */
-#define DBG_DATA		BIT(3)
+#define DBG_DATA	BIT(3)
 /** Debug level : Command */
-#define DBG_CMD			BIT(4)
+#define DBG_CMD		BIT(4)
 /** Debug level : Event */
-#define DBG_EVENT		BIT(5)
+#define DBG_EVENT	BIT(5)
 /** Debug level : Interrupt */
-#define DBG_INTR		BIT(6)
+#define DBG_INTR	BIT(6)
 
 /** Debug entry : Data dump */
-#define DBG_DAT_D		BIT(16)
+#define DBG_DAT_D	BIT(16)
 /** Debug entry : Data dump */
-#define DBG_CMD_D		BIT(17)
+#define DBG_CMD_D	BIT(17)
 
 /** Debug level : Entry */
-#define DBG_ENTRY		BIT(28)
+#define DBG_ENTRY	BIT(28)
 /** Debug level : Warning */
-#define DBG_WARN		BIT(29)
+#define DBG_WARN	BIT(29)
 /** Debug level : Informative */
-#define DBG_INFO		BIT(30)
+#define DBG_INFO	BIT(30)
 
 #ifdef	DEBUG_LEVEL1
 extern u32 mbt_drvdbg;
 
 #ifdef	DEBUG_LEVEL2
 /** Print informative message */
-#define	PRINTM_INFO(msg...)  do {if (mbt_drvdbg & DBG_INFO)  printk(KERN_DEBUG msg); } while (0)
+#define PRINTM_INFO(msg...)  do {if (mbt_drvdbg & DBG_INFO)  \
+				    printk(KERN_DEBUG msg); } while (0)
 /** Print warning message */
-#define	PRINTM_WARN(msg...)  do {if (mbt_drvdbg & DBG_WARN)  printk(KERN_DEBUG msg); } while (0)
+#define PRINTM_WARN(msg...)  do {if (mbt_drvdbg & DBG_WARN)  \
+				    printk(KERN_DEBUG msg); } while (0)
 /** Print entry message */
-#define	PRINTM_ENTRY(msg...) do {if (mbt_drvdbg & DBG_ENTRY) printk(KERN_DEBUG msg); } while (0)
+#define PRINTM_ENTRY(msg...) do {if (mbt_drvdbg & DBG_ENTRY) \
+				    printk(KERN_DEBUG msg); } while (0)
 #else
 /** Print informative message */
-#define	PRINTM_INFO(msg...)  do {} while (0)
+#define PRINTM_INFO(msg...)  do {} while (0)
 /** Print warning message */
-#define	PRINTM_WARN(msg...)  do {} while (0)
+#define PRINTM_WARN(msg...)  do {} while (0)
 /** Print entry message */
-#define	PRINTM_ENTRY(msg...) do {} while (0)
+#define PRINTM_ENTRY(msg...) do {} while (0)
 #endif /* DEBUG_LEVEL2 */
 
 /** Print interrupt message */
-#define	PRINTM_INTR(msg...)  do {if (mbt_drvdbg & DBG_INTR)  printk(KERN_DEBUG msg); } while (0)
+#define PRINTM_INTR(msg...)  do {if (mbt_drvdbg & DBG_INTR)  \
+				    printk(KERN_DEBUG msg); } while (0)
 /** Print event message */
-#define	PRINTM_EVENT(msg...) do {if (mbt_drvdbg & DBG_EVENT) printk(KERN_DEBUG msg); } while (0)
+#define PRINTM_EVENT(msg...) do {if (mbt_drvdbg & DBG_EVENT) \
+				    printk(KERN_DEBUG msg); } while (0)
 /** Print command message */
-#define	PRINTM_CMD(msg...)   do {if (mbt_drvdbg & DBG_CMD)   printk(KERN_DEBUG msg); } while (0)
+#define PRINTM_CMD(msg...)   do {if (mbt_drvdbg & DBG_CMD)   \
+				    printk(KERN_DEBUG msg); } while (0)
 /** Print data message */
-#define	PRINTM_DATA(msg...)  do {if (mbt_drvdbg & DBG_DATA)  printk(KERN_DEBUG msg); } while (0)
+#define PRINTM_DATA(msg...)  do {if (mbt_drvdbg & DBG_DATA)  \
+				    printk(KERN_DEBUG msg); } while (0)
 /** Print error message */
-#define	PRINTM_ERROR(msg...) do {if (mbt_drvdbg & DBG_ERROR) printk(KERN_ERR msg); } while (0)
+#define PRINTM_ERROR(msg...) do {if (mbt_drvdbg & DBG_ERROR) \
+				    printk(KERN_ERR msg); } while (0)
 /** Print fatal message */
-#define	PRINTM_FATAL(msg...) do {if (mbt_drvdbg & DBG_FATAL) printk(KERN_ERR msg); } while (0)
+#define PRINTM_FATAL(msg...) do {if (mbt_drvdbg & DBG_FATAL) \
+				    printk(KERN_ERR msg); } while (0)
 /** Print message */
-#define	PRINTM_MSG(msg...)   do {if (mbt_drvdbg & DBG_MSG)   printk(KERN_ALERT msg); } while (0)
+#define PRINTM_MSG(msg...)   do {if (mbt_drvdbg & DBG_MSG)   \
+				    printk(KERN_ALERT msg); } while (0)
 
 /** Print data dump message */
-#define	PRINTM_DAT_D(msg...)  do {if (mbt_drvdbg & DBG_DAT_D)  printk(KERN_DEBUG msg); } while (0)
+#define PRINTM_DAT_D(msg...)  do {if (mbt_drvdbg & DBG_DAT_D)  \
+				    printk(KERN_DEBUG msg); } while (0)
 /** Print data dump message */
-#define	PRINTM_CMD_D(msg...)  do {if (mbt_drvdbg & DBG_CMD_D)  printk(KERN_DEBUG msg); } while (0)
+#define PRINTM_CMD_D(msg...)  do {if (mbt_drvdbg & DBG_CMD_D)  \
+				    printk(KERN_DEBUG msg); } while (0)
 
 /** Print message with required level */
-#define	PRINTM(level, msg...) PRINTM_##level(msg)
+#define PRINTM(level, msg...) PRINTM_##level(msg)
 
 /** Debug dump buffer length */
-#define DBG_DUMP_BUF_LEN	64
+#define DBG_DUMP_BUF_LEN    64
 /** Maximum number of dump per line */
-#define MAX_DUMP_PER_LINE	16
+#define MAX_DUMP_PER_LINE   16
 /** Maximum data dump length */
-#define MAX_DATA_DUMP_LEN	48
+#define MAX_DATA_DUMP_LEN   48
 
 static inline void
 hexdump(char *prompt, u8 * buf, int len)
@@ -164,60 +176,62 @@ hexdump(char *prompt, u8 * buf, int len)
 }
 
 /** Debug hexdump of debug data */
-#define DBG_HEXDUMP_DAT_D(x, y, z)     do {if (mbt_drvdbg & DBG_DAT_D) hexdump(x, y, z); } while (0)
+#define DBG_HEXDUMP_DAT_D(x, y, z)     do {if (mbt_drvdbg & DBG_DAT_D) \
+					    hexdump(x, y, z); } while (0)
 /** Debug hexdump of debug command */
-#define DBG_HEXDUMP_CMD_D(x, y, z)     do {if (mbt_drvdbg & DBG_CMD_D) hexdump(x, y, z); } while (0)
+#define DBG_HEXDUMP_CMD_D(x, y, z)     do {if (mbt_drvdbg & DBG_CMD_D) \
+					    hexdump(x, y, z); } while (0)
 
 /** Debug hexdump */
-#define	DBG_HEXDUMP(level, x, y, z)    DBG_HEXDUMP_##level(x, y, z)
+#define DBG_HEXDUMP(level, x, y, z)    DBG_HEXDUMP_##level(x, y, z)
 
 /** Mark entry point */
-#define	ENTER()			PRINTM(ENTRY, "Enter: %s, %s:%i\n", __FUNCTION__, \
-							__FILE__, __LINE__)
+#define ENTER()		PRINTM(ENTRY, "Enter: %s, %s:%i\n", __func__, \
+			    __FILE__, __LINE__)
 /** Mark exit point */
-#define	LEAVE()			PRINTM(ENTRY, "Leave: %s, %s:%i\n", __FUNCTION__, \
-							__FILE__, __LINE__)
+#define LEAVE()		PRINTM(ENTRY, "Leave: %s, %s:%i\n", __func__, \
+			    __FILE__, __LINE__)
 #else
 /** Do nothing */
-#define	PRINTM(level, msg...) do {} while (0);
+#define PRINTM(level, msg...) do {} while (0)
 /** Do nothing */
-#define DBG_HEXDUMP(level, x, y, z)    do {} while (0);
+#define DBG_HEXDUMP(level, x, y, z)    do {} while (0)
 /** Do nothing */
-#define	ENTER()  do {} while (0);
+#define ENTER()	 do {} while (0)
 /** Do nothing */
-#define	LEAVE()  do {} while (0);
+#define LEAVE()	 do {} while (0)
 #endif /* DEBUG_LEVEL1 */
 
 /** Bluetooth upload size */
-#define	BT_UPLD_SIZE				2312
+#define BT_UPLD_SIZE		    2312
 /** Bluetooth status success */
-#define BT_STATUS_SUCCESS			(0)
+#define BT_STATUS_SUCCESS	    (0)
 /** Bluetooth status failure */
-#define BT_STATUS_FAILURE			(-1)
+#define BT_STATUS_FAILURE	    (-1)
 
-#ifndef	TRUE
+#ifndef TRUE
 /** True value */
-#define TRUE			1
+#define TRUE		1
 #endif
-#ifndef	FALSE
+#ifndef FALSE
 /** False value */
-#define	FALSE			0
+#define FALSE		0
 #endif
 
 /** Set thread state */
-#define OS_SET_THREAD_STATE(x)		set_current_state(x)
+#define OS_SET_THREAD_STATE(x)	    set_current_state(x)
 /** Time to wait until Host Sleep state change in millisecond */
 #define WAIT_UNTIL_HS_STATE_CHANGED 2000
 /** Time to wait cmd resp in millisecond */
-#define WAIT_UNTIL_CMD_RESP	    5000
+#define WAIT_UNTIL_CMD_RESP	5000
 
 /** Sleep until a condition gets true or a timeout elapses */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 5, 0)
 #define os_wait_interruptible_timeout(waitq, cond, timeout) \
-	interruptible_sleep_on_timeout(&waitq, ((timeout) * HZ / 1000))
+    interruptible_sleep_on_timeout(&waitq, ((timeout) * HZ / 1000))
 #else
 #define os_wait_interruptible_timeout(waitq, cond, timeout) \
-	wait_event_interruptible_timeout(waitq, cond, ((timeout) * HZ / 1000))
+    wait_event_interruptible_timeout(waitq, cond, ((timeout) * HZ / 1000))
 #endif
 
 typedef struct {
@@ -278,7 +292,7 @@ os_sched_timeout(u32 millisec)
 #endif
 
 #ifndef __ATTRIB_PACK__
-#define __ATTRIB_PACK__ __attribute__ ((packed))
+#define __ATTRIB_PACK__ __attribute__((packed))
 #endif
 
 /** Data structure for the Marvell Bluetooth device */
@@ -374,7 +388,7 @@ typedef struct _bt_adapter {
 	/** tx pending */
 	u32 skb_pending;
 /** Version string buffer length */
-#define MAX_VER_STR_LEN         128
+#define MAX_VER_STR_LEN		128
 	/** Driver version */
 	u8 drv_ver[MAX_VER_STR_LEN];
 	/** Number of command timeout */
@@ -382,7 +396,7 @@ typedef struct _bt_adapter {
 } bt_adapter, *pbt_adapter;
 
 /** Length of prov name */
-#define PROC_NAME_LEN				32
+#define PROC_NAME_LEN		32
 
 struct item_data {
 	/** Name */
@@ -453,130 +467,132 @@ typedef struct _bt_private {
 } bt_private, *pbt_private;
 
 /** Disable interrupt */
-#define OS_INT_DISABLE	spin_lock_irqsave(&priv->driver_lock, priv->driver_flags)
+#define OS_INT_DISABLE	spin_lock_irqsave(&priv->driver_lock, \
+					    priv->driver_flags)
 /** Enable interrupt */
-#define	OS_INT_RESTORE	spin_unlock_irqrestore(&priv->driver_lock, priv->driver_flags)
+#define OS_INT_RESTORE	spin_unlock_irqrestore(&priv->driver_lock, \
+					    priv->driver_flags)
 
 #ifndef HCI_BT_AMP
 /** BT_AMP flag for device type */
-#define  HCI_BT_AMP		0x80
+#define	 HCI_BT_AMP	0x80
 #endif
 
 /** Device type of BT */
-#define DEV_TYPE_BT		0x00
+#define DEV_TYPE_BT	0x00
 /** Device type of AMP */
-#define DEV_TYPE_AMP		0x01
+#define DEV_TYPE_AMP	0x01
 /** Device type of FM */
-#define DEV_TYPE_FM		0x02
+#define DEV_TYPE_FM	0x02
 /** Device type of NFC */
-#define DEV_TYPE_NFC		0x04
+#define DEV_TYPE_NFC	0x04
 
 /** Marvell vendor packet */
-#define MRVL_VENDOR_PKT			0xFE
+#define MRVL_VENDOR_PKT		0xFE
 
 /** Bluetooth command : Get FW Version */
-#define BT_CMD_GET_FW_VERSION       0x0F
+#define BT_CMD_GET_FW_VERSION	    0x0F
 /** Bluetooth command : Sleep mode */
-#define BT_CMD_AUTO_SLEEP_MODE		0x23
+#define BT_CMD_AUTO_SLEEP_MODE	    0x23
 /** Bluetooth command : Host Sleep configuration */
-#define BT_CMD_HOST_SLEEP_CONFIG	0x59
+#define BT_CMD_HOST_SLEEP_CONFIG    0x59
 /** Bluetooth command : Host Sleep enable */
-#define BT_CMD_HOST_SLEEP_ENABLE	0x5A
+#define BT_CMD_HOST_SLEEP_ENABLE    0x5A
 /** Bluetooth command : Module Configuration request */
-#define BT_CMD_MODULE_CFG_REQ		0x5B
+#define BT_CMD_MODULE_CFG_REQ	    0x5B
 /** Bluetooth command : SDIO pull up down configuration request */
-#define BT_CMD_SDIO_PULL_CFG_REQ	0x69
+#define BT_CMD_SDIO_PULL_CFG_REQ    0x69
 #ifdef SDIO_SUSPEND_RESUME
 /* FM default event interrupt mask
-		bit[0], RSSI low
-		bit[1], New RDS data
-		bit[2], RSSI indication */
-#define FM_DEFAULT_INTR_MASK    0x07
+	bit[0], RSSI low
+	bit[1], New RDS data
+	bit[2], RSSI indication */
+#define FM_DEFAULT_INTR_MASK	0x07
 /** Disable FM event interrupt mask */
-#define FM_DISABLE_INTR_MASK    0x00
+#define FM_DISABLE_INTR_MASK	0x00
 /** FM set event interrupt mask command */
-#define FM_SET_INTR_MASK	0x2E
+#define FM_SET_INTR_MASK    0x2E
 /** FM ocf value */
-#define FM_CMD			    0x0280
+#define FM_CMD		    0x0280
 int fm_set_intr_mask(bt_private * priv, u32 mask);
 #endif
 /** Sub Command: Module Bring Up Request */
-#define MODULE_BRINGUP_REQ		0xF1
+#define MODULE_BRINGUP_REQ	0xF1
 /** Sub Command: Module Shut Down Request */
-#define MODULE_SHUTDOWN_REQ		0xF2
+#define MODULE_SHUTDOWN_REQ	0xF2
 /** Module already up */
-#define MODULE_CFG_RESP_ALREADY_UP      0x0c
+#define MODULE_CFG_RESP_ALREADY_UP	0x0c
 /** Sub Command: Host Interface Control Request */
-#define MODULE_INTERFACE_CTRL_REQ	0xF5
+#define MODULE_INTERFACE_CTRL_REQ   0xF5
 
 /** Bluetooth event : Power State */
-#define BT_EVENT_POWER_STATE		0x20
+#define BT_EVENT_POWER_STATE	    0x20
 
 /** Bluetooth Power State : Enable */
-#define BT_PS_ENABLE			0x02
+#define BT_PS_ENABLE		0x02
 /** Bluetooth Power State : Disable */
-#define BT_PS_DISABLE			0x03
+#define BT_PS_DISABLE		0x03
 /** Bluetooth Power State : Sleep */
-#define BT_PS_SLEEP			0x01
+#define BT_PS_SLEEP	    0x01
 /** Bluetooth Power State : Awake */
-#define BT_PS_AWAKE			0x02
+#define BT_PS_AWAKE	    0x02
 
 /** Vendor OGF */
-#define VENDOR_OGF				0x3F
+#define VENDOR_OGF		0x3F
 /** OGF for reset */
-#define RESET_OGF		0x03
+#define RESET_OGF	0x03
 /** Bluetooth command : Reset */
 #define BT_CMD_RESET	0x03
 
 /** Host Sleep activated */
-#define HS_ACTIVATED			0x01
+#define HS_ACTIVATED		0x01
 /** Host Sleep deactivated */
-#define HS_DEACTIVATED			0x00
+#define HS_DEACTIVATED		0x00
 
 /** Power Save sleep */
-#define PS_SLEEP			0x01
+#define PS_SLEEP	    0x01
 /** Power Save awake */
-#define PS_AWAKE			0x00
+#define PS_AWAKE	    0x00
 
 /** bt header length */
-#define BT_HEADER_LEN			4
+#define BT_HEADER_LEN	    4
 
 #ifndef MAX
 /** Return maximum of two */
-#define MAX(a, b)		((a) > (b) ? (a) : (b))
+#define MAX(a, b)	((a) > (b) ? (a) : (b))
 #endif
 
 /** This is for firmware specific length */
-#define EXTRA_LEN	36
+#define EXTRA_LEN   36
 
 /** Command buffer size for Marvell driver */
-#define MRVDRV_SIZE_OF_CMD_BUFFER       (2 * 1024)
+#define MRVDRV_SIZE_OF_CMD_BUFFER	(2 * 1024)
 
 /** Bluetooth Rx packet buffer size for Marvell driver */
 #define MRVDRV_BT_RX_PACKET_BUFFER_SIZE \
-	(HCI_MAX_FRAME_SIZE + EXTRA_LEN)
+    (HCI_MAX_FRAME_SIZE + EXTRA_LEN)
 
 /** Buffer size to allocate */
 #define ALLOC_BUF_SIZE	(((MAX(MRVDRV_BT_RX_PACKET_BUFFER_SIZE, \
-			MRVDRV_SIZE_OF_CMD_BUFFER) + SDIO_HEADER_LEN \
-			+ SD_BLOCK_SIZE - 1) / SD_BLOCK_SIZE) * SD_BLOCK_SIZE)
+	    MRVDRV_SIZE_OF_CMD_BUFFER) + SDIO_HEADER_LEN \
+	    + SD_BLOCK_SIZE - 1) / SD_BLOCK_SIZE) * SD_BLOCK_SIZE)
 
 /** Request FW timeout in second */
-#define REQUEST_FW_TIMEOUT		30
+#define REQUEST_FW_TIMEOUT	30
 
 /** The number of times to try when polling for status bits */
-#define MAX_POLL_TRIES			100
+#define MAX_POLL_TRIES		100
 
 /** The number of times to try when waiting for downloaded firmware to
     become active when multiple interface is present */
-#define MAX_MULTI_INTERFACE_POLL_TRIES  1000
+#define MAX_MULTI_INTERFACE_POLL_TRIES	1000
 
 /** The number of times to try when waiting for downloaded firmware to
      become active. (polling the scratch register). */
-#define MAX_FIRMWARE_POLL_TRIES		100
+#define MAX_FIRMWARE_POLL_TRIES	    100
 
 /** default idle time */
-#define DEFAULT_IDLE_TIME           1000
+#define DEFAULT_IDLE_TIME	    1000
 
 #define BT_CMD_HEADER_SIZE    3
 
@@ -631,9 +647,6 @@ int bt_prepare_command(bt_private * priv);
 /** This function frees the structure of adapter */
 void bt_free_adapter(bt_private * priv);
 
-/** This function enables the host wake irq */
-void bt_enable_hostwake_irq(bool on);
-
 /** bt driver call this function to register to bus driver */
 int *sbi_register(void);
 /** bt driver call this function to unregister to bus driver */
@@ -662,21 +675,21 @@ int sd_disable_host_int(bt_private * priv);
 int sd_download_firmware_w_helper(bt_private * priv);
 
 /** Max line length allowed in init config file */
-#define MAX_LINE_LEN        256
+#define MAX_LINE_LEN	    256
 /** Max MAC address string length allowed */
 #define MAX_MAC_ADDR_LEN    18
 /** Max register type/offset/value etc. parameter length allowed */
-#define MAX_PARAM_LEN       12
+#define MAX_PARAM_LEN	    12
 
 /** Bluetooth command : Mac address configuration */
 #define BT_CMD_CONFIG_MAC_ADDR		0x22
 /** Bluetooth command : Write CSU register */
 #define BT_CMD_CSU_WRITE_REG		0x66
 /** Bluetooth command : Load calibrate data */
-#define BT_CMD_LOAD_CONFIG_DATA     0x61
+#define BT_CMD_LOAD_CONFIG_DATA	    0x61
 
 /** Bluetooth command : BLE deepsleep */
-#define BT_CMD_BLE_DEEP_SLEEP       0x8b
+#define BT_CMD_BLE_DEEP_SLEEP	    0x8b
 
 typedef struct _BT_BLE_CMD {
 	/** OCF OGF */

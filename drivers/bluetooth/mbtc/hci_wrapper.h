@@ -26,15 +26,15 @@
 #include <net/bluetooth/hci_core.h>
 
 /**  Define Seq num */
-#define BT_SEQ      0
-#define FM_SEQ      1
-#define NFC_SEQ     2
+#define BT_SEQ	    0
+#define FM_SEQ	    1
+#define NFC_SEQ	    2
 #define DEBUG_SEQ   3
 
 /** Define dev type */
-#define BT_TYPE     1
+#define BT_TYPE	    1
 #define BT_AMP_TYPE 2
-#define FM_TYPE     3
+#define FM_TYPE	    3
 #define NFC_TYPE    4
 #define DEBUG_TYPE  5
 
@@ -44,11 +44,11 @@
 #define GENERIC_SPEC   3
 
 /** Define lock/unlock wrapper */
-#define mdev_req_lock(d)		down(&d->req_lock)
-#define mdev_req_unlock(d)		up(&d->req_lock)
+#define mdev_req_lock(d)	down(&d->req_lock)
+#define mdev_req_unlock(d)	up(&d->req_lock)
 
 /** Length of device name */
-#define DEV_NAME_LEN				32
+#define DEV_NAME_LEN		    32
 
 /** Define struct m_dev */
 struct m_dev {
