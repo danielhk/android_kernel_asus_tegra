@@ -647,10 +647,14 @@ static void btlesbc_timer_callback(unsigned long data)
 				btlesbc,
 				btlesbc->write_index,
 				frames_to_silence);
+		/* This can cause btlesbc_pcm_trigger() to be called, which
+		 * may try to stop the timer. */
 		btlesbc_handle_frame_advance(substream, frames_to_silence);
 	}
 
-	btlesbc_schedule_timer(substream);
+	smp_rmb();
+	if (btlesbc->timer_enabled)
+		btlesbc_schedule_timer(substream);
 }
 
 static void btlesbc_timer_start(struct snd_pcm_substream *substream)
@@ -677,11 +681,22 @@ static void btlesbc_timer_stop(struct snd_pcm_substream *substream)
 	/* Tell timer function not to reschedule itself if it runs. */
 	btlesbc->timer_enabled = false;
 	smp_wmb();
-	ret = del_timer_sync(&btlesbc->decoding_timer);
-	if (ret < 0)
-		pr_err("%s:%d - ERROR del_timer_sync failed, ret = %d\n",
-			__func__, __LINE__, ret);
-
+	if (!in_interrupt()) {
+		/* del_timer_sync will hang if called in the timer callback. */
+		ret = del_timer_sync(&btlesbc->decoding_timer);
+		if (ret < 0)
+			pr_err("%s:%d - ERROR del_timer_sync failed, %d\n",
+				__func__, __LINE__, ret);
+	}
+	/*
+	 * Else if we are in an interrupt then we are being called from the
+	 * middle of the btlesbc_timer_callback(). The timer will not get
+	 * rescheduled because btlesbc->timer_enabled will be false
+	 * at the end of btlesbc_timer_callback().
+	 * We do not need to "delete" the timer.
+	 * The del_timer functions just cancel pending timers.
+	 * There are no resources that need to be cleaned up.
+	 */
 }
 
 /* ===================================================================== */
