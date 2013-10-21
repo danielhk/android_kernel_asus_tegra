@@ -44,5 +44,17 @@ struct tegra_xusb_pad_data {
 	u32 hs_disc_lvl;
 	u32 hsic_pad0_ctl0;
 	u32 hsic_pad0_ctl1;
+
+	/* Tegra 4 device has four USB controllers (USBOTG, USB2, USB3,
+	 * and XUSB) and four USB interfaces (UTMI0, UTMI1, HSIC0, and HSIC1).
+	 * There are mux between the USB controllers and the USB interfaces.
+	 * All 4 USB interfaces can be selected to connect with XUSB or other
+	 * USB controllers.
+	 */
+#define TEGRA_XUSB_USB2_P0	BIT(0)
+#define TEGRA_XUSB_USB2_P1	BIT(1)
+#define TEGRA_XUSB_HSIC_P0	BIT(2)
+#define TEGRA_XUSB_HSIC_P1	BIT(3)
+	u32 portmap;
 };
 #endif /* _TEGRA_XUSB_H_ */

@@ -570,6 +570,9 @@ static struct tegra_xusb_pad_data xusb_padctl_data = {
 	.hs_disc_lvl = (0x5 << 2),
 	.hsic_pad0_ctl0 = (0x00 << 8),
 	.hsic_pad0_ctl1 = (0x00 << 8),
+
+	/* XUSB (USB 3.0) is using UTMI2 phy */
+	.portmap = TEGRA_XUSB_USB2_P1,
 };
 
 static void __init molly_xusb_init(void)
