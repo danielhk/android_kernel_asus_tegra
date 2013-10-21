@@ -2106,11 +2106,11 @@ sbi_register_conf_dpc(bt_private * priv)
 		}
 	} else if (bt_mac) {
 		PRINTM(INFO,
-		       "Set BT mac_addr from insmod parametre bt_mac = %s\n",
+		       "Set BT mac_addr from insmod parameter bt_mac = %s\n",
 		       bt_mac);
 		if (BT_STATUS_SUCCESS != bt_init_mac_address(priv, bt_mac)) {
 			PRINTM(FATAL,
-			       "BT: Fail to set mac address from insmod parametre\n");
+			       "BT: Fail to set mac address from insmod parameter\n");
 			ret = BT_STATUS_FAILURE;
 			goto done;
 		}

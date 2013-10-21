@@ -555,7 +555,7 @@ done:
 }
 
 /**
- *    @brief BT init mac address from bt_mac parametre when insmod
+ *    @brief BT init mac address from bt_mac parameter when insmod
  *
  *    @param priv    a pointer to bt_private structure
  *    @param bt_mac  mac address buf
@@ -574,7 +574,7 @@ bt_init_mac_address(bt_private * priv, char *mac)
 	ret = bt_set_mac_address(priv, bt_mac);
 	if (ret != BT_STATUS_SUCCESS)
 		PRINTM(FATAL,
-		       "BT: Fail to set mac address from insmod parametre.\n");
+		       "BT: Fail to set mac address from insmod parameter.\n");
 
 	LEAVE();
 	return ret;
