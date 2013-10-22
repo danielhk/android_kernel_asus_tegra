@@ -279,7 +279,7 @@ struct freq_tuning_params {
 static struct freq_tuning_params tuning_params[3] = {
 	[TUNING_LOW_FREQ] = {
 		.multiple_tuning = false,
-		.freq_hz = 82000000,
+		.freq_hz = 100000000,
 		.nr_voltages = 1,
 		.voltages = {ULONG_MAX},
 	},
