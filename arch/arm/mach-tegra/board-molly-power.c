@@ -476,6 +476,17 @@ int __init molly_palmas_regulator_init(void)
 	pmc_ctrl = readl(pmc + PMC_CTRL);
 	writel(pmc_ctrl | PMC_CTRL_INTR_LOW, pmc + PMC_CTRL);
 
+	switch (molly_hw_rev) {
+	case MOLLY_REV_PROTO1:
+	case MOLLY_REV_PROTO2:
+	case MOLLY_REV_EVT1:
+	case MOLLY_REV_DVT1:
+		/* smps10 is not enabled for Molly prototype, EVT1 and DVT1.*/
+		pr_info("%s: smps10 is not enabled\n", __func__);
+		molly_reg_data[PALMAS_REG_SMPS10] = NULL;
+		molly_reg_init[PALMAS_REG_SMPS10] = NULL;
+	}
+
 	for (i = 0; i < PALMAS_NUM_REGS ; i++) {
 		pmic_platform.reg_data[i] = molly_reg_data[i];
 		pmic_platform.reg_init[i] = molly_reg_init[i];
