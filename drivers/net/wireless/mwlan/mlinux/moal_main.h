@@ -1894,4 +1894,5 @@ int woal_is_connected(moal_private * priv, mlan_ssid_bssid * ssid_bssid);
 void wifi_enable_hostwake_irq(int flag);
 int woal_priv_hostcmd(moal_private * priv, t_u8 * respbuf, t_u32 respbuflen);
 void woal_tcp_ack_tx_indication(moal_private * priv, mlan_buffer * pmbuf);
+mlan_status woal_request_country_power_table(moal_private * priv, char *region);
 #endif /* _MOAL_MAIN_H */

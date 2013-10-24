@@ -1379,6 +1379,7 @@ done:
 #define INIT_CFG_DATA           0x00
 #define TXPWRLIMIT_CFG_DATA     0x01
 #define INIT_HOSTCMD_CFG_DATA   0x02
+#define COUNTRY_POWER_TABLE     0x04
 
 /**
  *    @brief WOAL set user defined init data and param
@@ -1411,6 +1412,20 @@ woal_set_user_init_data(moal_handle * handle, int type)
 			       "Init config file request_firmware() failed\n");
 			goto done;
 		}
+	} else if (type == COUNTRY_POWER_TABLE) {
+		int status =
+			request_firmware(&handle->user_data, txpwrlimit_cfg,
+					 handle->hotplug_device);
+		/* File does not exist, skip download */
+		if (status == -ENOENT) {
+			PRINTM(MIOCTL,
+			       "Country power table file does not exist\n");
+			ret = MLAN_STATUS_SUCCESS;
+		} else if (status) {
+			PRINTM(MERROR,
+			       "Init config file request_firmware() failed\n");
+			goto done;
+		}
 	} else if (type == INIT_HOSTCMD_CFG_DATA) {
 		if ((request_firmware
 		     (&handle->user_data, init_hostcmd_cfg,
@@ -1432,7 +1447,8 @@ woal_set_user_init_data(moal_handle * handle, int type)
 				goto done;
 			}
 		} else if (type == TXPWRLIMIT_CFG_DATA ||
-			   type == INIT_HOSTCMD_CFG_DATA) {
+			   type == INIT_HOSTCMD_CFG_DATA ||
+			   type == COUNTRY_POWER_TABLE) {
 			if (MLAN_STATUS_SUCCESS !=
 			    woal_process_hostcmd_cfg(handle, cfg_data, len)) {
 				PRINTM(MERROR,
@@ -5223,6 +5239,67 @@ woal_moal_debug_info(moal_private * priv, moal_handle * handle, u8 flag)
 
 	LEAVE();
 	return;
+}
+
+/**
+ *    @brief Download power table to firmware for a specific country
+ *
+ *    @param priv         A pointer to moal_private
+ *    @param country      ISO 3166-1 alpha-2 country code
+ *
+ *    @return             MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
+ */
+mlan_status
+woal_request_country_power_table(moal_private * priv, char *country)
+{
+	mlan_status ret = MLAN_STATUS_SUCCESS;
+	moal_handle *handle = priv->phandle;
+	char country_name[] = "txpower_XX.bin";
+	char file_path[256];
+	char *last_slash = NULL;
+
+	ENTER();
+
+	if (!priv || !priv->phandle) {
+		PRINTM(MERROR, "Priv or handle is null\n");
+		LEAVE();
+		return MLAN_STATUS_FAILURE;
+	}
+
+	if (!country) {
+		PRINTM(MERROR, "Country is null\n");
+		LEAVE();
+		return MLAN_STATUS_FAILURE;
+	}
+
+	/* Replace XX with ISO 3166-1 alpha-2 country code */
+	strncpy(strstr(country_name, "XX"), country, strlen(country));
+
+	memset(file_path, 0, sizeof(file_path));
+	if (fw_name) {
+		strncpy(file_path, fw_name, sizeof(file_path));
+		last_slash = strrchr(file_path, '/');
+		if (last_slash)
+			memset(last_slash + 1, 0,
+			       sizeof(file_path) - 1 - (last_slash -
+							file_path));
+		else
+			memset(file_path, 0, sizeof(file_path));
+	} else {
+		strncpy(file_path, "mrvl/", sizeof(file_path));
+	}
+	txpwrlimit_cfg = strncat(file_path, country_name,
+				 sizeof(file_path) - strlen(file_path));
+
+	if (MLAN_STATUS_SUCCESS !=
+	    woal_set_user_init_data(handle, COUNTRY_POWER_TABLE)) {
+		PRINTM(MFATAL, "Download power table to firmware failed\n");
+		ret = MLAN_STATUS_FAILURE;
+	}
+
+	txpwrlimit_cfg = NULL;
+	LEAVE();
+	return ret;
 }
 
 /**

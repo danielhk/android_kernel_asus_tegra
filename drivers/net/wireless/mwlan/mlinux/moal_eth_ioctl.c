@@ -9408,6 +9408,11 @@ woal_android_priv_cmd(struct net_device *dev, struct ifreq *req)
 		memcpy(country_code, buf + strlen("COUNTRY") + 1,
 		       strlen(buf) - strlen("COUNTRY") - 1);
 		PRINTM(MIOCTL, "Set COUNTRY %s\n", country_code);
+		if (MLAN_STATUS_SUCCESS !=
+		    woal_request_country_power_table(priv, country_code)) {
+			ret = -EFAULT;
+			goto done;
+		}
 #ifdef STA_CFG80211
 		if (IS_STA_CFG80211(cfg80211_wext)) {
 			PRINTM(MIOCTL, "Notify country code=%s\n",
