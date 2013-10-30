@@ -1769,6 +1769,18 @@ static struct resource tegra_wdt0_resources[] = {
 		.flags	= IORESOURCE_MEM,
 	},
 #endif
+#ifdef CONFIG_TEGRA_WATCHDOG_STACK_DUMP
+	[4] = {
+		.start  = TEGRA_WDT4_BASE,
+		.end    = TEGRA_WDT4_BASE + TEGRA_WDT4_SIZE - 1,
+		.flags  = IORESOURCE_MEM,
+	},
+	[5] = {
+		.start  = INT_WDT_AVP,
+		.end    = INT_WDT_AVP,
+		.flags  = IORESOURCE_IRQ,
+	},
+#endif
 };
 
 struct platform_device tegra_wdt0_device = {
