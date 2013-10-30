@@ -46,6 +46,9 @@ int tegra_cec_open(struct inode *inode, struct file *file)
 	struct tegra_cec *cec = container_of(miscdev,
 		struct tegra_cec, misc_dev);
 	dev_dbg(cec->dev, "%s\n", __func__);
+
+	wait_event_interruptible(cec->init_waitq,
+	    atomic_read(&cec->init_done) == 1);
 	file->private_data = cec;
 
 	return 0;
@@ -67,6 +70,9 @@ ssize_t tegra_cec_write(struct file *file, const char __user *buffer,
 	unsigned long write_buff;
 
 	count = 4;
+
+	wait_event_interruptible(cec->init_waitq,
+	    atomic_read(&cec->init_done) == 1);
 
 	if (copy_from_user(&write_buff, buffer, count))
 		return -EFAULT;
@@ -102,6 +108,9 @@ ssize_t tegra_cec_read(struct file *file, char  __user *buffer,
 	struct tegra_cec *cec = file->private_data;
 	unsigned short rx_buffer;
 	count = 2;
+
+	wait_event_interruptible(cec->init_waitq,
+	    atomic_read(&cec->init_done) == 1);
 
 	if (cec->rx_wake == 0)
 		if (file->f_flags & O_NONBLOCK)
@@ -178,6 +187,8 @@ static const struct file_operations tegra_cec_fops = {
 static void tegra_cec_init(struct tegra_cec *cec)
 {
 
+	dev_notice(cec->dev, "%s started\n", __func__);
+
 	writel(0x00, cec->cec_base + TEGRA_CEC_HW_CONTROL);
 	writel(0x00, cec->cec_base + TEGRA_CEC_INT_MASK);
 	writel(0xffffffff, cec->cec_base + TEGRA_CEC_INT_STAT);
@@ -234,6 +245,18 @@ static void tegra_cec_init(struct tegra_cec *cec)
 	    TEGRA_CEC_INT_MASK_RX_REGISTER_FULL |
 	    TEGRA_CEC_INT_MASK_RX_REGISTER_OVERRUN),
 	   cec->cec_base + TEGRA_CEC_INT_MASK);
+
+	atomic_set(&cec->init_done, 1);
+	wake_up_interruptible(&cec->init_waitq);
+
+	dev_notice(cec->dev, "%s Done.\n", __func__);
+}
+
+static void tegra_cec_init_worker(struct work_struct *work)
+{
+	struct tegra_cec *cec = container_of(work, struct tegra_cec, work);
+
+	tegra_cec_init(cec);
 }
 
 static int __devinit tegra_cec_probe(struct platform_device *pdev)
@@ -280,6 +303,8 @@ static int __devinit tegra_cec_probe(struct platform_device *pdev)
 		goto cec_error;
 	}
 
+	atomic_set(&cec->init_done, 0);
+
 	cec->clk = clk_get(&pdev->dev, "cec");
 
 	if (IS_ERR_OR_NULL(cec->clk)) {
@@ -296,11 +321,13 @@ static int __devinit tegra_cec_probe(struct platform_device *pdev)
 	cec->tx_wake = 0;
 	init_waitqueue_head(&cec->rx_waitq);
 	init_waitqueue_head(&cec->tx_waitq);
+	init_waitqueue_head(&cec->init_waitq);
 
 	platform_set_drvdata(pdev, cec);
 	/* clear out the hardware. */
 
-	tegra_cec_init(cec);
+	INIT_WORK(&cec->work, tegra_cec_init_worker);
+	schedule_work(&cec->work);
 
 	device_init_wakeup(&pdev->dev, 1);
 
@@ -342,6 +369,7 @@ static int tegra_cec_remove(struct platform_device *pdev)
 	clk_put(cec->clk);
 
 	misc_deregister(&cec->misc_dev);
+	cancel_work_sync(&cec->work);
 
 	return 0;
 }
@@ -351,17 +379,26 @@ static int tegra_cec_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	struct tegra_cec *cec = platform_get_drvdata(pdev);
 
+	/* cancel the work queue */
+	cancel_work_sync(&cec->work);
+
+	atomic_set(&cec->init_done, 0);
+
 	clk_disable(cec->clk);
 
+	dev_notice(&pdev->dev, "suspended\n");
 	return 0;
 }
 
 static int tegra_cec_resume(struct platform_device *pdev)
 {
-
 	struct tegra_cec *cec = platform_get_drvdata(pdev);
+
+	dev_notice(&pdev->dev, "Resuming\n");
+
 	clk_enable(cec->clk);
-	tegra_cec_init(cec);
+	schedule_work(&cec->work);
+
 	return 0;
 }
 #endif
