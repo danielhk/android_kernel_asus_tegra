@@ -242,6 +242,13 @@ config TEGRA_WATCHDOG_ENABLE_ON_PROBE
 	  Say Y here to enable the tegra watchdog at driver
 	  probe time, rather than when the device is opened.
 
+config TEGRA_WATCHDOG_STACK_DUMP
+	bool "Dump all kernel stacks on watchdog expiration"
+	depends on TEGRA_WATCHDOG && ARCH_TEGRA_11x_SOC && TRUSTED_FOUNDATIONS
+	help
+	  Say Y here to enable a stack dump of all kernel threads on
+	  watchdog expiration.
+
 config EP93XX_WATCHDOG
 	tristate "EP93xx Watchdog"
 	depends on ARCH_EP93XX
