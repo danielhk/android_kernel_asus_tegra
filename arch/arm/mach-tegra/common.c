@@ -76,9 +76,11 @@
 #define   ENB_FAST_REARBITRATE	BIT(2)
 #define   DONT_SPLIT_AHB_WR     BIT(7)
 
-#define   RECOVERY_MODE	BIT(31)
-#define   BOOTLOADER_MODE	BIT(30)
-#define   FORCED_RECOVERY_MODE	BIT(1)
+#define   RECOVERY_MODE			BIT(31)
+#define   BOOTLOADER_MODE		BIT(30)
+#define   RECOVERY_FACTORY_RESET_MODE	BIT(29)
+#define   NORMAL_REBOOT_MODE		BIT(28)
+#define   FORCED_RECOVERY_MODE		BIT(1)
 
 #define AHB_GIZMO_USB		0x1c
 #define AHB_GIZMO_USB2		0x78
@@ -179,21 +181,29 @@ void tegra_assert_system_reset(char mode, const char *cmd)
 	u32 reg;
 
 	reg = readl_relaxed(reset + PMC_SCRATCH0);
-	/* Writing recovery kernel or Bootloader mode in SCRATCH0 31:30:1 */
+
+	reg &= ~(BOOTLOADER_MODE | RECOVERY_MODE | NORMAL_REBOOT_MODE |
+			RECOVERY_FACTORY_RESET_MODE |
+			FORCED_RECOVERY_MODE);
+
+	/* Writing recovery kernel or Bootloader mode in SCRATCH0
+	 * 31:28:1
+	 */
 	if (cmd) {
-		if (!strcmp(cmd, "recovery"))
+		if (!strcmp(cmd, "recovery:wipe_data"))
+			reg |= RECOVERY_FACTORY_RESET_MODE;
+		else if (!strcmp(cmd, "recovery"))
 			reg |= RECOVERY_MODE;
 		else if (!strcmp(cmd, "bootloader"))
 			reg |= BOOTLOADER_MODE;
 		else if (!strcmp(cmd, "forced-recovery"))
 			reg |= FORCED_RECOVERY_MODE;
 		else
-			reg &= ~(BOOTLOADER_MODE | RECOVERY_MODE | FORCED_RECOVERY_MODE);
+			reg |= NORMAL_REBOOT_MODE;
+	} else {
+		reg |= NORMAL_REBOOT_MODE;
 	}
-	else {
-		/* Clearing SCRATCH0 31:30:1 on default reboot */
-		reg &= ~(BOOTLOADER_MODE | RECOVERY_MODE | FORCED_RECOVERY_MODE);
-	}
+
 	writel_relaxed(reg, reset + PMC_SCRATCH0);
 	reg = readl_relaxed(reset);
 	reg |= 0x10;
