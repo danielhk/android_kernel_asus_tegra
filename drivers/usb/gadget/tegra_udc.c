@@ -2376,9 +2376,12 @@ static void tegra_udc_non_std_charger_detect_work(struct work_struct *work)
 {
 	struct tegra_udc *udc = container_of(work, struct tegra_udc,
 					non_std_charger_work.work);
+	unsigned long flags;
 	DBG("%s(%d) BEGIN\n", __func__, __LINE__);
 
+	spin_lock_irqsave(&udc->lock, flags);
 	dr_controller_stop(udc);
+	spin_unlock_irqrestore(&udc->lock, flags);
 
 	tegra_udc_set_charger_type(udc, CONNECT_TYPE_NON_STANDARD_CHARGER);
 
@@ -2422,14 +2425,14 @@ static irqreturn_t tegra_udc_irq(int irq, void *_udc)
 		temp = udc_readl(udc, VBUS_WAKEUP_REG_OFFSET);
 		/* write back the register to clear the interrupt */
 		udc_writel(udc, temp, VBUS_WAKEUP_REG_OFFSET);
-		if (temp & USB_SYS_VBUS_WAKEUP_INT_STATUS)
+		if (temp & USB_SYS_VBUS_WAKEUP_INT_STATUS && !udc->stopped)
 			schedule_work(&udc->irq_work);
 		status = IRQ_HANDLED;
 #else
 		temp = udc_readl(udc, VBUS_SENSOR_REG_OFFSET);
 		/* write back the register to clear the interrupt */
 		udc_writel(udc, temp, VBUS_SENSOR_REG_OFFSET);
-		if (temp & USB_SYS_VBUS_ASESSION_CHANGED)
+		if (temp & USB_SYS_VBUS_ASESSION_CHANGED && !udc->stopped)
 			schedule_work(&udc->irq_work);
 		status = IRQ_HANDLED;
 #endif
@@ -3031,16 +3034,23 @@ static int tegra_udc_suspend(struct platform_device *pdev, pm_message_t state)
 	if (udc->transceiver)
 			return 0;
 
+	spin_lock_irqsave(&udc->lock, flags);
 	if (udc->vbus_active) {
-		spin_lock_irqsave(&udc->lock, flags);
 		/* Reset all internal Queues and inform client driver */
 		reset_queues(udc);
 		udc->vbus_active = 0;
 		udc->usb_state = USB_STATE_DEFAULT;
-		spin_unlock_irqrestore(&udc->lock, flags);
 	}
 	/* Stop the controller and turn off the clocks */
 	dr_controller_stop(udc);
+	spin_unlock_irqrestore(&udc->lock, flags);
+
+	/* wait for all scheduled works to complete */
+	flush_delayed_work_sync(&udc->non_std_charger_work);
+	flush_work_sync(&udc->current_work);
+	flush_work_sync(&udc->boost_cpufreq_work);
+	flush_work_sync(&udc->irq_work);
+
 	if (udc->transceiver)
 		udc->transceiver->state = OTG_STATE_UNDEFINED;
 
