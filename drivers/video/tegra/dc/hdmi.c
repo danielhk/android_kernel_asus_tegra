@@ -2014,15 +2014,21 @@ static long tegra_dc_hdmi_setup_clk(struct tegra_dc *dc, struct clk *clk)
 		dc->out->parent_clk ? : "pll_d_out0");
 	struct clk *base_clk = clk_get_parent(parent_clk);
 
-	/*
-	 * Providing dynamic frequency rate setting for T20/T30 HDMI.
-	 * The required rate needs to be setup at 4x multiplier,
-	 * as out0 is 1/2 of the actual PLL output.
+	rate = clk_get_rate(base_clk);
+	/* If the current out0 (1/2 of the actual PLL output) clock rate
+	 * can be divisible by the target pixel clock, we do not need to
+	 * change the clock source (PLL) rate here.
 	 */
-
-	rate = dc->mode.pclk * 2;
-	while (rate < 500000000)
-		rate *= 2;
+	if (((rate / 2) % dc->mode.pclk) != 0) {
+		/*
+		 * Providing dynamic frequency rate setting for T20/T30 HDMI.
+		 * The required rate needs to be setup at 4x multiplier,
+		 * as out0 is 1/2 of the actual PLL output.
+		 */
+		rate = dc->mode.pclk * 2;
+		while (rate < 500000000)
+			rate *= 2;
+	}
 
 	if (rate != clk_get_rate(base_clk))
 		clk_set_rate(base_clk, rate);
