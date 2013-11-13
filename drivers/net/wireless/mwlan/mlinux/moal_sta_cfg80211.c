@@ -3248,7 +3248,8 @@ void
 woal_clear_conn_params(moal_private * priv)
 {
 	ENTER();
-	kfree(priv->sme_current.ie);
+	if (priv->sme_current.ie_len)
+		kfree(priv->sme_current.ie);
 	memset(&priv->sme_current, 0, sizeof(struct cfg80211_connect_params));
 	priv->roaming_required = MFALSE;
 	LEAVE();
