@@ -219,20 +219,20 @@ static struct tegra_dc_mode hdmi_panel_modes[] = {
 		.v_front_porch = 5,   /* lower_margin */
 		.avi_m = TEGRA_DC_MODE_AVI_M_16_9,
 	},
-	/* 640x480p@59.94Hz/60Hz CEA mode 1 */
+	/* 720x480p@59.94Hz/60Hz CEA mode 3 */
 	{
-		.pclk = 25175000,
+		.pclk = 27000000,
 		.h_ref_to_sync = 1,
 		.v_ref_to_sync = 1,
-		.h_sync_width = 96,   /* hsync_len */
-		.v_sync_width = 2,    /* vsync_len */
-		.h_back_porch = 48,   /* left_margin */
-		.v_back_porch = 33,   /* upper_margin */
-		.h_active = 640,      /* xres */
+		.h_sync_width = 62,   /* hsync_len */
+		.v_sync_width = 6,    /* vsync_len */
+		.h_back_porch = 60,   /* left_margin */
+		.v_back_porch = 30,   /* upper_margin */
+		.h_active = 720,      /* xres */
 		.v_active = 480,      /* yres */
 		.h_front_porch = 16,  /* right_margin */
-		.v_front_porch = 10,  /* lower_margin */
-		.avi_m = TEGRA_DC_MODE_AVI_M_4_3,
+		.v_front_porch = 9,   /* lower_margin */
+		.avi_m = TEGRA_DC_MODE_AVI_M_16_9,
 	},
 };
 
