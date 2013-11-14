@@ -862,6 +862,35 @@ struct hci_cp_le_create_conn {
 
 #define HCI_OP_LE_CREATE_CONN_CANCEL	0x200e
 
+#define HCI_OP_LE_READ_WHITE_LIST_SIZE	0x200f
+struct hci_ev_le_read_white_list_size_resp {
+	__u8     status;
+	__u8     size;
+} __packed;
+
+#define HCI_OP_LE_CLEAR_WHITE_LIST	0x2010
+struct hci_ev_le_clear_white_list_resp {
+	__u8     status;
+} __packed;
+
+#define HCI_OP_LE_ADD_DEVICE_TO_WHITE_LIST	0x2011
+struct hci_cp_le_add_device_to_white_list {
+	__u8     addr_type;
+	bdaddr_t addr;
+} __packed;
+struct hci_ev_le_add_device_to_white_list_resp {
+	__u8     status;
+} __packed;
+
+#define HCI_OP_LE_REMOVE_DEVICE_FROM_WHITE_LIST	0x2012
+struct hci_cp_le_remove_device_from_white_list {
+	__u8     addr_type;
+	bdaddr_t addr;
+} __packed;
+struct hci_ev_le_remove_device_from_white_list_resp {
+	__u8     status;
+} __packed;
+
 #define HCI_OP_LE_CONN_UPDATE		0x2013
 struct hci_cp_le_conn_update {
 	__le16   handle;

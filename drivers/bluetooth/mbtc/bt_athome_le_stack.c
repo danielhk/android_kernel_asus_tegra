@@ -1007,8 +1007,8 @@ static uint32_t aahbt_connect_if_needed_l(uint64_t now,
 	put_unaligned_le16(AAH_BT_CONN_SCAN_INTERVAL, &cmd.scan_interval);
 	put_unaligned_le16(AAH_BT_SCAN_WINDOW,        &cmd.scan_window);
 	cmd.filter_policy    = 0;	/* no whitelist */
-	cmd.peer_addr_type   = 1;	/* peer addr is random */
-	cmd.own_address_type = 0;	/* use our public MAC */
+	cmd.peer_addr_type   = ADDR_LE_DEV_RANDOM;	/* peer addr is random */
+	cmd.own_address_type = ADDR_LE_DEV_PUBLIC;	/* use our public MAC */
 	put_unaligned_le16(cs->conn_interval,       &cmd.conn_interval_min);
 	put_unaligned_le16(cs->conn_interval,       &cmd.conn_interval_max);
 	put_unaligned_le16(cs->conn_latency,        &cmd.conn_latency);
@@ -1061,6 +1061,126 @@ static void aahbt_send_disconnect_l(struct aahbt_conn *c)
 
 	aahbt_purge_pending_tx_l(c);
 	c->state = CONN_STATE_DISCONNECTING;
+}
+
+static void aahbt_clear_white_list_l(void)
+{
+	int err;
+	struct {
+		struct hci_event_hdr                   ev_hdr;
+		struct hci_ev_cmd_complete             cc_hdr;
+		struct hci_ev_le_clear_white_list_resp white_list;
+	} __packed resp;
+
+	err = aahbt_simple_cmd_l(HCI_OGF_LE,
+				 HCI_LE_Clear_White_List,
+				 0, NULL,
+				 sizeof(resp), (uint8_t*)&resp);
+	if (err != 0) {
+		aahlog("failed to send clear_white_list"
+		       " (err = %d)\n", err);
+		return;
+	}
+
+	if (resp.ev_hdr.plen != (sizeof(resp) - sizeof(resp.ev_hdr))) {
+		aahlog("clear_white_list resp had bad len %d (expected %d)\n",
+		       resp.ev_hdr.plen, (sizeof(resp) - sizeof(resp.ev_hdr)));
+		return;
+	}
+
+	if (resp.white_list.status) {
+		aahlog("clear_white_list rejected (status 0x%02x)\n",
+		       resp.white_list.status);
+		return;
+	}
+
+	aahlog("clear_white_list succeeded.\n");
+}
+
+static void aahbt_add_device_to_white_list_l(const struct aahbt_conn *c)
+{
+	int err;
+	struct hci_cp_le_add_device_to_white_list cmd;
+	struct {
+		struct hci_event_hdr                           ev_hdr;
+		struct hci_ev_cmd_complete                     cc_hdr;
+		struct hci_ev_le_add_device_to_white_list_resp white_list;
+	} __packed resp;
+
+	BUG_ON(!c);
+
+	bacpy(&cmd.addr, &c->MAC);
+	cmd.addr_type = ADDR_LE_DEV_RANDOM;
+
+	err = aahbt_simple_cmd_l(HCI_OGF_LE,
+				 HCI_LE_Add_Device_To_White_List,
+				 sizeof(cmd), (uint8_t*)&cmd,
+				 sizeof(resp), (uint8_t*)&resp);
+	if (err != 0) {
+		aahlog(MAC_FMT " : failed to send add_device_to_white_list"
+		       " (err = %d)\n",
+		       MAC_DATA(c->MAC), err);
+		return;
+	}
+
+	if (resp.ev_hdr.plen != (sizeof(resp) - sizeof(resp.ev_hdr))) {
+		aahlog(MAC_FMT " : add_device_to_white_list resp had bad len %d"
+		       " (expected %d)\n",
+		       MAC_DATA(c->MAC), resp.ev_hdr.plen,
+		       (sizeof(resp) - sizeof(resp.ev_hdr)));
+		return;
+	}
+
+	if (resp.white_list.status) {
+		aahlog(MAC_FMT " : add_device_to_white_list rejected (status 0x%02x)\n",
+		       MAC_DATA(c->MAC), resp.white_list.status);
+		return;
+	}
+
+	aahlog(MAC_FMT " : add_device_to_white_list succeeded.\n", MAC_DATA(c->MAC));
+}
+
+static void aahbt_remove_device_from_white_list_l(const struct aahbt_conn *c)
+{
+	int err;
+	struct hci_cp_le_remove_device_from_white_list cmd;
+	struct {
+		struct hci_event_hdr                                ev_hdr;
+		struct hci_ev_cmd_complete                          cc_hdr;
+		struct hci_ev_le_remove_device_from_white_list_resp white_list;
+	} __packed resp;
+
+	BUG_ON(!c);
+
+	bacpy(&cmd.addr, &c->MAC);
+	cmd.addr_type = ADDR_LE_DEV_RANDOM;
+
+	err = aahbt_simple_cmd_l(HCI_OGF_LE,
+				 HCI_LE_Remove_Device_From_White_List,
+				 sizeof(cmd), (uint8_t*)&cmd,
+				 sizeof(resp), (uint8_t*)&resp);
+	if (err != 0) {
+		aahlog(MAC_FMT " : failed to send remove_device_from_white_list"
+		       " (err = %d)\n",
+		       MAC_DATA(c->MAC), err);
+		return;
+	}
+
+	if (resp.ev_hdr.plen != (sizeof(resp) - sizeof(resp.ev_hdr))) {
+		aahlog(MAC_FMT " : remove_device_from_white_list resp had bad len %d"
+		       " (expected %d)\n",
+		       MAC_DATA(c->MAC), resp.ev_hdr.plen,
+		       (sizeof(resp) - sizeof(resp.ev_hdr)));
+		return;
+	}
+
+	if (resp.white_list.status) {
+		aahlog(MAC_FMT " : remove_device_from_white_list rejected (status 0x%02x)\n",
+		       MAC_DATA(c->MAC), resp.white_list.status);
+		return;
+	}
+
+	aahlog(MAC_FMT " : remove_device_from_white_list succeeded.\n", MAC_DATA(c->MAC));
 }
 
 #define CHECK_LEN(needed) \
@@ -1190,6 +1310,21 @@ static int aahbt_process_le_conn_complete_l(const uint8_t* data, size_t len)
 		c->handle = get_unaligned_le16(&evt->handle);
 		c->state  = CONN_STATE_CONNECTED;
 
+		/* Add this device's MAC into the white list so that the
+		 * device filtering is in effect. Since the controller
+		 * will ignore the requests from the devices not on the list,
+		 * it reduces the number of transmissions the controller would
+		 * be required to make, which reduces power consumption.
+		 * Especially, we don't want the white list to be empty when the
+		 * system goes into suspend, otherwise it would wake too often
+		 * because the controller will respond to advertisement packets
+		 * and scan requests from any BLE device.
+		 *
+		 * TODO: we might want to enable the device filtering earlier,
+		 * e.g. before attempting the connection.
+		 */
+		aahbt_add_device_to_white_list_l(c);
+
 		/* If the user attempted to abort this connection just as it was
 		 * being made, then the disconnect_asap flag will be set, and we
 		 * should start the process of disconnecting.
@@ -1247,6 +1382,14 @@ static int aahbt_process_disconn_evt_l(const uint8_t* data, size_t len)
 	 */
 	if (cur_total_tx_pending < max_total_tx_pending)
 		aahbt_usr_signal_tx_has_room();
+
+	/* Remove the device from the white list.
+	 *
+	 * TODO: this is a conservative approach. We might want to leave the
+	 * device filtering enabled if we can safely ignore other LE devices
+	 * until we re-connect to the same device.
+	 */
+	aahbt_remove_device_from_white_list_l(c);
 
 	aahbt_reset_conn_state_l(c, (tmp = c->reconnect_after_discon));
 	if (tmp)
@@ -1741,6 +1884,9 @@ static int aahbt_thread(void *unusedData)
 		aahlog("host setup failed\n");
 		goto shutdown;
 	}
+
+	/* Clear white list to make sure no device filtering is going on. */
+	aahbt_clear_white_list_l();
 
 	/* While its not time to shutdown, do work */
 	while (!aahbt_should_quit()) {
