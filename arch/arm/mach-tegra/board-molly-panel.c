@@ -304,7 +304,7 @@ static struct tegra_dc_out molly_disp_out = {
 	.flags		= TEGRA_DC_OUT_HOTPLUG_HIGH |
 			  TEGRA_DC_OUT_HOTPLUG_WAKE_LP0 |
 			  TEGRA_DC_OUT_FILTER_ALLOWED_MODES,
-	.parent_clk	= "pll_d2_out0",
+	.parent_clk	= "pll_d_out0",
 
 	.dcc_bus	= 3,
 	.hotplug_gpio	= MOLLY_HDMI_HPD,
