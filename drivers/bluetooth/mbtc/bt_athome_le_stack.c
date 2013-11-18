@@ -564,7 +564,9 @@ static int aahbt_host_setup(void)
 	uint i;
 	int err;
 
-	aahlog("host setup\n");
+	aahlog("host setup, AAH_BT_MAX_EVENT_LENGTH = %d"
+		", AAH_BT_ACTIVE_CONN_INTERVAL = %d\n",
+		AAH_BT_MAX_EVENT_LENGTH, AAH_BT_ACTIVE_CONN_INTERVAL);
 	parP = buf;
 
 	aahlog("turning le and le simul on\n");
@@ -1035,7 +1037,10 @@ static uint32_t aahbt_connect_if_needed_l(uint64_t now,
 		goto failure;
 	}
 
-	aahlog(MAC_FMT " : connection attempt started.\n", MAC_DATA(c->MAC));
+	aahlog(MAC_FMT " : connection attempt started"
+		", interval = %d, latency = %d, timeout = %d msec\n",
+		MAC_DATA(c->MAC), cs->conn_interval,
+		cs->conn_latency, cs->svc_timeout);
 	c->state = CONN_STATE_CONNECTING;
 	connection_in_progress = true;
 
@@ -2267,6 +2272,10 @@ void aahbt_set_default_conn_settings(const struct aahbt_conn_settings_t *s)
 	mutex_lock(&state_lock);
 	memcpy(&default_conn_settings, s, sizeof(*s));
 	mutex_unlock(&state_lock);
+
+	aahlog("default_conn_settings changed to"
+		", interval = %d, latency = %d, timeout = %d msec\n",
+		s->conn_interval, s->conn_latency, s->svc_timeout);
 }
 
 bool aahbt_tx_pipeline_has_room(void)
