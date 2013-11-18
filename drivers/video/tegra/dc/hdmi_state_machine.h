@@ -83,6 +83,12 @@ enum {
 	 */
 	HDMI_STATE_DONE_RECHECK_EDID,
 
+	/* Initial state at boot that checks if HDMI is already initialized
+	 * by bootloader and not go to HDMI_STATE_RESET which would disable
+	 * HDMI and cause blanking of the bootloader displayed image.
+	 */
+	HDMI_STATE_INIT_FROM_BOOTLOADER,
+
 	/* STATE_COUNT must be the final state in the enum.
 	 * 1) Do not add states after STATE_COUNT.
 	 * 2) Do not assign explicit values to the states.
