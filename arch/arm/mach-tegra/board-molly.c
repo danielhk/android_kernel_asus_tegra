@@ -765,6 +765,35 @@ static void __init molly_spi_init(void)
 			     ARRAY_SIZE(molly_spi_devices));
 }
 
+#define MOLLY_BOOT_EMC_RATE 792000000
+static void __init molly_boost_emc_clk_for_boot(bool if_boost)
+{
+	static struct clk *boot_emc_clk;
+
+	if (if_boost) {
+		if (IS_ERR_OR_NULL(boot_emc_clk)) {
+			boot_emc_clk = clk_get_sys("boot", "emc");
+			if (IS_ERR_OR_NULL(boot_emc_clk)) {
+				pr_err("%s: failed to get boot.emc clk\n",
+					__func__);
+				return;
+			}
+			clk_prepare_enable(boot_emc_clk);
+			clk_set_rate(boot_emc_clk, MOLLY_BOOT_EMC_RATE);
+			pr_info("molly: enable emc boost for booting (%d Hz)\n",
+				MOLLY_BOOT_EMC_RATE);
+		}
+	} else {
+		if (!IS_ERR_OR_NULL(boot_emc_clk)) {
+			clk_set_rate(boot_emc_clk, 0);
+			clk_disable_unprepare(boot_emc_clk);
+			clk_put(boot_emc_clk);
+			boot_emc_clk = NULL;
+			pr_info("molly: disable emc boost for booting\n");
+		}
+	}
+}
+
 static void __init tegra_molly_init(void)
 {
 	molly_init_hw_rev();
@@ -787,6 +816,7 @@ static void __init tegra_molly_init(void)
 	molly_regulator_init();
 	molly_sdhci_init();
 	molly_suspend_init();
+	molly_boost_emc_clk_for_boot(true);
 	molly_emc_init();
 	molly_edp_init();
 	molly_panel_init();
@@ -798,6 +828,13 @@ static void __init tegra_molly_init(void)
 	molly_soctherm_init();
 	tegra_register_fuse();
 }
+
+static int __init tegra_molly_late_init(void)
+{
+	molly_boost_emc_clk_for_boot(false);
+	return 0;
+}
+late_initcall(tegra_molly_late_init);
 
 static void __init tegra_molly_dt_init(void)
 {
