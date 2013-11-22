@@ -286,11 +286,11 @@ struct tmds_config molly_tmds_config[] = {
 	},
 	{ /* 4K : 297MHz modes */
 		.pclk = INT_MAX,
-		.pll0 = 0x01003110,
-		.pll1 = 0x00500B00,
-		.drive_current = 0x30303030,
+		.pll0 = 0x01003f10,
+		.pll1 = 0x00500f00,
+		.drive_current = 0x3A3A3F3A,
 		.pe_current = 0x00000000,
-		.peak_current = 0x0a0a0a0a,
+		.peak_current = 0x0f0f0f0f,
 	},
 };
 
