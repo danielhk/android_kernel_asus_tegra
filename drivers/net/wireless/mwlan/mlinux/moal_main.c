@@ -145,6 +145,11 @@ char *txpwrlimit_cfg;
 /** Init hostcmd file */
 char *init_hostcmd_cfg;
 
+#ifdef MFG_CMD_SUPPORT
+/** Mfg mode cfg file */
+char *mfg_mode_cfg;
+#endif
+
 /** Enable minicard power-up/down */
 int minicard_pwrup = 1;
 /** Pointer to struct with control hooks */
@@ -1595,7 +1600,42 @@ woal_init_fw_dpc(moal_handle * handle)
 	if (handle->user_data) {
 		param.pcal_data_buf = (t_u8 *) handle->user_data->data;
 		param.cal_data_len = handle->user_data->size;
+
+		release_firmware(handle->user_data);
+		handle->user_data = NULL;
 	}
+
+#ifdef MFG_CMD_SUPPORT
+	/** Mfg mode config file */
+	if (!mfg_mode_cfg)
+		mfg_mode_cfg = "mrvl/mfg_mode.cfg"; /* default file name */
+
+	if (request_firmware
+	    (&handle->user_data, mfg_mode_cfg,
+	     handle->hotplug_device) < 0) {
+		PRINTM(MINFO, "No Mfg mode config found -- OK\n");
+	}
+
+	if (handle->user_data) {
+		/* mfg_mode */
+		mfg_mode = 1;
+		param.mfg_mode = 1;
+		/* drv_mode, max_vir_bss */
+		drv_mode = 1;
+		max_vir_bss = 0;
+		woal_update_drv_tbl(handle, drv_mode);
+		/* sta_name */
+		sta_name = "mlan";
+		/* wfd_name */
+		wfd_name = "wfd";
+		/* mac_addr */
+		mac_addr = NULL;
+		handle->set_mac_addr = 0;
+
+		release_firmware(handle->user_data);
+		handle->user_data = NULL;
+	}
+#endif
 
 	handle->hardware_status = HardwareStatusFwReady;
 	if (ret != MLAN_STATUS_SUCCESS)
@@ -6101,6 +6141,10 @@ MODULE_PARM_DESC(txpwrlimit_cfg,
 		 "Set configuration data of Tx power limitation");
 module_param(init_hostcmd_cfg, charp, 0);
 MODULE_PARM_DESC(init_hostcmd_cfg, "Init hostcmd file name");
+#ifdef MFG_CMD_SUPPORT
+module_param(mfg_mode_cfg, charp, 0);
+MODULE_PARM_DESC(mfg_mode_cfg, "Mfg mode config file name");
+#endif
 module_param(minicard_pwrup, int, 1);
 MODULE_PARM_DESC(minicard_pwrup,
 		 "1: Driver load clears PDn/Rst, unload sets (default); 0: Don't do this.");

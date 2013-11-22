@@ -450,6 +450,9 @@ typedef struct _mlan_init_param {
     /** Cal data length */
 	t_u32 cal_data_len;
     /** Other custom data */
+#ifdef MFG_CMD_SUPPORT
+	t_u32 mfg_mode;
+#endif
 } mlan_init_param, *pmlan_init_param;
 
 /** mlan_event data structure */

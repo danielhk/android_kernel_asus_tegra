@@ -558,6 +558,11 @@ mlan_set_init_param(IN t_void * pmlan_adapter, IN pmlan_init_param pparam)
 		pmadapter->cal_data_len = pparam->cal_data_len;
 	}
 
+#ifdef MFG_CMD_SUPPORT
+	if (pparam->mfg_mode > 0)
+		pmadapter->init_para.mfg_mode = pparam->mfg_mode;
+#endif
+
 	LEAVE();
 	return ret;
 }
