@@ -707,7 +707,7 @@ void __init tegra20_init_early(void)
 	tegra_init_ahb_gizmo_settings();
 	tegra_init_debug_uart_rate();
 	tegra_gpio_resume_init();
-	tegra_ram_console_debug_reserve(SZ_1M);
+	tegra_ram_console_debug_reserve(USE_DEFAULT_START_ADDR, SZ_1M);
 }
 #endif
 #ifdef CONFIG_ARCH_TEGRA_3x_SOC
@@ -733,7 +733,7 @@ void __init tegra30_init_early(void)
 	tegra_init_ahb_gizmo_settings();
 	tegra_init_debug_uart_rate();
 	tegra_gpio_resume_init();
-	tegra_ram_console_debug_reserve(SZ_1M);
+	tegra_ram_console_debug_reserve(USE_DEFAULT_START_ADDR, SZ_1M);
 
 	init_dma_coherent_pool_size(SZ_1M);
 }
@@ -1657,11 +1657,14 @@ static struct persistent_ram ram = {
 	.num_descs = 1,
 };
 
-void __init tegra_ram_console_debug_reserve(unsigned long ram_console_size)
+void __init tegra_ram_console_debug_reserve(phys_addr_t ram_console_start,
+					    unsigned long ram_console_size)
 {
 	int ret;
 
-	ram.start = memblock_end_of_DRAM() - ram_console_size;
+	if (ram_console_start == USE_DEFAULT_START_ADDR)
+		ram_console_start = memblock_end_of_DRAM() - ram_console_size;
+	ram.start = ram_console_start;
 	ram.size = ram_console_size;
 	ram.descs->size = ram_console_size;
 

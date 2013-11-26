@@ -545,7 +545,7 @@ void __init tegra_whistler_reserve(void)
 		pr_warn("Cannot reserve first 4K of memory for safety\n");
 
 	tegra_reserve(SZ_152M, SZ_3M, SZ_1M);
-	tegra_ram_console_debug_reserve(SZ_1M);
+	tegra_ram_console_debug_reserve(USE_DEFAULT_START_ADDR, SZ_1M);
 }
 
 static const char *whistler_dt_board_compat[] = {

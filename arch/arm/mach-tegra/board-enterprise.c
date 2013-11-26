@@ -1164,7 +1164,7 @@ static void __init tegra_enterprise_reserve(void)
 #else
 	tegra_reserve(SZ_128M, SZ_4M, SZ_8M);
 #endif
-	tegra_ram_console_debug_reserve(SZ_1M);
+	tegra_ram_console_debug_reserve(USE_DEFAULT_START_ADDR, SZ_1M);
 }
 
 static const char *enterprise_dt_board_compat[] = {

@@ -1338,7 +1338,7 @@ static void __init tegra_pluto_init(void)
 
 static void __init pluto_ramconsole_reserve(unsigned long size)
 {
-	tegra_ram_console_debug_reserve(SZ_1M);
+	tegra_ram_console_debug_reserve(USE_DEFAULT_START_ADDR, SZ_1M);
 }
 
 static void __init tegra_pluto_dt_init(void)

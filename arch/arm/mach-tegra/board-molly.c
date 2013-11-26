@@ -58,6 +58,7 @@
 #include <mach/tegra_asoc_pdata.h>
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
+#include <asm/setup.h>
 #include <mach/usb_phy.h>
 #include <mach/gpio-tegra.h>
 #include <mach/tegra_fiq_debugger.h>
@@ -798,11 +799,6 @@ static void __init tegra_molly_init(void)
 	tegra_register_fuse();
 }
 
-static void __init molly_ramconsole_reserve(unsigned long size)
-{
-	tegra_ram_console_debug_reserve(SZ_1M);
-}
-
 static void __init tegra_molly_dt_init(void)
 {
 #ifdef CONFIG_USE_OF
@@ -827,7 +823,13 @@ static void __init tegra_molly_reserve(void)
 #else
 	tegra_reserve(SZ_128M, SZ_16M, 0);
 #endif
-	molly_ramconsole_reserve(SZ_1M);
+	/* Allocate at a fixed place, 1GB into RAM
+	 * so it doesn't move when other blocks near
+	 * end of RAM change size.  This makes it easier
+	 * for the bootloader to keep in sync with it for
+	 * implementing "fastboot oem kmsg".
+	 */
+	tegra_ram_console_debug_reserve(meminfo.bank[0].start + SZ_1G, SZ_1M);
 }
 
 static const char * const molly_dt_board_compat[] = {
