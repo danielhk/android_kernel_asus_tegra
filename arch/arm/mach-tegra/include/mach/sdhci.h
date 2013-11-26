@@ -59,6 +59,7 @@ struct tegra_sdhci_platform_data {
 	unsigned int edp_states[SD_EDP_NUM_STATES];
 	bool power_off_rail;
 	bool en_freq_scaling;
+	int core_speedo;
 };
 
 #endif

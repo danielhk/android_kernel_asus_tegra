@@ -39,6 +39,7 @@
 #include "board.h"
 #include "board-molly.h"
 #include "dvfs.h"
+#include "fuse.h"
 
 #define MOLLY_WLAN_PWR	TEGRA_GPIO_PCC5
 #if MOLLY_ON_DALMORE == 1
@@ -48,6 +49,7 @@
 #endif
 #define MOLLY_WLAN_WOW	TEGRA_GPIO_PU5
 #define MOLLY_BT_HOST_WAKE	TEGRA_GPIO_PU6
+#define FUSE_CORE_SPEEDO_0	0x134
 
 static void (*wifi_status_cb)(int card_present, void *dev_id);
 static void *wifi_status_cb_devid;
@@ -403,6 +405,7 @@ int __init molly_sdhci_init(void)
 {
 	int nominal_core_mv;
 	int min_vcore_override_mv;
+	int speedo;
 
 	nominal_core_mv =
 		tegra_dvfs_rail_get_nominal_millivolts(tegra_core_rail);
@@ -422,6 +425,10 @@ int __init molly_sdhci_init(void)
 		&& (!(tegra_sdhci_platform_data3.uhs_mask &
 		MMC_UHS_MASK_DDR50)))
 		tegra_sdhci_platform_data3.trim_delay = 0;
+
+	speedo = tegra_fuse_readl(FUSE_CORE_SPEEDO_0);
+	tegra_sdhci_platform_data3.core_speedo = speedo;
+	tegra_sdhci_platform_data0.core_speedo = speedo;
 
 	/* device0 uses resource0, which is sdmmc1.  used for WiFi
 	 * device2 uses resource2, which is sdmmc3.
