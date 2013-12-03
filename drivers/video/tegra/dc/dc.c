@@ -84,6 +84,8 @@ static void _tegra_dc_controller_disable(struct tegra_dc *dc);
 
 struct tegra_dc *tegra_dcs[TEGRA_MAX_DC];
 
+static bool skip_program_mode = false;
+
 DEFINE_MUTEX(tegra_dc_lock);
 DEFINE_MUTEX(shared_lock);
 
@@ -1992,11 +1994,14 @@ static int tegra_dc_init(struct tegra_dc *dc)
 
 	trace_display_mode(dc, &dc->mode);
 
-	if (dc->mode.pclk) {
+	if (dc->mode.pclk && !skip_program_mode) {
 		if (tegra_dc_program_mode(dc, &dc->mode)) {
 			tegra_dc_io_end(dc);
 			return -EINVAL;
 		}
+	} else {
+		pr_info("%s: Skipping tegra_dc_program_mode() because"
+			" no pclk or mode already set\n", __func__);
 	}
 
 	/* Initialize SD AFTER the modeset.
@@ -2131,7 +2136,7 @@ static int _tegra_dc_set_default_videomode(struct tegra_dc *dc)
 		switch (dc->out->type) {
 		case TEGRA_DC_OUT_HDMI:
 		/* DC enable called but no videomode is loaded.
-		     Check if HDMI is connected, then set fallback mdoe */
+		     Check if HDMI is connected, then set fallback mode */
 		if (tegra_dc_hpd(dc)) {
 			return tegra_dc_set_fb_mode(dc,
 					&tegra_dc_hdmi_fallback_mode, 0);
@@ -2624,10 +2629,28 @@ static int tegra_dc_probe(struct platform_device *ndev)
 	}
 	disable_dc_irq(dc);
 
+	mode = tegra_dc_get_override_mode(dc);
+	if (mode) {
+		pr_info("get_override_mode() returned %p, %dx%d\n",
+			mode, mode->h_active, mode->v_active);
+		/* make sure _tegra_dc_enable(), which eventually
+		 * results in a call to tegra_dc_init(), doesn't
+		 * call tegra_dc_program_mode() since a mode
+		 * has been already set by the bootloader and
+		 * doing it again can cause an HDMI glitch when
+		 * the dsi clk changes because some monitors drop
+		 * HPD as a result.
+		 */
+		skip_program_mode = true;
+	}
+
 	if (dc->pdata->flags & TEGRA_DC_FLAG_ENABLED) {
 		_tegra_dc_set_default_videomode(dc);
 		dc->enabled = _tegra_dc_enable(dc);
 	}
+
+	/* after boot stage, clear skip_program_mode flag so */
+	skip_program_mode = false;
 
 	tegra_dc_create_debugfs(dc);
 
@@ -2645,7 +2668,6 @@ static int tegra_dc_probe(struct platform_device *ndev)
 				tegra_dc_fmt_bpp(fmt);
 		}
 
-		mode = tegra_dc_get_override_mode(dc);
 		if (mode) {
 			dc->pdata->fb->xres = mode->h_active;
 			dc->pdata->fb->yres = mode->v_active;
