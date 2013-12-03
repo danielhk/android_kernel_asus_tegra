@@ -677,7 +677,7 @@ struct tegra_fb_info *tegra_fb_register(struct platform_device *ndev,
 	win->stride_uv = 0;
 	win->flags = TEGRA_WIN_FLAG_ENABLED;
 
-	for (mode_idx = 1; mode_idx < dc->out->n_modes; mode_idx++) {
+	for (mode_idx = 0; mode_idx < dc->out->n_modes; mode_idx++) {
 		struct tegra_dc_mode mode = dc->out->modes[mode_idx];
 		struct fb_videomode vmode;
 
@@ -700,7 +700,7 @@ struct tegra_fb_info *tegra_fb_register(struct platform_device *ndev,
 
 	tegra_fb->info = info;
 
-	dev_info(&ndev->dev, "probed\n");
+	dev_info(&ndev->dev, "%s done\n", __func__);
 
 	if (fb_data->flags & TEGRA_FB_FLIP_ON_PROBE) {
 		tegra_dc_update_windows(&tegra_fb->win, 1);
