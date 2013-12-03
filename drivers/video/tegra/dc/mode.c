@@ -303,6 +303,13 @@ EXPORT_SYMBOL(tegra_dc_get_panel_sync_rate);
 int tegra_dc_set_mode(struct tegra_dc *dc, const struct tegra_dc_mode *mode)
 {
 	mutex_lock(&dc->lock);
+
+	if (memcmp(&dc->mode, mode, sizeof(dc->mode)) == 0) {
+		/* mode is unchanged, just return */
+		mutex_unlock(&dc->lock);
+		return 0;
+	}
+
 	memcpy(&dc->mode, mode, sizeof(dc->mode));
 	dc->mode_dirty = true;
 
