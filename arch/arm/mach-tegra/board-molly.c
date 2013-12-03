@@ -812,16 +812,21 @@ static void __init tegra_molly_dt_init(void)
 static void __init tegra_molly_reserve(void)
 {
 #if defined(CONFIG_NVMAP_CONVERT_CARVEOUT_TO_IOVMM)
-	/* 1920*1080*4*2 = 16588800 bytes, or 15.8203125MB
-	 * 3840*2160*4*2 = 66355200 bytes, or 63.28125MB
-	 * We don't run fb at 4K mode.  Movie playback
-	 * doesn't use it.
+	/* 1920*1080*4*2 = 16588800 bytes (recovery uses
+	 *                 double buffered miniui)
+	 * 3840*2160*4 = 33177600 bytes (boot animation
+	 *               uses single buffer, SurfaceFlinger
+	 *               and hwcomposer will allocate its
+	 *               own buffers
+	 * Use the larger of the two to cover both cases.
 	 */
 	tegra_reserve(0, /* carveout */
-		      SZ_16M, /* fb_size */
+		      PAGE_ALIGN(33177600), /* fb_size */
 		      0); /* fb2_size: 0, not used */
 #else
-	tegra_reserve(SZ_128M, SZ_16M, 0);
+	tegra_reserve(SZ_128M,  /* carveout */
+		      PAGE_ALIGN(33177600), /* fb_size */
+		      0); /* fb2_size: 0, not used */
 #endif
 	/* Allocate at a fixed place, 1GB into RAM
 	 * so it doesn't move when other blocks near
