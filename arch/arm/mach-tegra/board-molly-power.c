@@ -253,8 +253,8 @@ PALMAS_REGS_PDATA(ldo1, 1050,  1050, palmas_rails(smps7), 1, 0, 1, 0,
 /* va_usb3_1v2 - 1.2V */
 PALMAS_REGS_PDATA(ldo2, 1200,  1200, palmas_rails(smps7), 0, 0, 1, 0,
 		  0, 0, 0, 0, 0);
-/* avdd_hdmi_pll - 1.25V */
-PALMAS_REGS_PDATA(ldo3, 1250,  1250, palmas_rails(smps8), 0, 0, 1, 0,
+/* avdd_hdmi_pll - 1.20V */
+PALMAS_REGS_PDATA(ldo3, 1200,  1200, palmas_rails(smps8), 0, 0, 1, 0,
 		  0, 0, 0, 0, 0);
 /* avdd_hsic_1v2 - 1.2V */
 PALMAS_REGS_PDATA(ldo4, 1200,  1200, palmas_rails(smps8), 0, 0, 1, 0,

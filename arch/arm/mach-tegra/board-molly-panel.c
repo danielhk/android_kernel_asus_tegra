@@ -288,9 +288,9 @@ struct tmds_config molly_tmds_config[] = {
 		.pclk = INT_MAX,
 		.pll0 = 0x01003f10,
 		.pll1 = 0x00500f00,
-		.drive_current = 0x3A3A3F3A,
+		.drive_current = 0x3D3D3D3D,
 		.pe_current = 0x00000000,
-		.peak_current = 0x0f0f0f0f,
+		.peak_current = 0x0B0B0B0B,
 	},
 };
 
