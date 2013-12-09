@@ -24,6 +24,11 @@ Change log:
     10/27/2008: initial version
 ********************************************************/
 
+#ifdef HISTOGRAM_SUPPORT
+#include "linux/kernel.h"
+#include "linux/slab.h"
+#endif
+
 #include "mlan.h"
 #include "mlan_join.h"
 #include "mlan_util.h"
@@ -31,10 +36,34 @@ Change log:
 #include "mlan_main.h"
 #include "mlan_11n_aggr.h"
 #include "mlan_11n_rxreorder.h"
+#ifdef HISTOGRAM_SUPPORT
+#include "mlan_decl.h"
+#endif
+
+#ifdef HISTOGRAM_SUPPORT
+static void mlan_hist_data_reset(void);
+static void mlan_hist_data_set(t_s8 rxRate, t_s8 snr, t_s8 nflr);
+#endif
 
 /********************************************************
 		Local Variables
 ********************************************************/
+
+#ifdef HISTOGRAM_SUPPORT
+/* Number of samples in histogram (/proc/mwlan/mlan0/histogram). */
+#define MLAN_HIST_MAX_SAMPLES   1048576
+
+typedef struct _hgm_data {
+	atomic_t rx_rate[RX_RATE_MAX];
+	atomic_t snr[SNR_MAX];
+	atomic_t noise_flr[NOISE_FLR_MAX];
+	atomic_t sig_str[SIG_STRENGTH_MAX];
+	atomic_t num_samples;
+
+} mlan_hgm_data;
+
+static mlan_hgm_data *pmlan_hist = 0;
+#endif
 
 /** Ethernet II header */
 typedef struct {
@@ -51,9 +80,88 @@ typedef struct {
 		Global Variables
 ********************************************************/
 
+#ifdef HISTOGRAM_SUPPORT
+void* mlan_memcpy(void *pDest, void *pSrc, unsigned int count)
+{
+	char *d = (char *)pDest;
+	char *s = (char *)pSrc;
+	while (count--)
+		*d++ = *s++;
+
+	return pDest;
+}
+
+int mlan_hist_data_get(char *pBuf, unsigned int *pNumSamples)
+{
+	unsigned int temp;
+	int ix, dest_ix = 0;
+	if (pmlan_hist)	{
+		*pNumSamples = atomic_read(&(pmlan_hist->num_samples));
+		for (ix = 0; ix < RX_RATE_MAX; ix++) {
+			temp = atomic_read(&(pmlan_hist->rx_rate[ix]));
+			mlan_memcpy(pBuf + dest_ix, &temp, sizeof(temp));
+			dest_ix += sizeof(temp);
+		}
+		for (ix = 0; ix < SNR_MAX; ix++) {
+			temp = atomic_read(&(pmlan_hist->snr[ix]));
+			mlan_memcpy(pBuf + dest_ix, &temp, sizeof(temp));
+			dest_ix += sizeof(temp);
+		}
+		for (ix = 0; ix < NOISE_FLR_MAX; ix++) {
+			temp = atomic_read(&(pmlan_hist->noise_flr[ix]));
+			mlan_memcpy(pBuf + dest_ix, &temp, sizeof(temp));
+			dest_ix += sizeof(temp);
+		}
+		for (ix = 0; ix < SIG_STRENGTH_MAX; ix++) {
+			temp = atomic_read(&(pmlan_hist->sig_str[ix]));
+			mlan_memcpy(pBuf + dest_ix, &temp, sizeof(temp));
+			dest_ix += sizeof(temp);
+		}
+		return 0;
+	}
+
+	*pNumSamples = 0;
+	return -1;
+}
+
+int mlan_hist_data_clear(void)
+{
+	if (pmlan_hist) {
+		mlan_hist_data_reset();
+		return 0;
+	}
+	return -1;
+}
+#endif
+
 /********************************************************
 		Local Functions
 ********************************************************/
+#ifdef HISTOGRAM_SUPPORT
+static void mlan_hist_data_reset(void)
+{
+	int ix;
+
+	atomic_set(&pmlan_hist->num_samples, 0);
+	for (ix = 0; ix < RX_RATE_MAX; ix++)
+		atomic_set(&pmlan_hist->rx_rate[ix], 0);
+	for (ix = 0; ix < SNR_MAX; ix++)
+		atomic_set(&pmlan_hist->snr[ix], 0);
+	for (ix = 0; ix < NOISE_FLR_MAX; ix++)
+		atomic_set(&pmlan_hist->noise_flr[ix], 0);
+	for (ix = 0; ix < SIG_STRENGTH_MAX; ix++)
+		atomic_set(&pmlan_hist->sig_str[ix], 0);
+}
+
+static void mlan_hist_data_set(t_s8 rxRate, t_s8 snr, t_s8 nflr)
+{
+	atomic_inc(&pmlan_hist->num_samples);
+	atomic_inc(&pmlan_hist->rx_rate[rxRate]);
+	atomic_inc(&pmlan_hist->snr[snr]);
+	atomic_inc(&pmlan_hist->noise_flr[128+nflr]);
+	atomic_inc(&pmlan_hist->sig_str[nflr-snr]);
+}
+#endif
 
 /********************************************************
 		Global functions
@@ -222,6 +330,9 @@ wlan_process_rx_packet(pmlan_adapter pmadapter, pmlan_buffer pmbuf)
 	t_u8 appletalk_aarp_type[2] = { 0x80, 0xf3 };
 	t_u8 ipx_snap_type[2] = { 0x81, 0x37 };
 	t_u8 tdls_action_type[2] = { 0x89, 0x0d };
+#ifdef HISTOGRAM_SUPPORT
+	t_u8 adj_rx_rate = 0;
+#endif
 
 	ENTER();
 
@@ -321,6 +432,36 @@ wlan_process_rx_packet(pmlan_adapter pmadapter, pmlan_buffer pmbuf)
 		    MIN(prx_pd->rx_pkt_length, MAX_DATA_DUMP_LEN));
 	priv->rxpd_rate = prx_pd->rx_rate;
 	priv->rxpd_htinfo = prx_pd->ht_info;
+
+#ifdef HISTOGRAM_SUPPORT
+	if (priv->rxpd_htinfo & MBIT(0)) { /* Check for 11n HT20 rates */
+		adj_rx_rate = priv->rxpd_rate + MLAN_RATE_INDEX_MCS0;
+		PRINTM(MDATA,"HT20 Rate! ht_info:%x Rx Rate:%d adj_rate:%d\n",
+		       priv->rxpd_htinfo,priv->rxpd_rate,adj_rx_rate);
+	} else { /* BG rates */
+		adj_rx_rate = (priv->rxpd_rate > MLAN_RATE_INDEX_OFDM0) ?
+			priv->rxpd_rate - 1 : priv->rxpd_rate;
+		PRINTM(MDATA,"HT20 Rate! ht_info:%x Rx Rate:%d adj_rate:%d\n",
+		       priv->rxpd_htinfo,priv->rxpd_rate,adj_rx_rate);
+	}
+
+	if (pmlan_hist) {
+		unsigned long curr_size;
+		curr_size = atomic_read(&pmlan_hist->num_samples);
+		if (curr_size > MLAN_HIST_MAX_SAMPLES)
+			mlan_hist_data_reset();
+
+		mlan_hist_data_set( adj_rx_rate, prx_pd->snr, prx_pd->nf);
+	} else {
+		pmlan_hist = (mlan_hgm_data *)kmalloc(sizeof(mlan_hgm_data),
+						      GFP_KERNEL);
+		if (pmlan_hist) {
+			mlan_hist_data_reset();
+			mlan_hist_data_set(adj_rx_rate, prx_pd->snr,
+					   prx_pd->nf);
+		}
+	}
+#endif
 
 	pmadapter->callbacks.moal_get_system_time(pmadapter->pmoal_handle,
 						  &pmbuf->out_ts_sec,

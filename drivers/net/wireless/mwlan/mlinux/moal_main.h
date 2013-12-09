@@ -964,6 +964,9 @@ struct _moal_private {
 #ifdef PROC_DEBUG
     /** MLAN debug info */
 	struct debug_data_priv items_priv;
+#ifdef HISTOGRAM_SUPPORT
+	struct debug_data_priv items_priv_hist;
+#endif
 #endif
 
     /** tcp session queue */

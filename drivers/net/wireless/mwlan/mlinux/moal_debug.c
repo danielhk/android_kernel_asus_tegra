@@ -25,6 +25,10 @@ Change log:
 ********************************************************/
 
 #include	"moal_main.h"
+#ifdef HISTOGRAM_SUPPORT
+#include	"../mlan/mlan_decl.h"
+#include	<linux/seq_file.h>
+#endif
 
 /********************************************************
 		Global Variables
@@ -422,6 +426,172 @@ static struct debug_data uap_items[] = {
 };
 #endif /* UAP_SUPPORT */
 
+#ifdef HISTOGRAM_SUPPORT
+/* Histogram support */
+struct _hgm_seq_data {
+	int   histDataSize;
+	int   pos;
+	int   numHgmSamples;
+	char  *pHgmData;
+};
+
+static struct _hgm_seq_data hgm_seq_data;
+static unsigned int woal_debug_get_uint(char *pBuf);
+
+static void
+hgm_seq_init_globals(void)
+{
+	int i;
+	ENTER();
+
+	if (!hgm_seq_data.pHgmData){
+		hgm_seq_data.histDataSize =
+			(RX_RATE_MAX+SNR_MAX+NOISE_FLR_MAX+SIG_STRENGTH_MAX) *
+			sizeof(unsigned int);
+		hgm_seq_data.pHgmData =
+			(char *)kmalloc(hgm_seq_data.histDataSize, GFP_KERNEL);
+
+		if (!hgm_seq_data.pHgmData){
+			PRINTM(MERROR, "Could not allocate memory\n");
+			LEAVE();
+			return;
+		}
+
+		for (i = 0; i < hgm_seq_data.histDataSize; i++)
+			hgm_seq_data.pHgmData[i] = 0;
+	}
+
+	LEAVE();
+	return;
+}
+
+static void *
+hgm_seq_start(struct seq_file *s, loff_t *pos)
+{
+
+	ENTER();
+
+	if (unlikely(!hgm_seq_data.pHgmData)) {
+		LEAVE();
+		return NULL;
+	} else if (0 == *pos) {
+		if (0 != mlan_hist_data_get(hgm_seq_data.pHgmData,
+					    &hgm_seq_data.numHgmSamples)) {
+			LEAVE();
+			return NULL;
+		}
+	}
+
+	hgm_seq_data.pos = *pos;
+	if (*pos >= hgm_seq_data.histDataSize) { /* are we done? */
+		LEAVE();
+		return NULL;
+	}
+
+	LEAVE();
+	return (void *)&hgm_seq_data;
+}
+
+
+static int
+hgm_seq_show(struct seq_file *s, void *v)
+{
+	struct _hgm_seq_data *hgm = (struct _hgm_seq_data *)v;
+	int pos;
+	int rx_max = RX_RATE_MAX;
+	int snr_max = rx_max + SNR_MAX;
+	int nflr_max = snr_max + NOISE_FLR_MAX;
+	int sigs_max = nflr_max + SIG_STRENGTH_MAX;
+	int i;
+
+	pos = hgm->pos;
+
+	if (unlikely(pos == 0)) {
+		/* Position 0, print banner, num items and first entry. */
+		seq_printf(s, "total samples = %d \n", hgm->numHgmSamples);
+		seq_printf(s, "rx rates (in Mbps): 0=1M   1=2M   2=5.5M  3=11M   4=6M  5=9M  6=12M\n");
+		seq_printf(s, "                    7=18M  8=24M  9=36M  10=48M  11=54M   12-19 == MCS0-7(BW20)\n\n");
+
+		i = woal_debug_get_uint((char *) (pos + hgm->pHgmData));
+		if (i) {
+			seq_printf(s, "rx_rate[%02d] = %d\n", pos, i);
+		}
+	} else if (pos < rx_max*sizeof(unsigned int)) {
+		i = woal_debug_get_uint((char *) (pos + hgm->pHgmData));
+		if (i) {
+			seq_printf(s, "rx_rate[%02d] = %d\n",
+				   pos/sizeof(unsigned int), i);
+		}
+	} else if (pos < snr_max*sizeof(unsigned int)) {
+		i = woal_debug_get_uint((char *) (pos + hgm->pHgmData));
+		if (i) {
+			seq_printf(s, "snr[%02ddB] = %d\n",
+				   (pos/sizeof(unsigned int)) - rx_max, i);
+		}
+	} else if (pos < nflr_max*sizeof(unsigned int)) {
+		i = woal_debug_get_uint((char *) (pos + hgm->pHgmData));
+		if (i) {
+			seq_printf(s, "noise_flr[-%02ddBm] = %d\n",
+				   ((pos/sizeof(unsigned int))-snr_max)-128, i);
+		}
+	} else if (pos < sigs_max*sizeof(unsigned int)) {
+		i = woal_debug_get_uint((char *) (pos + hgm->pHgmData));
+		if (i) {
+			seq_printf(s, "sig_strength[-%02ddBm] = %d\n",
+				   (pos/sizeof(unsigned int)) - nflr_max, i);
+		}
+	}
+
+	return 0;
+}
+
+static void *
+hgm_seq_next(struct seq_file *s, void *v, loff_t *pos)
+{
+	struct _hgm_seq_data *hgm = (struct _hgm_seq_data *)v;
+
+	if (*pos >= hgm->histDataSize) /* we are done */
+		return NULL;
+
+	*pos += sizeof(unsigned int); /* increase my position counter */
+	hgm->pos = *pos;
+
+	return v;
+}
+
+static void
+hgm_seq_stop(struct seq_file *s, void *v)
+{
+}
+
+static struct seq_operations hgm_seq_ops = {
+	.start = hgm_seq_start,
+	.next  = hgm_seq_next,
+	.stop  = hgm_seq_stop,
+	.show  = hgm_seq_show
+};
+
+static int hgm_seq_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &hgm_seq_ops);
+}
+
+static unsigned int woal_debug_get_uint(char *pBuf)
+{
+	unsigned int n;
+	mlan_memcpy((void *) &n, (void *)pBuf, sizeof(unsigned int));
+	return n;
+}
+
+static int
+woal_debug_write_histogram(struct file *filp, const char __user *buf,
+			   size_t count, loff_t *ppos)
+{
+	mlan_hist_data_clear();
+	return count;
+}
+#endif
+
 /********************************************************
 		Local Functions
 ********************************************************/
@@ -711,6 +881,17 @@ static const struct file_operations debug_proc_fops = {
 	.write = woal_debug_write,
 };
 
+#ifdef HISTOGRAM_SUPPORT
+static struct file_operations hgm_file_ops = {
+	.owner   = THIS_MODULE,
+	.open    = hgm_seq_open,
+	.write   = woal_debug_write_histogram,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = seq_release
+};
+#endif
+
 /********************************************************
 		Global Functions
 ********************************************************/
@@ -725,6 +906,9 @@ void
 woal_debug_entry(moal_private * priv)
 {
 	struct proc_dir_entry *r;
+#ifdef HISTOGRAM_SUPPORT
+	struct proc_dir_entry *r2;
+#endif
 	int i;
 	int handle_items;
 
@@ -746,6 +930,9 @@ woal_debug_entry(moal_private * priv)
 		}
 		memcpy(priv->items_priv.items, items, sizeof(items));
 		priv->items_priv.num_of_items = ARRAY_SIZE(items);
+#ifdef HISTOGRAM_SUPPORT
+		priv->items_priv_hist.num_of_items = 0;
+#endif
 	}
 #endif
 #ifdef UAP_SUPPORT
@@ -765,6 +952,9 @@ woal_debug_entry(moal_private * priv)
 #endif
 
 	priv->items_priv.priv = priv;
+#ifdef HISTOGRAM_SUPPORT
+	priv->items_priv_hist.priv = priv;
+#endif
 	handle_items = 9;
 #ifdef SDIO_MMC_DEBUG
 	handle_items += 2;
@@ -794,6 +984,26 @@ woal_debug_entry(moal_private * priv)
 		return;
 	}
 
+#ifdef HISTOGRAM_SUPPORT
+	/* Initialize hgm data structure */
+	hgm_seq_init_globals();
+
+	/* Create proc entry for driver histogram data */
+	r2 = create_proc_entry("histogram", 0664, priv->proc_entry);
+	if (r2 == NULL) {
+		LEAVE();
+		return;
+	}
+	r2->data = &priv->items_priv_hist;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,30)
+	r2->owner = THIS_MODULE;
+#endif
+	r2->proc_fops = &hgm_file_ops;
+	r2->uid = 0;
+	r2->gid = 1008; // wifi group
+	mlan_hist_data_clear();
+#endif
+
 	LEAVE();
 }
 
@@ -812,6 +1022,9 @@ woal_debug_remove(moal_private * priv)
 	kfree(priv->items_priv.items);
 	/* Remove proc entry */
 	remove_proc_entry("debug", priv->proc_entry);
+#ifdef HISTOGRAM_SUPPORT
+	remove_proc_entry("histogram", priv->proc_entry);
+#endif
 
 	LEAVE();
 }

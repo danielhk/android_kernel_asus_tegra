@@ -236,6 +236,13 @@ typedef t_u8 mlan_802_11_mac_addr[MLAN_MAC_ADDR_LENGTH];
 /** Maximum tx retry count */
 #define MLAN_TX_RETRY_MAX		(14)
 
+#ifdef HISTOGRAM_SUPPORT
+#define RX_RATE_MAX                     24
+#define SNR_MAX                         256
+#define NOISE_FLR_MAX                   256
+#define SIG_STRENGTH_MAX                256
+#endif
+
 /** define SDIO block size for data Tx/Rx */
 /* We support up to 480-byte block size due to FW buffer limitation. */
 #define MLAN_SDIO_BLOCK_SIZE		256
@@ -1151,4 +1158,21 @@ MLAN_API mlan_status mlan_ioctl(IN t_void * pmlan_adapter,
 /** mlan select wmm queue */
 MLAN_API t_u8 mlan_select_wmm_queue(IN t_void * pmlan_adapter,
 				    IN t_u8 bss_num, IN t_u8 tid);
+
+#ifdef HISTOGRAM_SUPPORT
+/** api to get the histogram data */
+MLAN_API int mlan_hist_data_get(
+	OUT char *pBuf,
+	OUT unsigned int *pNumSamples);
+
+/** api to clear existing histogram data */
+MLAN_API int mlan_hist_data_clear(void);
+
+/** memcpy implementation for mlan */
+MLAN_API void* mlan_memcpy(
+	IN void *pDest,
+	IN void *pSrc,
+	IN unsigned int count);
+#endif
+
 #endif /* !_MLAN_DECL_H_ */
