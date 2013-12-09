@@ -2434,6 +2434,13 @@ set_best_tap:
 		if (tegra_host->instance != 3) {
 			/* Dump the tap window data */
 			sdhci_tegra_dump_tuning_data(sdhci, freq_band);
+
+			if ((tegra_host->instance == 0) &&
+			    (tegra_host->tuning_data[freq_band]->best_tap_value != 0)) {
+				dev_warn(mmc_dev(sdhci->mmc),
+					"WAR: hard code best tap value as 0\n");
+				tegra_host->tuning_data[freq_band]->best_tap_value = 0;
+			}
 		}
 
 		sdhci_tegra_set_tap_delay(sdhci,
