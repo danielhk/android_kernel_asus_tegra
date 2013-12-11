@@ -2863,6 +2863,9 @@ static int __devinit sdhci_tegra_probe(struct platform_device *pdev)
 	if (IS_ERR(host))
 		return PTR_ERR(host);
 
+	/* delayed clock gate quirk in sdhci_host used */
+	host->quirks2 |= SDHCI_QUIRK2_DELAYED_CLK_GATE;
+
 	pltfm_host = sdhci_priv(host);
 
 	plat = pdev->dev.platform_data;
