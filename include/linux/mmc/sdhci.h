@@ -100,6 +100,8 @@ struct sdhci_host {
 #define SDHCI_QUIRK2_HOST_OFF_CARD_ON			(1<<0)
 /* Controller has incorrect preset values */
 #define SDHCI_QUIRK2_BROKEN_PRESET_VALUES		(1<<1)
+/* Controller supports delayed clock gate */
+#define SDHCI_QUIRK2_DELAYED_CLK_GATE			(1<<2)
 
 	int irq;		/* Device IRQ */
 	void __iomem *ioaddr;	/* Mapped address */
@@ -184,6 +186,8 @@ struct sdhci_host {
 	struct edp_client *sd_edp_client;
 	unsigned int edp_states[SD_EDP_NUM_STATES];
 	bool edp_support;
+
+	struct delayed_work	delayed_clk_gate_wrk;
 
 	unsigned long private[0] ____cacheline_aligned;
 

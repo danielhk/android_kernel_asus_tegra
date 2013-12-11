@@ -47,6 +47,8 @@
 
 #define MAX_TUNING_LOOP 40
 
+#define CLK_GATING_DELAY_MSEC 20
+
 static unsigned int debug_quirks = 0;
 static unsigned int debug_quirks2;
 
@@ -2006,6 +2008,10 @@ int sdhci_enable(struct mmc_host *mmc)
 	if (!mmc->card || mmc->card->type == MMC_TYPE_SDIO)
 		return 0;
 
+	if (host->quirks2 & SDHCI_QUIRK2_DELAYED_CLK_GATE)
+		if (mmc_card_mmc(host->mmc->card))
+			cancel_delayed_work_sync(&host->delayed_clk_gate_wrk);
+
 	if (mmc->ios.clock) {
 		if (host->ops->set_clock)
 			host->ops->set_clock(host, mmc->ios.clock);
@@ -2022,14 +2028,10 @@ int sdhci_enable(struct mmc_host *mmc)
 	return 0;
 }
 
-int sdhci_disable(struct mmc_host *mmc)
+static void mmc_host_clk_gate(struct sdhci_host *host)
 {
-	struct sdhci_host *host = mmc_priv(mmc);
 	int ret;
 	struct platform_device *pdev = to_platform_device(mmc_dev(host->mmc));
-
-	if (!mmc->card || mmc->card->type == MMC_TYPE_SDIO)
-		return 0;
 
 	sdhci_set_clock(host, 0);
 	if (host->ops->set_clock)
@@ -2041,6 +2043,36 @@ int sdhci_disable(struct mmc_host *mmc)
 		if (ret)
 			dev_err(&pdev->dev, "Unable to set SD_EDP_LOW state\n");
 	}
+}
+
+static void delayed_clk_gate_cb(struct work_struct *work)
+{
+	struct sdhci_host *host = container_of(work, struct sdhci_host,
+					delayed_clk_gate_wrk.work);
+
+	/* power off check */
+	if (host->mmc->ios.power_mode == MMC_POWER_OFF)
+		return;
+
+	mmc_host_clk_gate(host);
+}
+
+int sdhci_disable(struct mmc_host *mmc)
+{
+	struct sdhci_host *host = mmc_priv(mmc);
+
+	if (!mmc->card || mmc->card->type == MMC_TYPE_SDIO)
+		return 0;
+
+	if (host->quirks2 & SDHCI_QUIRK2_DELAYED_CLK_GATE) {
+		if (mmc_card_mmc(host->mmc->card)) {
+			schedule_delayed_work(&host->delayed_clk_gate_wrk,
+				msecs_to_jiffies(CLK_GATING_DELAY_MSEC));
+			return 0;
+		}
+	}
+
+	mmc_host_clk_gate(host);
 
 	return 0;
 }
@@ -2607,6 +2639,8 @@ int sdhci_suspend_host(struct sdhci_host *host)
 
 	sdhci_mask_irqs(host, SDHCI_INT_ALL_MASK);
 
+	cancel_delayed_work_sync(&host->delayed_clk_gate_wrk);
+
 	if (host->irq)
 		disable_irq(host->irq);
 
@@ -2783,6 +2817,7 @@ struct sdhci_host *sdhci_alloc_host(struct device *dev,
 
 	host = mmc_priv(mmc);
 	host->mmc = mmc;
+	INIT_DELAYED_WORK(&host->delayed_clk_gate_wrk, delayed_clk_gate_cb);
 
 	return host;
 }
