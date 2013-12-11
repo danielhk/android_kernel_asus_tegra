@@ -326,6 +326,8 @@ wlan_get_info_ioctl(IN pmlan_adapter pmadapter, IN pmlan_ioctl_req pioctl_req)
 		pget_info->param.fw_info.region_code = pmadapter->region_code;
 		pget_info->param.fw_info.hw_dev_mcs_support =
 			pmadapter->hw_dev_mcs_support;
+		pget_info->param.fw_info.hw_dot_11n_dev_cap =
+			pmadapter->hw_dot_11n_dev_cap;
 		break;
 	case MLAN_OID_GET_BSS_INFO:
 		status = wlan_get_info_bss_info(pmadapter, pioctl_req);
@@ -4945,6 +4947,15 @@ wlan_misc_cfg_ioctl(IN pmlan_adapter pmadapter, IN pmlan_ioctl_req pioctl_req)
 		status = wlan_misc_ioctl_custom_ie_list(pmadapter, pioctl_req,
 							MTRUE);
 		break;
+	case MLAN_OID_MISC_TDLS_CONFIG:
+		status = wlan_misc_ioctl_tdls_config(pmadapter, pioctl_req);
+		break;
+	case MLAN_OID_MISC_TDLS_OPER:
+		status = wlan_misc_ioctl_tdls_oper(pmadapter, pioctl_req);
+		break;
+	case MLAN_OID_MISC_GET_TDLS_IES:
+		status = wlan_misc_ioctl_tdls_get_ies(pmadapter, pioctl_req);
+		break;
 
 	case MLAN_OID_MISC_MAC_CONTROL:
 		status = wlan_misc_ioctl_mac_control(pmadapter, pioctl_req);
@@ -5076,7 +5087,8 @@ wlan_scan_ioctl(IN pmlan_adapter pmadapter, IN pmlan_ioctl_req pioctl_req)
 	ENTER();
 
 	pscan = (mlan_ds_scan *) pioctl_req->pbuf;
-	if (pscan->sub_command == MLAN_OID_SCAN_CONFIG)
+	if (pscan->sub_command == MLAN_OID_SCAN_CONFIG
+	    || pscan->sub_command == MLAN_OID_SCAN_BGSCAN_CONFIG)
 		goto start_config;
 	if (pmadapter->scan_processing && pioctl_req->action == MLAN_ACT_SET &&
 	    pscan->sub_command != MLAN_OID_SCAN_CANCEL) {

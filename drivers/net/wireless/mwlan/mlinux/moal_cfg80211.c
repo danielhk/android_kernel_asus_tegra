@@ -229,7 +229,9 @@ woal_get_active_intf_freq(moal_private * priv)
 			    (handle->priv[i]->bss_type == priv->bss_type))
 				return ieee80211_channel_to_frequency(handle->
 								      priv[i]->
-								      channel,
+								      channel
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39) || defined(COMPAT_WIRELESS)
+								      ,
 								      (handle->
 								       priv[i]->
 								       channel
@@ -237,7 +239,10 @@ woal_get_active_intf_freq(moal_private * priv)
 								       14 ?
 								       IEEE80211_BAND_2GHZ
 								       :
-								       IEEE80211_BAND_5GHZ));
+								       IEEE80211_BAND_5GHZ)
+#endif
+					);
+
 		}
 #endif
 #ifdef UAP_SUPPORT
@@ -246,7 +251,9 @@ woal_get_active_intf_freq(moal_private * priv)
 			    (handle->priv[i]->bss_type == priv->bss_type))
 				return ieee80211_channel_to_frequency(handle->
 								      priv[i]->
-								      channel,
+								      channel
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 39) || defined(COMPAT_WIRELESS)
+								      ,
 								      (handle->
 								       priv[i]->
 								       channel
@@ -254,7 +261,9 @@ woal_get_active_intf_freq(moal_private * priv)
 								       14 ?
 								       IEEE80211_BAND_2GHZ
 								       :
-								       IEEE80211_BAND_5GHZ));
+								       IEEE80211_BAND_5GHZ)
+#endif
+					);
 		}
 #endif
 	}
@@ -429,11 +438,7 @@ woal_cfg80211_set_key(moal_private * priv, t_u8 is_enable_wep,
 	}
 
 	/* Send IOCTL request to MLAN */
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
-		ret = MLAN_STATUS_FAILURE;
-		goto done;
-	}
+	ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
 
 done:
 	if (ret != MLAN_STATUS_PENDING)
@@ -738,7 +743,6 @@ woal_cfg80211_init_p2p_go(moal_private * priv)
 	int ret = MLAN_STATUS_SUCCESS;
 	t_u16 wifi_direct_mode;
 	t_u8 bss_role;
-	mlan_ds_wifi_direct_config p2p_config;
 
 	ENTER();
 
@@ -787,22 +791,6 @@ woal_cfg80211_init_p2p_go(moal_private * priv)
 			goto done;
 		}
 	}
-/* NoA:-- Interval = 100TUs and Duration= 50TUs, count=255*/
-#define DEF_NOA_COUNT       255
-#define DEF_NOA_DURATION    50
-#define DEF_NOA_INTERVAL    100
-/* CTWindow = 10ms*/
-#define DEF_CT_WINDOW       10
-	memset(&p2p_config, 0, sizeof(p2p_config));
-	p2p_config.noa_enable = MTRUE;
-	p2p_config.index = 0;
-	p2p_config.noa_count = DEF_NOA_COUNT;
-	p2p_config.noa_duration = DEF_NOA_DURATION;
-	p2p_config.noa_interval = DEF_NOA_INTERVAL;
-	p2p_config.opp_ps_enable = MTRUE;
-	p2p_config.ct_window = DEF_CT_WINDOW;
-	p2p_config.flags = WIFI_DIRECT_NOA | WIFI_DIRECT_OPP_PS;
-	woal_p2p_config(priv, MLAN_ACT_SET, &p2p_config);
 done:
 	LEAVE();
 	return ret;
@@ -932,6 +920,7 @@ woal_cfg80211_change_virtual_intf(struct wiphy *wiphy,
 #if defined(STA_SUPPORT) && defined(UAP_SUPPORT)
 	t_u8 bss_role;
 #endif
+	mlan_status status = MLAN_STATUS_SUCCESS;
 
 	ENTER();
 
@@ -1127,14 +1116,15 @@ woal_cfg80211_change_virtual_intf(struct wiphy *wiphy,
 	if (ret)
 		goto done;
 
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
+	status = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (MLAN_STATUS_SUCCESS != status) {
 		ret = -EFAULT;
 		goto done;
 	}
 
 done:
-	kfree(req);
+	if (status != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -1518,17 +1508,18 @@ woal_cfg80211_set_bitrate_mask(struct wiphy *wiphy,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 4, 0)
 	/* Fill MCS rates */
 	rate_cfg->bitmap_rates[2] = mask->control[band].mcs[0];
-	if (priv->phandle->card_type == CARD_TYPE_SD8797)
-		rate_cfg->bitmap_rates[2] |= mask->control[band].mcs[1] << 8;
+	rate_cfg->bitmap_rates[2] |= mask->control[band].mcs[1] << 8;
 #endif
 
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
+	status = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (MLAN_STATUS_SUCCESS != status) {
 		ret = -EFAULT;
 		goto done;
 	}
 
 done:
+	if (status != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -1550,6 +1541,7 @@ woal_cfg80211_set_antenna(struct wiphy *wiphy, u32 tx_ant, u32 rx_ant)
 	moal_private *priv = NULL;
 	mlan_ds_radio_cfg *radio = NULL;
 	mlan_ioctl_req *req = NULL;
+	mlan_status status = MLAN_STATUS_SUCCESS;
 	int ret = 0;
 
 	ENTER();
@@ -1577,14 +1569,15 @@ woal_cfg80211_set_antenna(struct wiphy *wiphy, u32 tx_ant, u32 rx_ant)
 	radio->param.ant_cfg.tx_antenna = tx_ant;
 	radio->param.ant_cfg.rx_antenna = rx_ant;
 
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
+	status = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (MLAN_STATUS_SUCCESS != status) {
 		ret = -EFAULT;
 		goto done;
 	}
 
 done:
-	kfree(req);
+	if (status != MLAN_STATUS_PENDING)
+		kfree(req);
 	/* Driver must return -EINVAL to cfg80211 */
 	if (ret)
 		ret = -EINVAL;
@@ -1809,8 +1802,8 @@ woal_cfg80211_mgmt_tx(struct wiphy *wiphy,
 
 	if (buf == NULL || len == 0) {
 		PRINTM(MERROR, "woal_cfg80211_mgmt_tx() corrupt data\n");
-		ret = -EFAULT;
-		goto done;
+		LEAVE();
+		return -EFAULT;
 	}
 
 	/* If the packet is probe response, that means we are in listen phase,
@@ -1842,32 +1835,17 @@ woal_cfg80211_mgmt_tx(struct wiphy *wiphy,
 		/* With sd8777 We have difficulty to receive response packet in
 		   500ms */
 #define MGMT_TX_DEFAULT_WAIT_TIME	   1500
-		/** cancel previous remain on channel */
-		if (priv->phandle->remain_on_channel) {
+		if (priv->phandle->remain_on_channel)
 			remain_priv =
 				priv->phandle->priv[priv->phandle->
 						    remain_bss_index];
-			if (!remain_priv) {
+		/** cancel previous remain on channel */
+		if (priv->phandle->remain_on_channel && remain_priv) {
+			if (woal_cfg80211_remain_on_channel_cfg
+			    (remain_priv, MOAL_IOCTL_WAIT, MTRUE,
+			     &channel_status, NULL, 0, 0))
 				PRINTM(MERROR,
-				       "mgmt_tx:Wrong remain_bss_index=%d\n",
-				       priv->phandle->remain_bss_index);
-				ret = -EFAULT;
-				goto done;
-			}
-			if ((priv->phandle->chan.center_freq !=
-			     chan->center_freq)
-				) {
-				if (woal_cfg80211_remain_on_channel_cfg
-				    (remain_priv, MOAL_IOCTL_WAIT, MTRUE,
-				     &channel_status, NULL, 0, 0)) {
-					PRINTM(MERROR,
-					       "mgmt_tx:Fail to cancel remain on channel\n");
-					ret = -EFAULT;
-					goto done;
-				}
-
-			}
-
+				       "mgmt_tx:Fail to cancel remain on channel\n");
 			if (priv->phandle->cookie) {
 				cfg80211_remain_on_channel_expired(
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 6, 0)
@@ -2079,6 +2057,7 @@ woal_cfg80211_custom_ie(moal_private * priv,
 	t_u8 *pos = NULL;
 	t_u16 len = 0;
 	int ret = 0;
+	mlan_status status = MLAN_STATUS_SUCCESS;
 
 	ENTER();
 
@@ -2135,8 +2114,8 @@ woal_cfg80211_custom_ie(moal_private * priv,
 
 	memcpy(&misc->param.cust_ie, custom_ie, sizeof(mlan_ds_misc_custom_ie));
 
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, ioctl_req, MOAL_IOCTL_WAIT)) {
+	status = woal_request_ioctl(priv, ioctl_req, MOAL_IOCTL_WAIT);
+	if (MLAN_STATUS_SUCCESS != status) {
 		ret = -EFAULT;
 		goto done;
 	}
@@ -2182,7 +2161,8 @@ woal_cfg80211_custom_ie(moal_private * priv,
 		ret = -EFAULT;
 
 done:
-	kfree(ioctl_req);
+	if (status != MLAN_STATUS_PENDING)
+		kfree(ioctl_req);
 	kfree(custom_ie);
 	LEAVE();
 	return ret;

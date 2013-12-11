@@ -43,17 +43,15 @@ Change log:
 #ifdef SDIO_SUSPEND_RESUME
 /** PM keep power */
 extern int pm_keep_power;
+extern int shutdown_hs;
 #endif
 
 /** Device ID for SD8797 */
 #define SD_DEVICE_ID_8797   (0x9129)
-/** Device ID for SD8782 */
-#define SD_DEVICE_ID_8782   (0x9121)
 
 /** WLAN IDs */
 static const struct sdio_device_id wlan_ids[] = {
 	{SDIO_DEVICE(MARVELL_VENDOR_ID, SD_DEVICE_ID_8797)},
-	{SDIO_DEVICE(MARVELL_VENDOR_ID, SD_DEVICE_ID_8782)},
 	{},
 };
 
@@ -71,6 +69,8 @@ static struct dev_pm_ops wlan_sdio_pm_ops = {
 	.suspend = woal_sdio_suspend,
 	.resume = woal_sdio_resume,
 };
+
+void woal_sdio_shutdown(struct device *dev);
 #endif
 #endif
 static struct sdio_driver REFDATA wlan_sdio = {
@@ -84,14 +84,17 @@ static struct sdio_driver REFDATA wlan_sdio = {
 #ifdef SDIO_SUSPEND_RESUME
 #ifdef MMC_PM_KEEP_POWER
 		.pm = &wlan_sdio_pm_ops,
+		.shutdown = woal_sdio_shutdown,
 #endif
 #endif
+
 		}
 #else
 #ifdef SDIO_SUSPEND_RESUME
 #ifdef MMC_PM_KEEP_POWER
 	.drv = {
 		.pm = &wlan_sdio_pm_ops,
+		.shutdown = woal_sdio_shutdown,
 		}
 #endif
 #endif
@@ -133,24 +136,6 @@ woal_dump_sdio_reg(moal_handle * handle)
 /********************************************************
 		Global Functions
 ********************************************************/
-/**  @brief This function updates the SDIO card types
- *
- *  @param handle   A Pointer to the moal_handle structure
- *  @param card     A Pointer to card
- *
- *  @return         N/A
- */
-t_void
-woal_sdio_update_card_type(moal_handle * handle, t_void * card)
-{
-	struct sdio_mmc_card *cardp = (struct sdio_mmc_card *)card;
-
-	/* Update card type */
-	if (cardp->func->device == SD_DEVICE_ID_8797)
-		handle->card_type = CARD_TYPE_SD8797;
-	else if (cardp->func->device == SD_DEVICE_ID_8782)
-		handle->card_type = CARD_TYPE_SD8782;
-}
 
 /**
  *  @brief This function handles the interrupt.
@@ -289,6 +274,78 @@ woal_wlan_is_suspended(moal_handle * handle)
 	LEAVE();
 }
 #endif
+
+#define SHUTDOWN_HOST_SLEEP_DEF_GAP      100
+#define SHUTDOWN_HOST_SLEEP_DEF_GPIO     0x3
+#define SHUTDOWN_HOST_SLEEP_DEF_COND     0x0
+
+/**  @brief This function handles client driver shutdown
+ *
+ *  @param dev      A pointer to device structure
+ *  @return         N/A
+ */
+void
+woal_sdio_shutdown(struct device *dev)
+{
+	struct sdio_func *func = dev_to_sdio_func(dev);
+	moal_handle *handle = NULL;
+	struct sdio_mmc_card *cardp;
+	mlan_ds_hs_cfg hscfg;
+	int timeout = 0;
+	int i;
+
+	ENTER();
+	PRINTM(MCMND, "<--- Enter woal_sdio_shutdown --->\n");
+	cardp = sdio_get_drvdata(func);
+	if (!cardp || !cardp->handle) {
+		PRINTM(MERROR, "Card or moal_handle structure is not valid\n");
+		LEAVE();
+		return;
+	}
+	handle = cardp->handle;
+	for (i = 0; i < handle->priv_num; i++)
+		netif_device_detach(handle->priv[i]->netdev);
+	if (shutdown_hs) {
+		memset(&hscfg, 0, sizeof(mlan_ds_hs_cfg));
+		hscfg.is_invoke_hostcmd = MFALSE;
+		hscfg.conditions = SHUTDOWN_HOST_SLEEP_DEF_COND;
+		hscfg.gap = SHUTDOWN_HOST_SLEEP_DEF_GAP;
+		hscfg.gpio = SHUTDOWN_HOST_SLEEP_DEF_GPIO;
+		if (woal_set_get_hs_params
+		    (woal_get_priv(handle, MLAN_BSS_ROLE_ANY), MLAN_ACT_SET,
+		     MOAL_IOCTL_WAIT, &hscfg) == MLAN_STATUS_FAILURE) {
+			PRINTM(MERROR,
+			       "Fail to set HS parameter in shutdown: 0x%x 0x%x 0x%x\n",
+			       hscfg.conditions, hscfg.gap, hscfg.gpio);
+			goto done;
+		}
+		/* Enable Host Sleep */
+		handle->hs_activate_wait_q_woken = MFALSE;
+		memset(&hscfg, 0, sizeof(mlan_ds_hs_cfg));
+		hscfg.is_invoke_hostcmd = MTRUE;
+		if (woal_set_get_hs_params
+		    (woal_get_priv(handle, MLAN_BSS_ROLE_ANY), MLAN_ACT_SET,
+		     MOAL_NO_WAIT, &hscfg) == MLAN_STATUS_FAILURE) {
+			PRINTM(MERROR,
+			       "Request HS enable failed in shutdown\n");
+			goto done;
+		}
+		timeout =
+			wait_event_interruptible_timeout(handle->
+							 hs_activate_wait_q,
+							 handle->
+							 hs_activate_wait_q_woken,
+							 HS_ACTIVE_TIMEOUT);
+		if (handle->hs_activated == MTRUE)
+			PRINTM(MMSG, "HS actived in shutdown\n");
+		else
+			PRINTM(MMSG, "Fail to enable HS in shutdown\n");
+	}
+done:
+	PRINTM(MCMND, "<--- Leave woal_sdio_shutdown --->\n");
+	LEAVE();
+	return;
+}
 
 /**  @brief This function handles client driver suspend
  *

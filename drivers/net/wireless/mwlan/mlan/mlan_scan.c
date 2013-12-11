@@ -4461,13 +4461,14 @@ wlan_cmd_bgscan_config(IN mlan_private * pmpriv,
 			sizeof(MrvlIEtypesHeader_t) +
 			sizeof(ChanScanParamSet_t) * chan_num;
 	}
+
 	tlv_start_later = (MrvlIEtypes_StartLater_t *) tlv;
 	tlv_start_later->header.type =
 		wlan_cpu_to_le16(TLV_TYPE_STARTBGSCANLATER);
 	tlv_start_later->header.len =
 		wlan_cpu_to_le16(sizeof(MrvlIEtypes_StartLater_t) -
 				 sizeof(MrvlIEtypesHeader_t));
-	tlv_start_later->value = 0;
+	tlv_start_later->value = wlan_cpu_to_le16(bg_scan_in->start_later);
 	tlv += sizeof(MrvlIEtypes_StartLater_t);
 	cmd_size += sizeof(MrvlIEtypes_StartLater_t);
 done:

@@ -647,7 +647,6 @@ moal_send_packet_complete(IN t_void * pmoal_handle,
 	moal_handle *handle = (moal_handle *) pmoal_handle;
 	struct sk_buff *skb = NULL;
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 29)
-	t_u32 tid = 0;
 	t_u32 index = 0;
 #endif
 
@@ -671,11 +670,7 @@ moal_send_packet_complete(IN t_void * pmoal_handle,
 					priv->stats.tx_errors++;
 				}
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 29)
-				tid = pmbuf->priority;
-				index = mlan_select_wmm_queue(priv->phandle->
-							      pmlan_adapter,
-							      priv->bss_index,
-							      tid);
+				index = skb_get_queue_mapping(skb);
 				atomic_dec(&handle->tx_pending);
 				if (atomic_dec_return
 				    (&priv->wmm_tx_pending[index]) <
@@ -894,7 +889,8 @@ moal_recv_event(IN t_void * pmoal_handle, IN pmlan_event pmevent)
 
 	ENTER();
 
-	if (pmevent->event_id != MLAN_EVENT_ID_DRV_DEFER_RX_WORK)
+	if ((pmevent->event_id != MLAN_EVENT_ID_DRV_DEFER_RX_WORK) &&
+	    (pmevent->event_id != MLAN_EVENT_ID_DRV_DEFER_HANDLING))
 		PRINTM(MEVENT, "event id:0x%x\n", pmevent->event_id);
 	priv = woal_bss_index_to_priv(pmoal_handle, pmevent->bss_index);
 	if (priv == NULL) {
@@ -1736,6 +1732,9 @@ moal_recv_event(IN t_void * pmoal_handle, IN pmlan_event pmevent)
 							sizeof(pmevent->
 							       event_id) -
 							MLAN_MAC_ADDR_LENGTH,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 12, 0)
+							0,
+#endif
 							GFP_ATOMIC);
 #else
 				cfg80211_rx_mgmt(priv->netdev, freq,
@@ -1820,6 +1819,21 @@ moal_recv_event(IN t_void * pmoal_handle, IN pmlan_event pmevent)
 				PRINTM(MMSG, "BSS START Complete!\n");
 			}
 		}
+		break;
+	case MLAN_EVENT_ID_DRV_TDLS_TEARDOWN_REQ:
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0)
+#ifdef STA_CFG80211
+		if (IS_STA_CFG80211(cfg80211_wext)) {
+			tdls_tear_down_event *tdls_event =
+				(tdls_tear_down_event *) pmevent->event_buf;
+			cfg80211_tdls_oper_request(priv->netdev,
+						   tdls_event->peer_mac_addr,
+						   NL80211_TDLS_TEARDOWN,
+						   tdls_event->reason_code,
+						   GFP_KERNEL);
+		}
+#endif
+#endif
 		break;
 	default:
 		break;

@@ -188,6 +188,10 @@ wlan_dump_info(mlan_adapter * pmadapter, t_u8 reason)
 	PRINTM(MERROR, "mlan_processing =%d\n", pmadapter->mlan_processing);
 	PRINTM(MERROR, "mlan_rx_processing =%d\n",
 	       pmadapter->mlan_rx_processing);
+	PRINTM(MERROR, "rx_pkts_queued=%d\n",
+	       util_scalar_read(pmadapter->pmoal_handle,
+				&pmadapter->rx_pkts_queued, MNULL, MNULL));
+
 	PRINTM(MERROR, "more_task_flag = %d\n", pmadapter->more_task_flag);
 	PRINTM(MERROR, "num_cmd_timeout = %d\n",
 	       pmadapter->dbg.num_cmd_timeout);
@@ -3837,53 +3841,23 @@ wlan_cmd_802_11_rf_antenna(IN pmlan_private pmpriv,
 {
 	HostCmd_DS_802_11_RF_ANTENNA *pantenna = &cmd->params.antenna;
 	mlan_ds_ant_cfg *ant_cfg = (mlan_ds_ant_cfg *) pdata_buf;
-	typedef struct _HostCmd_DS_802_11_RF_ANTENNA_1X1 {
-	/** Action */
-		t_u16 action;
-	/**  Antenna or 0xffff (diversity) */
-		t_u16 antenna_mode;
-	} HostCmd_DS_802_11_RF_ANTENNA_1X1;
-	HostCmd_DS_802_11_RF_ANTENNA_1X1 *pantenna_1x1 =
-		(HostCmd_DS_802_11_RF_ANTENNA_1X1 *) & cmd->params.antenna;
 
 	ENTER();
 	cmd->command = wlan_cpu_to_le16(HostCmd_CMD_802_11_RF_ANTENNA);
-	if (!IS_STREAM_2X2(pmpriv->adapter->feature_control))
-		cmd->size =
-			wlan_cpu_to_le16(sizeof
-					 (HostCmd_DS_802_11_RF_ANTENNA_1X1) +
-					 S_DS_GEN);
-	else
-		cmd->size =
-			wlan_cpu_to_le16(sizeof(HostCmd_DS_802_11_RF_ANTENNA) +
-					 S_DS_GEN);
+	cmd->size =
+		wlan_cpu_to_le16(sizeof(HostCmd_DS_802_11_RF_ANTENNA) +
+				 S_DS_GEN);
 
 	if (cmd_action == HostCmd_ACT_GEN_SET) {
-		if (IS_STREAM_2X2(pmpriv->adapter->feature_control)) {
-			pantenna->action_tx =
-				wlan_cpu_to_le16(HostCmd_ACT_SET_TX);
-			pantenna->tx_antenna_mode =
-				wlan_cpu_to_le16((t_u16) ant_cfg->tx_antenna);
-			pantenna->action_rx =
-				wlan_cpu_to_le16(HostCmd_ACT_SET_RX);
-			pantenna->rx_antenna_mode =
-				wlan_cpu_to_le16((t_u16) ant_cfg->rx_antenna);
-		} else {
-			pantenna_1x1->action =
-				wlan_cpu_to_le16(HostCmd_ACT_SET_BOTH);
-			pantenna_1x1->antenna_mode =
-				wlan_cpu_to_le16(*(t_u16 *) pdata_buf);
-		}
+		pantenna->action_tx = wlan_cpu_to_le16(HostCmd_ACT_SET_TX);
+		pantenna->tx_antenna_mode =
+			wlan_cpu_to_le16((t_u16) ant_cfg->tx_antenna);
+		pantenna->action_rx = wlan_cpu_to_le16(HostCmd_ACT_SET_RX);
+		pantenna->rx_antenna_mode =
+			wlan_cpu_to_le16((t_u16) ant_cfg->rx_antenna);
 	} else {
-		if (IS_STREAM_2X2(pmpriv->adapter->feature_control)) {
-			pantenna->action_tx =
-				wlan_cpu_to_le16(HostCmd_ACT_GET_TX);
-			pantenna->action_rx =
-				wlan_cpu_to_le16(HostCmd_ACT_GET_RX);
-		} else {
-			pantenna_1x1->action =
-				wlan_cpu_to_le16(HostCmd_ACT_GET_BOTH);
-		}
+		pantenna->action_tx = wlan_cpu_to_le16(HostCmd_ACT_GET_TX);
+		pantenna->action_rx = wlan_cpu_to_le16(HostCmd_ACT_GET_RX);
 	}
 	LEAVE();
 	return MLAN_STATUS_SUCCESS;
@@ -3906,36 +3880,19 @@ wlan_ret_802_11_rf_antenna(IN pmlan_private pmpriv,
 	HostCmd_DS_802_11_RF_ANTENNA *pantenna = &resp->params.antenna;
 	t_u16 tx_ant_mode = wlan_le16_to_cpu(pantenna->tx_antenna_mode);
 	t_u16 rx_ant_mode = wlan_le16_to_cpu(pantenna->rx_antenna_mode);
-	typedef struct _HostCmd_DS_802_11_RF_ANTENNA_1X1 {
-	    /** Action */
-		t_u16 action;
-	    /**  Antenna or 0xffff (diversity) */
-		t_u16 antenna_mode;
-	} HostCmd_DS_802_11_RF_ANTENNA_1X1;
-	HostCmd_DS_802_11_RF_ANTENNA_1X1 *pantenna_1x1 =
-		(HostCmd_DS_802_11_RF_ANTENNA_1X1 *) & resp->params.antenna;
-	t_u16 ant_mode = wlan_le16_to_cpu(pantenna_1x1->antenna_mode);
 	mlan_ds_radio_cfg *radio = MNULL;
 
 	ENTER();
 
-	if (IS_STREAM_2X2(pmpriv->adapter->feature_control))
-		PRINTM(MINFO, "RF_ANT_RESP: Tx action = 0x%x, Tx Mode = 0x%04x"
-		       " Rx action = 0x%x, Rx Mode = 0x%04x\n",
-		       wlan_le16_to_cpu(pantenna->action_tx), tx_ant_mode,
-		       wlan_le16_to_cpu(pantenna->action_rx), rx_ant_mode);
-	else
-		PRINTM(MINFO, "RF_ANT_RESP: action = 0x%x, Mode = 0x%04x\n",
-		       wlan_le16_to_cpu(pantenna_1x1->action), ant_mode);
+	PRINTM(MINFO, "RF_ANT_RESP: Tx action = 0x%x, Tx Mode = 0x%04x"
+	       " Rx action = 0x%x, Rx Mode = 0x%04x\n",
+	       wlan_le16_to_cpu(pantenna->action_tx), tx_ant_mode,
+	       wlan_le16_to_cpu(pantenna->action_rx), rx_ant_mode);
 
 	if (pioctl_buf) {
 		radio = (mlan_ds_radio_cfg *) pioctl_buf->pbuf;
-		if (IS_STREAM_2X2(pmpriv->adapter->feature_control)) {
-			radio->param.ant_cfg.tx_antenna = tx_ant_mode;
-			radio->param.ant_cfg.rx_antenna = rx_ant_mode;
-		} else {
-			radio->param.antenna = ant_mode;
-		}
+		radio->param.ant_cfg.tx_antenna = tx_ant_mode;
+		radio->param.ant_cfg.rx_antenna = rx_ant_mode;
 	}
 
 	LEAVE();

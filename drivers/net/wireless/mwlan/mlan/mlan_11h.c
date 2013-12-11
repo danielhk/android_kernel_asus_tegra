@@ -976,16 +976,16 @@ wlan_11h_is_dfs_master(mlan_private * priv)
 
 	ENTER();
 	/* UAP: all are master */
-	if (GET_BSS_ROLE(priv) == MLAN_BSS_ROLE_UAP) {
+	if (GET_BSS_ROLE(priv) == MLAN_BSS_ROLE_UAP)
 		ret = MTRUE;
-	}
+
 	/* STA: only ad-hoc creator is master */
 	else if ((GET_BSS_ROLE(priv) == MLAN_BSS_ROLE_STA) &&
 		 (priv->bss_mode == MLAN_BSS_MODE_IBSS) &&
 		 (priv->adhoc_state == ADHOC_STARTED ||
-		  priv->adhoc_state == ADHOC_STARTING)) {
+		  priv->adhoc_state == ADHOC_STARTING))
 		ret = MTRUE;
-	}
+
 	/* all other cases = slave interface */
 	LEAVE();
 	return ret;
@@ -1297,10 +1297,14 @@ wlan_11h_get_uap_start_channel(mlan_private * priv, t_u8 uap_band_cfg)
 							(t_u8) chn_tbl->
 							pcfp[rand_entry].
 							channel;
-					} while (wlan_11h_is_channel_under_nop
-						 (adapter, start_chn) &&
-						 (++rand_tries <
-						  MAX_RANDOM_CHANNEL_RETRIES));
+					} while ((wlan_11h_is_channel_under_nop
+						  (adapter, start_chn) ||
+						  ((adapter->state_rdh.stage ==
+						    RDH_GET_INFO_CHANNEL) &&
+						   wlan_11h_radar_detect_required
+						   (priv, start_chn)))
+						 && (++rand_tries <
+						     MAX_RANDOM_CHANNEL_RETRIES));
 				}
 			}
 		}
@@ -3060,7 +3064,7 @@ wlan_11h_radar_detected_handling(mlan_adapter * pmadapter)
 								MTRUE);
 			if ((ret != MLAN_STATUS_SUCCESS) || !pioctl_req) {
 				PRINTM(MERROR,
-				       "%s(): Error in preparng CHAN_SW IE.\n",
+				       "%s(): Error in preparing CHAN_SW IE.\n",
 				       __func__);
 				break;	/* EXIT CASE */
 			}
@@ -3123,7 +3127,7 @@ wlan_11h_radar_detected_handling(mlan_adapter * pmadapter)
 								MFALSE);
 			if ((ret != MLAN_STATUS_SUCCESS) || !pioctl_req) {
 				PRINTM(MERROR,
-				       "%s(): Error in preparng CHAN_SW IE.\n",
+				       "%s(): Error in preparing CHAN_SW IE.\n",
 				       __func__);
 				break;	/* EXIT CASE */
 			}
@@ -3150,19 +3154,6 @@ wlan_11h_radar_detected_handling(mlan_adapter * pmadapter)
 		/* else */
 		pstate_rdh->priv_curr_idx = RDH_STAGE_FIRST_ENTRY_PRIV_IDX;
 		pstate_rdh->stage = RDH_STOP_INTFS;
-#ifdef DFS_TESTING_SUPPORT
-		if (pmadapter->dfs_test_params.no_channel_change_on_radar) {
-			PRINTM(MCMD_D,
-			       "dfs_testing - no channel change on radar."
-			       "  Also skip stop/restart interface stages.\n",
-			       pmadapter->dfs_test_params.
-			       no_channel_change_on_radar);
-			pstate_rdh->priv_curr_idx =
-				RDH_STAGE_FIRST_ENTRY_PRIV_IDX;
-			pstate_rdh->stage = RDH_RESTART_TRAFFIC;
-			goto rdh_restart_traffic;	/* skip several stages */
-		}
-#endif
 		/* FALL THROUGH TO NEXT STAGE */
 
 	case RDH_STOP_INTFS:
@@ -3207,6 +3198,18 @@ wlan_11h_radar_detected_handling(mlan_adapter * pmadapter)
 		/* else */
 		pstate_rdh->priv_curr_idx = RDH_STAGE_FIRST_ENTRY_PRIV_IDX;
 		pstate_rdh->stage = RDH_SET_NEW_CHANNEL;
+#ifdef DFS_TESTING_SUPPORT
+		if (pmadapter->dfs_test_params.no_channel_change_on_radar) {
+			PRINTM(MCMD_D,
+			       "dfs_testing - no channel change on radar."
+			       "  Overwrite new_chan = curr_chan.\n");
+			pstate_rdh->new_channel = pstate_rdh->curr_channel;
+			pstate_rdh->priv_curr_idx =
+				RDH_STAGE_FIRST_ENTRY_PRIV_IDX;
+			pstate_rdh->stage = RDH_RESTART_INTFS;
+			goto rdh_restart_intfs;	/* skip next stage */
+		}
+#endif
 		/* FALL THROUGH TO NEXT STAGE */
 
 	case RDH_SET_NEW_CHANNEL:
@@ -3250,6 +3253,9 @@ wlan_11h_radar_detected_handling(mlan_adapter * pmadapter)
 		/* FALL THROUGH TO NEXT STAGE */
 
 	case RDH_RESTART_INTFS:
+#ifdef DFS_TESTING_SUPPORT
+rdh_restart_intfs:
+#endif
 		PRINTM(MCMD_D, "%s(): stage(%d)=%s, priv_idx=%d\n",
 		       __func__, pstate_rdh->stage,
 		       rdh_stage_str[pstate_rdh->stage],
@@ -3341,9 +3347,6 @@ wlan_11h_radar_detected_handling(mlan_adapter * pmadapter)
 		/* FALL THROUGH TO NEXT STAGE */
 
 	case RDH_RESTART_TRAFFIC:
-#ifdef DFS_TESTING_SUPPORT
-rdh_restart_traffic:
-#endif
 		PRINTM(MCMD_D, "%s(): stage(%d)=%s\n",
 		       __func__, pstate_rdh->stage,
 		       rdh_stage_str[pstate_rdh->stage]);

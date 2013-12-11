@@ -1151,6 +1151,48 @@ typedef struct {
 
 } wlan_11h_bss_info_t;
 
+/** Ethernet packet type for TDLS */
+#define MLAN_ETHER_PKT_TYPE_TDLS_ACTION	(0x890D)
+
+/*802.11z  TDLS action frame type and strcuct */
+typedef MLAN_PACK_START struct {
+	/* link indentifier ie =101 */
+	t_u8 element_id;
+	/* len = 18 */
+	t_u8 len;
+   /** bssid */
+	t_u8 bssid[MLAN_MAC_ADDR_LENGTH];
+   /** init sta mac address */
+	t_u8 init_sta[MLAN_MAC_ADDR_LENGTH];
+   /** resp sta mac address */
+	t_u8 resp_sta[MLAN_MAC_ADDR_LENGTH];
+} MLAN_PACK_END IEEEtypes_tdls_linkie;
+
+/** action code for tdls setup request */
+#define TDLS_SETUP_REQUEST 0
+/** action code for tdls setup response */
+#define TDLS_SETUP_RESPONSE 1
+/** action code for tdls setup confirm */
+#define TDLS_SETUP_CONFIRM 2
+/** action code for tdls tear down */
+#define TDLS_TEARDOWN 3
+/** action code for tdls traffic indication */
+#define TDLS_PEER_TRAFFIC_INDICATION 4
+/** action code for tdls channel switch request */
+#define TDLS_CHANNEL_SWITCH_REQUEST 5
+/** action code for tdls channel switch response */
+#define TDLS_CHANNEL_SWITCH_RESPONSE 6
+/** action code for tdls psm request */
+#define TDLS_PEER_PSM_REQUEST 7
+/** action code for tdls psm response */
+#define TDLS_PEER_PSM_RESPONSE 8
+/** action code for tdls traffic response */
+#define TDLS_PEER_TRAFFIC_RESPONSE 9
+/** action code for tdls discovery request */
+#define TDLS_DISCOVERY_REQUEST 10
+/** action code for TDLS discovery response */
+#define TDLS_DISCOVERY_RESPONSE 14
+
 #ifdef STA_SUPPORT
 /** Macro for maximum size of scan response buffer */
 #define MAX_SCAN_RSP_BUF (16 * 1024)
@@ -1295,6 +1337,8 @@ typedef MLAN_PACK_START struct {
 	t_u8 snr_threshold;
     /** repeat count */
 	t_u16 repeat_count;
+    /** start later flag */
+	t_u16 start_later;
     /** SSID filter list used in the to limit the scan results */
 	wlan_user_scan_ssid ssid_list[MRVDRV_MAX_SSID_LIST_LENGTH];
     /** Variable number (fixed maximum) of channels to scan up */

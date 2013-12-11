@@ -1846,6 +1846,12 @@ woal_send_host_packet(struct net_device *dev, struct ifreq *req)
 		goto done;
 	}
 #define PACKET_HEADER_LEN        8
+#define MV_ETH_FRAME_LEN      1514
+	if (packet_len > MV_ETH_FRAME_LEN) {
+		PRINTM(MERROR, "Invalid packet length %d\n", packet_len);
+		ret = -EFAULT;
+		goto done;
+	}
 	pmbuf = woal_alloc_mlan_buffer(priv->phandle,
 				       (int)(MLAN_MIN_DATA_HEADER_LEN +
 					     (int)packet_len +
@@ -1945,6 +1951,86 @@ woal_set_get_custom_ie(moal_private * priv, t_u16 mask, t_u8 * ie, int ie_len)
 	return ret;
 }
 #endif /* defined(HOST_TXRX_MGMT_FRAME) && defined(UAP_WEXT) */
+
+/**
+ *  @brief TDLS configuration ioctl handler
+ *
+ *  @param dev      A pointer to net_device structure
+ *  @param req      A pointer to ifreq structure
+ *  @return         0 --success, otherwise fail
+ */
+int
+woal_tdls_config_ioctl(struct net_device *dev, struct ifreq *req)
+{
+	moal_private *priv = (moal_private *) netdev_priv(dev);
+	mlan_ioctl_req *ioctl_req = NULL;
+	mlan_ds_misc_cfg *misc = NULL;
+	mlan_ds_misc_tdls_config *tdls_data = NULL;
+	int ret = 0;
+
+	ENTER();
+
+	/* Sanity check */
+	if (req->ifr_data == NULL) {
+		PRINTM(MERROR, "woal_tdls_config_ioctl() corrupt data\n");
+		ret = -EFAULT;
+		goto done;
+	}
+
+	tdls_data = kmalloc(sizeof(mlan_ds_misc_tdls_config), GFP_KERNEL);
+	if (!tdls_data) {
+		ret = -ENOMEM;
+		goto done;
+	}
+	memset(tdls_data, 0, sizeof(mlan_ds_misc_tdls_config));
+
+	if (copy_from_user
+	    (tdls_data, req->ifr_data, sizeof(mlan_ds_misc_tdls_config))) {
+		PRINTM(MERROR, "Copy from user failed\n");
+		ret = -EFAULT;
+		goto done;
+	}
+
+	ioctl_req = woal_alloc_mlan_ioctl_req(sizeof(mlan_ds_misc_cfg));
+	if (ioctl_req == NULL) {
+		ret = -ENOMEM;
+		goto done;
+	}
+
+	misc = (mlan_ds_misc_cfg *) ioctl_req->pbuf;
+	misc->sub_command = MLAN_OID_MISC_TDLS_CONFIG;
+	ioctl_req->req_id = MLAN_IOCTL_MISC_CFG;
+	if (tdls_data->tdls_action == WLAN_TDLS_DISCOVERY_REQ
+	    || tdls_data->tdls_action == WLAN_TDLS_LINK_STATUS)
+		ioctl_req->action = MLAN_ACT_GET;
+	else
+		ioctl_req->action = MLAN_ACT_SET;
+
+	memcpy(&misc->param.tdls_config, tdls_data,
+	       sizeof(mlan_ds_misc_tdls_config));
+
+	if (MLAN_STATUS_SUCCESS !=
+	    woal_request_ioctl(priv, ioctl_req, MOAL_IOCTL_WAIT)) {
+		ret = -EFAULT;
+		goto done;
+	}
+
+	if (tdls_data->tdls_action == WLAN_TDLS_DISCOVERY_REQ
+	    || tdls_data->tdls_action == WLAN_TDLS_LINK_STATUS) {
+		if (copy_to_user(req->ifr_data, &misc->param.tdls_config,
+				 sizeof(mlan_ds_misc_tdls_config))) {
+			PRINTM(MERROR, "Copy to user failed!\n");
+			ret = -EFAULT;
+			goto done;
+		}
+	}
+
+done:
+	kfree(ioctl_req);
+	kfree(tdls_data);
+	LEAVE();
+	return ret;
+}
 
 /**
  *  @brief ioctl function get BSS type
@@ -2327,6 +2413,7 @@ woal_enable_hs(moal_private * priv)
 	}
 #if defined(WIFI_DIRECT_SUPPORT)
 #if defined(STA_CFG80211) && defined(UAP_CFG80211)
+#if LINUX_VERSION_CODE >= WIFI_DIRECT_KERNEL_VERSION
 	if (priv->phandle->is_remain_timer_set) {
 		woal_cancel_timer(&priv->phandle->remain_timer);
 		woal_remain_timer_func(priv->phandle);
@@ -2367,6 +2454,7 @@ woal_enable_hs(moal_private * priv)
 		}
 		priv->phandle->remain_on_channel = MFALSE;
 	}
+#endif
 #endif
 #endif
 
@@ -4049,6 +4137,9 @@ woal_cancel_scan(moal_private * priv, t_u8 wait_option)
 		spin_lock(&handle->priv[i]->scan_req_lock);
 		if (IS_STA_CFG80211(cfg80211_wext) &&
 		    handle->priv[i]->scan_request) {
+			PRINTM(MINFO, "Reporting scan results\n");
+			woal_inform_bss_from_scan_result(priv, NULL,
+							 wait_option);
 	    /** some supplicant can not handle SCAN abort event */
 			cfg80211_scan_done(handle->priv[i]->scan_request,
 					   MFALSE);
@@ -4205,6 +4296,13 @@ woal_set_bg_scan(moal_private * priv, char *buf, int length)
 			buf_left -= 2;
 			break;
 		case WEXT_BGSCAN_INTERVAL_SECTION:
+			if (buf_left < 3) {
+				PRINTM(MERROR,
+				       "Invalid scan_interval, buf_left=%d\n",
+				       buf_left);
+				buf_left = 0;
+				break;
+			}
 			priv->scan_cfg.scan_interval =
 				(ptr[2] << 8 | ptr[1]) * 1000;
 			PRINTM(MIOCTL, "BG scan: scan_interval=%d\n",

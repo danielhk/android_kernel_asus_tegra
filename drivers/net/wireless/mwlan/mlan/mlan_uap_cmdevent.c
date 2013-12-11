@@ -267,6 +267,7 @@ wlan_process_tx_pause_event(pmlan_private priv, pmlan_buffer pevent)
 					 sizeof(t_u32));
 	MrvlIEtypes_tx_pause_t *tx_pause_tlv;
 	sta_node *sta_ptr = MNULL;
+	t_u8 bc_mac[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
 	ENTER();
 
@@ -284,18 +285,38 @@ wlan_process_tx_pause_event(pmlan_private priv, pmlan_buffer pevent)
 			PRINTM(MCMND, "TxPause: " MACSTR " pause=%d, pkts=%d\n",
 			       MAC2STR(tx_pause_tlv->peermac),
 			       tx_pause_tlv->tx_pause, tx_pause_tlv->pkt_cnt);
-			sta_ptr =
-				wlan_get_station_entry(priv,
-						       tx_pause_tlv->peermac);
-			if (sta_ptr) {
-				if (sta_ptr->tx_pause != tx_pause_tlv->tx_pause) {
-					sta_ptr->tx_pause =
-						tx_pause_tlv->tx_pause;
-					wlan_update_ralist_tx_pause(priv,
-								    tx_pause_tlv->
-								    peermac,
-								    tx_pause_tlv->
-								    tx_pause);
+			if (!memcmp
+			    (priv->adapter, bc_mac, tx_pause_tlv->peermac,
+			     MLAN_MAC_ADDR_LENGTH)) {
+				wlan_update_ralist_tx_pause(priv,
+							    tx_pause_tlv->
+							    peermac,
+							    tx_pause_tlv->
+							    tx_pause);
+			} else if (!memcmp
+				   (priv->adapter, priv->curr_addr,
+				    tx_pause_tlv->peermac,
+				    MLAN_MAC_ADDR_LENGTH)) {
+				if (tx_pause_tlv->tx_pause)
+					priv->port_open = MFALSE;
+				else
+					priv->port_open = MTRUE;
+			} else {
+				sta_ptr =
+					wlan_get_station_entry(priv,
+							       tx_pause_tlv->
+							       peermac);
+				if (sta_ptr) {
+					if (sta_ptr->tx_pause !=
+					    tx_pause_tlv->tx_pause) {
+						sta_ptr->tx_pause =
+							tx_pause_tlv->tx_pause;
+						wlan_update_ralist_tx_pause
+							(priv,
+							 tx_pause_tlv->peermac,
+							 tx_pause_tlv->
+							 tx_pause);
+					}
 				}
 			}
 		}
@@ -3349,6 +3370,7 @@ wlan_ops_uap_process_event(IN t_void * priv)
 	case EVENT_MICRO_AP_BSS_ACTIVE:
 		PRINTM(MEVENT, "EVENT: MICRO_AP_BSS_ACTIVE\n");
 		pmpriv->media_connected = MTRUE;
+		pmpriv->port_open = MTRUE;
 		pevent->event_id = MLAN_EVENT_ID_UAP_FW_BSS_ACTIVE;
 		break;
 	case EVENT_MICRO_AP_BSS_IDLE:
@@ -3358,6 +3380,7 @@ wlan_ops_uap_process_event(IN t_void * priv)
 		wlan_clean_txrx(pmpriv);
 		wlan_notify_station_deauth(pmpriv);
 		wlan_delete_station_list(pmpriv);
+		pmpriv->port_open = MFALSE;
 		break;
 	case EVENT_PS_AWAKE:
 		PRINTM(MINFO, "EVENT: AWAKE\n");

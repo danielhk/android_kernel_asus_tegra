@@ -233,8 +233,6 @@ mlan_register(IN pmlan_device pmdevice, OUT t_void ** ppmlan_adapter)
 	/* Save pmoal_handle */
 	pmadapter->pmoal_handle = pmdevice->pmoal_handle;
 
-	pmadapter->feature_control = pmdevice->feature_control;
-
 	if ((pmdevice->int_mode == INT_MODE_GPIO) && (pmdevice->gpio_pin == 0)) {
 		PRINTM(MERROR, "SDIO_GPIO_INT_CONFIG: Invalid GPIO Pin\n");
 		ret = MLAN_STATUS_FAILURE;
@@ -273,9 +271,8 @@ mlan_register(IN pmlan_device pmdevice, OUT t_void ** ppmlan_adapter)
 #else
 	pmadapter->init_para.cfg_11d = 0;
 #endif
-	if (IS_DFS_SUPPORT(pmadapter->feature_control))
-		pmadapter->init_para.dfs_master_radar_det_en =
-			DFS_MASTER_RADAR_DETECT_EN;
+	pmadapter->init_para.dfs_master_radar_det_en =
+		DFS_MASTER_RADAR_DETECT_EN;
 	pmadapter->init_para.dfs_slave_radar_det_en = DFS_SLAVE_RADAR_DETECT_EN;
 	pmadapter->rx_work_flag = pmdevice->rx_work;
 
@@ -785,6 +782,11 @@ process_start:
 		     pmadapter->callbacks.moal_spin_unlock) > HIGH_RX_PENDING) {
 			PRINTM(MEVENT, "Pause\n");
 			pmadapter->delay_task_flag = MTRUE;
+			if (!pmadapter->mlan_rx_processing)
+				wlan_recv_event(wlan_get_priv
+						(pmadapter, MLAN_BSS_ROLE_ANY),
+						MLAN_EVENT_ID_DRV_DEFER_RX_WORK,
+						MNULL);
 			break;
 		}
 		/* Handle pending SDIO interrupts if any */
@@ -834,12 +836,15 @@ process_start:
 
 			if (pmadapter->scan_processing
 			    || pmadapter->data_sent
+			    || wlan_is_tdls_link_chan_switching(pmadapter->
+								tdls_status)
 			    || (wlan_bypass_tx_list_empty(pmadapter) &&
 				wlan_wmm_lists_empty(pmadapter))
 			    || wlan_11h_radar_detected_tx_blocked(pmadapter)
 				) {
 				if (pmadapter->cmd_sent || pmadapter->curr_cmd
-				    ||
+				    || !wlan_is_send_cmd_allowed(pmadapter->
+								 tdls_status) ||
 				    (!util_peek_list
 				     (pmadapter->pmoal_handle,
 				      &pmadapter->cmd_pending_q,
@@ -887,7 +892,9 @@ process_start:
 			)
 			continue;
 
-		if (!pmadapter->cmd_sent && !pmadapter->curr_cmd) {
+		if (!pmadapter->cmd_sent && !pmadapter->curr_cmd
+		    && wlan_is_send_cmd_allowed(pmadapter->tdls_status)
+			) {
 			if (wlan_exec_next_cmd(pmadapter) ==
 			    MLAN_STATUS_FAILURE) {
 				ret = MLAN_STATUS_FAILURE;
@@ -898,6 +905,7 @@ process_start:
 		if (!pmadapter->scan_processing
 		    && !pmadapter->data_sent &&
 		    !wlan_11h_radar_detected_tx_blocked(pmadapter) &&
+		    !wlan_is_tdls_link_chan_switching(pmadapter->tdls_status) &&
 		    !wlan_bypass_tx_list_empty(pmadapter)) {
 			PRINTM(MINFO, "mlan_send_pkt(): deq(bybass_txq)\n");
 			wlan_process_bypass_tx(pmadapter);
@@ -913,6 +921,7 @@ process_start:
 		if (!pmadapter->scan_processing
 		    && !pmadapter->data_sent && !wlan_wmm_lists_empty(pmadapter)
 		    && !wlan_11h_radar_detected_tx_blocked(pmadapter)
+		    && !wlan_is_tdls_link_chan_switching(pmadapter->tdls_status)
 			) {
 			wlan_wmm_process_tx(pmadapter);
 			if (pmadapter->hs_activated == MTRUE) {
@@ -975,6 +984,8 @@ mlan_send_packet(IN t_void * pmlan_adapter, IN pmlan_buffer pmbuf)
 	mlan_adapter *pmadapter = (mlan_adapter *) pmlan_adapter;
 	mlan_private *pmpriv;
 	t_u16 eth_type = 0;
+	t_u8 ra[MLAN_MAC_ADDR_LENGTH];
+	tdlsStatus_e tdls_status;
 
 	ENTER();
 	MASSERT(pmlan_adapter && pmbuf);
@@ -991,9 +1002,18 @@ mlan_send_packet(IN t_void * pmlan_adapter, IN pmlan_buffer pmbuf)
 	     ((eth_type == MLAN_ETHER_PKT_TYPE_EAPOL)
 	      || (eth_type == MLAN_ETHER_PKT_TYPE_WAPI)
 	     ))
+	    || (eth_type == MLAN_ETHER_PKT_TYPE_TDLS_ACTION)
 	    || (pmbuf->buf_type == MLAN_BUF_TYPE_RAW_DATA)
 
 		) {
+		if (eth_type == MLAN_ETHER_PKT_TYPE_TDLS_ACTION) {
+			memcpy(pmadapter, ra, pmbuf->pbuf + pmbuf->data_offset,
+			       MLAN_MAC_ADDR_LENGTH);
+			tdls_status = wlan_get_tdls_link_status(pmpriv, ra);
+			if (MTRUE == wlan_is_tdls_link_setup(tdls_status) ||
+			    !pmpriv->media_connected)
+				pmbuf->flags |= MLAN_BUF_FLAG_TDLS;
+		}
 		PRINTM(MINFO, "mlan_send_pkt(): enq(bybass_txq)\n");
 		wlan_add_buf_bypass_txqueue(pmadapter, pmbuf);
 	} else {

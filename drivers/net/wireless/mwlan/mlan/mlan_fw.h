@@ -31,8 +31,12 @@ Change log:
 /** Interface header length */
 #define INTF_HEADER_LEN     4
 
+#ifdef PRAGMA_PACK
+#pragma pack(push, 1)
+#endif
+
 /** Ethernet header */
-typedef struct {
+typedef MLAN_PACK_START struct {
     /** Ethernet header destination address */
 	t_u8 dest_addr[MLAN_MAC_ADDR_LENGTH];
     /** Ethernet header source address */
@@ -40,10 +44,10 @@ typedef struct {
     /** Ethernet header length */
 	t_u16 h803_len;
 
-} Eth803Hdr_t;
+} MLAN_PACK_END Eth803Hdr_t;
 
 /** RFC 1042 header */
-typedef struct {
+typedef MLAN_PACK_START struct {
     /** LLC DSAP */
 	t_u8 llc_dsap;
     /** LLC SSAP */
@@ -55,11 +59,7 @@ typedef struct {
     /** SNAP type */
 	t_u16 snap_type;
 
-} Rfc1042Hdr_t;
-
-#ifdef PRAGMA_PACK
-#pragma pack(push, 1)
-#endif
+} MLAN_PACK_END Rfc1042Hdr_t;
 
 /** Rx packet header */
 typedef MLAN_PACK_START struct {
@@ -403,6 +403,10 @@ typedef enum _WLAN_802_11_WEP_STATUS {
 /** TLV type: hs wake hold off */
 #define TLV_TYPE_HS_WAKE_HOLDOFF     (PROPRIETARY_TLV_BASE_ID + 0xB6)	/* 0x01b6
 									 */
+
+/** TLV type : TDLS IDLE TIMEOUT */
+#define TLV_TYPE_TDLS_IDLE_TIMEOUT               (PROPRIETARY_TLV_BASE_ID + 0xC2)	/* 0x01C2
+											 */
 
 /** TLV type : HT Capabilities */
 #define TLV_TYPE_HT_CAP                  (PROPRIETARY_TLV_BASE_ID + 0x4a)	/* 0x014a
@@ -770,6 +774,8 @@ typedef enum _WLAN_802_11_WEP_STATUS {
 
 /** Host Command ID : 802.11 deauthenticate */
 #define HostCmd_CMD_802_11_DEAUTHENTICATE     0x0024
+/** Host Command ID: 802.11 disassoicate */
+#define HostCmd_CMD_802_11_DISASSOCIATE       0x0026
 /** Host Command ID : MAC control */
 #define HostCmd_CMD_MAC_CONTROL               0x0028
 /** Host Command ID : 802.11 Ad-Hoc start */
@@ -920,6 +926,11 @@ typedef enum _WLAN_802_11_WEP_STATUS {
 
 /** Host Command ID : mgmt IE list */
 #define  HostCmd_CMD_MGMT_IE_LIST             0x00f2
+
+/** Host Command ID : TDLS configuration */
+#define  HostCmd_CMD_TDLS_CONFIG              0x0100
+/** Host Command ID : TDLS operation */
+#define HostCmd_CMD_TDLS_OPERATION			0x0122
 
 /** Host Command ID : Extended scan support */
 #define  HostCmd_CMD_802_11_SCAN_EXT          0x0107
@@ -1205,6 +1216,9 @@ typedef enum _ENH_PS_MODES {
 #define EVENT_REMAIN_ON_CHANNEL_EXPIRED        0x0000005f
 #endif
 
+/** TDLS generic event */
+#define EVENT_TDLS_GENERIC_EVENT        0x00000052
+
 /** Card Event definition: Channel switch pending announcment */
 #define EVENT_CHANNEL_SWITCH_ANN        0x00000050
 
@@ -1257,6 +1271,76 @@ typedef enum _ENH_PS_MODES {
 #define EVENT_GET_BSS_TYPE(event_cause)         \
 	(((event_cause) >> 24) & 0x00ff)
 
+/** event type for tdls setup failure */
+#define TDLS_EVENT_TYPE_SETUP_FAILURE         1
+/** event type for tdls setup request received */
+#define TDLS_EVENT_TYPE_SETUP_REQ      		  2
+/** event type for tdls link torn down */
+#define TDLS_EVENT_TYPE_LINK_TORN_DOWN        3
+/** event type for tdls link established */
+#define TDLS_EVENT_TYPE_LINK_ESTABLISHED      4
+/** event type for tdls debug */
+#define TDLS_EVENT_TYPE_DEBUG                 5
+/** event type for tdls packet */
+#define TDLS_EVENT_TYPE_PACKET                6
+/** event type for channel switch result */
+#define TDLS_EVENT_TYPE_CHAN_SWITCH_RESULT    7
+/** event type for start channel switch */
+#define TDLS_EVENT_TYPE_START_CHAN_SWITCH     8
+/** event type for stop channel switch */
+#define TDLS_EVENT_TYPE_CHAN_SWITCH_STOPPED    9
+
+/** Packet received on direct link */
+#define RXPD_FLAG_PKT_DIRECT_LINK             1
+/** TDLS base channel */
+#define TDLS_BASE_CHANNEL	0
+/** TDLS off channel */
+#define TDLS_OFF_CHANNEL	1
+
+/** structure for channel switch result from TDLS FW */
+typedef MLAN_PACK_START struct _chan_switch_result {
+    /** current channel, 0 - base channel, 1 - off channel*/
+	t_u8 current_channel;
+    /** channel switch status*/
+	t_u8 status;
+    /** channel switch fauilure reason code*/
+	t_u8 reason;
+} MLAN_PACK_END chan_switch_result;
+
+typedef MLAN_PACK_START struct _ie_data {
+    /** IE Length */
+	t_u16 ie_length;
+    /** IE pointer */
+	t_u8 ie_ptr[0];
+} MLAN_PACK_END tdls_ie_data;
+
+/** Event structure for generic events from TDLS FW */
+typedef MLAN_PACK_START struct _Event_tdls_generic {
+    /** Event Type */
+	t_u16 event_type;
+    /** Peer mac address */
+	t_u8 peer_mac_addr[MLAN_MAC_ADDR_LENGTH];
+	union {
+	/** channel switch result structure*/
+		chan_switch_result switch_result;
+	/** channel switch stop reason*/
+		t_u8 cs_stop_reason;
+	/** Reason code */
+		t_u16 reason_code;
+	/** IE data */
+		tdls_ie_data ie_data;
+	} u;
+} MLAN_PACK_END Event_tdls_generic;
+
+typedef enum _tdls_error_code_e {
+	NO_ERROR = 0,
+	INTERNAL_ERROR,
+	MAX_TDLS_LINKS_EST,
+	TDLS_LINK_EXISTS,
+	TDLS_LINK_NONEXISTENT,
+	TDLS_PEER_STA_UNREACHABLE = 25,
+} tdls_error_code_e;
+
 /** Event_WEP_ICV_ERR structure */
 typedef MLAN_PACK_START struct _Event_WEP_ICV_ERR {
     /** Reason code */
@@ -1308,6 +1392,15 @@ typedef MLAN_PACK_START struct _MrvlIEtypes_Data_t {
 	t_u8 data[1];
 } MLAN_PACK_END MrvlIEtypes_Data_t;
 
+/*TDLS TIMEOUT VALUE (seconds)*/
+#define TDLS_IDLE_TIMEOUT             60
+/** MrvlIEtypes_Data_t */
+typedef MLAN_PACK_START struct _MrvlIEtypes_TDLS_Idle_Timeout_t {
+    /** Header */
+	MrvlIEtypesHeader_t header;
+    /** value */
+	t_u16 value;
+} MLAN_PACK_END MrvlIEtypes_TDLS_Idle_Timeout_t;
 #if defined(STA_SUPPORT)
 /** Pairwise Cipher Suite length */
 #define PAIRWISE_CIPHER_SUITE_LEN    4
@@ -1322,6 +1415,9 @@ typedef MLAN_PACK_START struct _MrvlIEtypes_Data_t {
 #define MRVDRV_TxPD_POWER_MGMT_NULL_PACKET 0x01
 /** Bit mask for TxPD status field for last packet */
 #define MRVDRV_TxPD_POWER_MGMT_LAST_PACKET 0x08
+
+/** Bit mask for TxPD status field for TDLS packet */
+#define MRVDRV_TxPD_FLAGS_TDLS_PACKET MBIT(4)
 
 /** Packet type: 802.11 */
 #define PKT_TYPE_802DOT11   0x05
@@ -1385,7 +1481,11 @@ typedef MLAN_PACK_START struct _RxPD {
      * [Bit 2]  HT Guard Interval: LGI = 0, SGI = 1 */
 	t_u8 ht_info;
     /** Reserved */
-	t_u8 reserved;
+	t_u8 reserved[3];
+    /** TDLS flags, bit 0: 0=InfraLink, 1=DirectLink */
+	t_u8 flags;
+    /** Reserved */
+	t_u8 reserved_1;
 } MLAN_PACK_END RxPD, *PRxPD;
 
 #ifdef UAP_SUPPORT
@@ -3641,6 +3741,28 @@ typedef MLAN_PACK_START struct _HostCmd_DS_MGMT_IE_LIST {
 	mlan_ds_misc_custom_ie ds_mgmt_ie;
 } MLAN_PACK_END HostCmd_DS_MGMT_IE_LIST_CFG;
 
+/** HostCmd_DS_TDLS_CONFIG */
+typedef MLAN_PACK_START struct _HostCmd_DS_TDLS_CONFIG {
+    /** Set TDLS configuration */
+	mlan_ds_misc_tdls_config tdls_info;
+} MLAN_PACK_END HostCmd_DS_TDLS_CONFIG;
+
+/**Action ID for TDLS delete link*/
+#define TDLS_DELETE           0x00
+/**Action ID for TDLS create link*/
+#define TDLS_CREATE            0x01
+/**Action ID for TDLS config link*/
+#define TDLS_CONFIG            0x02
+/** HostCmd_DS_TDLS_OPER */
+typedef MLAN_PACK_START struct _HostCmd_DS_TDLS_OPER {
+    /** Action */
+	t_u16 tdls_action;
+	/**reason*/
+	t_u16 reason;
+    /** peer mac */
+	t_u8 peer_mac[MLAN_MAC_ADDR_LENGTH];
+} MLAN_PACK_END HostCmd_DS_TDLS_OPER;
+
 /** HostCmd_CMD_MAC_REG_ACCESS */
 typedef MLAN_PACK_START struct _HostCmd_DS_MAC_REG_ACCESS {
     /** Action */
@@ -4770,6 +4892,10 @@ typedef struct MLAN_PACK_START _HostCmd_DS_COMMAND {
 		HostCmd_DS_802_11_IBSS_STATUS ibss_coalescing;
 	/** Mgmt IE list configuration */
 		HostCmd_DS_MGMT_IE_LIST_CFG mgmt_ie_list;
+	/** TDLS configuration command */
+		HostCmd_DS_TDLS_CONFIG tdls_config_data;
+	    /** TDLS operation command */
+		HostCmd_DS_TDLS_OPER tdls_oper_data;
 	/** System clock configuration */
 		HostCmd_DS_ECL_SYSTEM_CLOCK_CONFIG sys_clock_cfg;
 	/** MAC register access */

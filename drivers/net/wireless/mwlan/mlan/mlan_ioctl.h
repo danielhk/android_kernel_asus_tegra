@@ -208,6 +208,7 @@ enum _mlan_ioctl_req_id {
 	MLAN_OID_MISC_ASSOC_RSP = 0x0020000C,
 	MLAN_OID_MISC_INIT_SHUTDOWN = 0x0020000D,
 	MLAN_OID_MISC_CUSTOM_IE = 0x0020000F,
+	MLAN_OID_MISC_TDLS_CONFIG = 0x00200010,
 	MLAN_OID_MISC_TX_DATAPAUSE = 0x00200012,
 	MLAN_OID_MISC_IP_ADDR = 0x00200013,
 	MLAN_OID_MISC_MAC_CONTROL = 0x00200014,
@@ -231,6 +232,8 @@ enum _mlan_ioctl_req_id {
 #ifdef WIFI_DIRECT_SUPPORT
 	MLAN_OID_MISC_WIFI_DIRECT_CONFIG = 0x00200025,
 #endif
+	MLAN_OID_MISC_TDLS_OPER = 0x00200026,
+	MLAN_OID_MISC_GET_TDLS_IES = 0x00200027,
 };
 
 /** Sub command size */
@@ -1212,6 +1215,8 @@ typedef struct _mlan_fw_info {
 	t_u32 fw_ver;
     /** MAC address */
 	mlan_802_11_mac_addr mac_addr;
+    /** 802.11n device capabilities */
+	t_u32 hw_dot_11n_dev_cap;
     /** Device support for MIMO abstraction of MCSs */
 	t_u8 hw_dev_mcs_support;
 	/** fw supported band */
@@ -1321,6 +1326,25 @@ typedef struct {
 #define SDIO_MP_DBG_NUM                  6
 #endif
 
+/** Maximum size of IEEE Information Elements */
+#define IEEE_MAX_IE_SIZE      256
+
+/** support up to 8 TDLS peer */
+#define MLAN_MAX_TDLS_PEER_SUPPORTED     8
+/** TDLS peer info */
+typedef struct _tdls_peer_info {
+    /** station mac address */
+	t_u8 mac_addr[MLAN_MAC_ADDR_LENGTH];
+    /** SNR */
+	t_s8 snr;
+    /** Noise Floor */
+	t_s8 nf;
+	/** Extended Capabilities IE */
+	t_u8 ext_cap[IEEE_MAX_IE_SIZE];
+    /** HT Capabilities IE */
+	t_u8 ht_cap[IEEE_MAX_IE_SIZE];
+} tdls_peer_info;
+
 /** mlan_debug_info data structure for MLAN_OID_GET_DEBUG_INFO */
 typedef struct _mlan_debug_info {
 	/* WMM AC_BK count */
@@ -1345,6 +1369,10 @@ typedef struct _mlan_debug_info {
 	t_u32 rx_tbl_num;
     /** Rx reorder table*/
 	rx_reorder_tbl rx_tbl[MLAN_MAX_RX_BASTREAM_SUPPORTED];
+    /** TDLS peer number */
+	t_u32 tdls_peer_num;
+    /** TDLS peer list*/
+	tdls_peer_info tdls_peer_list[MLAN_MAX_TDLS_PEER_SUPPORTED];
     /** Corresponds to ps_mode member of mlan_adapter */
 	t_u16 ps_mode;
     /** Corresponds to ps_state member of mlan_adapter */
@@ -1485,6 +1513,8 @@ typedef struct _mlan_debug_info {
 	t_u32 mlan_processing;
     /** mlan_rx_processing */
 	t_u32 mlan_rx_processing;
+    /** rx pkts queued */
+	t_u32 rx_pkts_queued;
     /** mlan_adapter pointer */
 	t_void *mlan_adapter;
     /** mlan_adapter_size */
@@ -2560,9 +2590,6 @@ typedef struct _mlan_ds_11n_cfg {
 /** Country code length */
 #define COUNTRY_CODE_LEN                        3
 
-/** Maximum size of IEEE Information Elements */
-#define IEEE_MAX_IE_SIZE      256
-
 /*-----------------------------------------------------------------*/
 /** 802.11d Configuration Group */
 /*-----------------------------------------------------------------*/
@@ -3037,6 +3064,59 @@ typedef struct _mlan_ds_misc_pmfcfg {
 } mlan_ds_misc_pmfcfg;
 #endif
 
+/**Action ID for TDLS disable link*/
+#define WLAN_TDLS_DISABLE_LINK           0x00
+/**Action ID for TDLS enable link*/
+#define WLAN_TDLS_ENABLE_LINK            0x01
+/**Action ID for TDLS create link*/
+#define WLAN_TDLS_CREATE_LINK            0x02
+/**Action ID for TDLS config link*/
+#define WLAN_TDLS_CONFIG_LINK            0x03
+/*reason code*/
+#define WLAN_REASON_TDLS_TEARDOWN_UNSPECIFIED 26
+/** TDLS operation buffer */
+typedef struct _mlan_ds_misc_tdls_oper {
+    /** TDLS Action */
+	t_u16 tdls_action;
+    /** TDLS peer address */
+	t_u8 peer_mac[MLAN_MAC_ADDR_LENGTH];
+	/** peer capability */
+	t_u16 capability;
+	/** peer qos info */
+	t_u8 qos_info;
+	/** peer extend capability */
+	t_u8 *ext_capab;
+	/** extend capability len */
+	t_u8 ext_capab_len;
+	/** support rates */
+	t_u8 *supported_rates;
+	/** supported rates len */
+	t_u8 supported_rates_len;
+	/** peer ht_cap */
+	t_u8 *ht_capa;
+} mlan_ds_misc_tdls_oper;
+
+/** flag for TDLS extcap */
+#define TDLS_IE_FLAGS_EXTCAP     0x0001
+/** flag for TDLS HTCAP */
+#define TDLS_IE_FLAGS_HTCAP      0x0002
+/** flag for TDLS HTINFO */
+#define TDLS_IE_FLAGS_HTINFO     0x0004
+
+/** TDLS ie buffer */
+typedef struct _mlan_ds_misc_tdls_ies {
+    /** TDLS peer address */
+	t_u8 peer_mac[MLAN_MAC_ADDR_LENGTH];
+    /** flags for request IEs */
+	t_u16 flags;
+    /** Extended Capabilities IE */
+	t_u8 ext_cap[IEEE_MAX_IE_SIZE];
+    /** HT Capabilities IE */
+	t_u8 ht_cap[IEEE_MAX_IE_SIZE];
+    /** HT Information IE */
+	t_u8 ht_info[IEEE_MAX_IE_SIZE];
+} mlan_ds_misc_tdls_ies;
+
 /** Type definition of mlan_ds_misc_cfg for MLAN_IOCTL_MISC_CFG */
 typedef struct _mlan_ds_misc_cfg {
     /** Sub-command */
@@ -3063,6 +3143,12 @@ typedef struct _mlan_ds_misc_cfg {
 		t_u32 func_init_shutdown;
 	/** Custom IE for MLAN_OID_MISC_CUSTOM_IE */
 		mlan_ds_misc_custom_ie cust_ie;
+	/** TDLS configuration for MLAN_OID_MISC_TDLS_CONFIG */
+		mlan_ds_misc_tdls_config tdls_config;
+	/** TDLS operation for MLAN_OID_MISC_TDLS_OPER */
+		mlan_ds_misc_tdls_oper tdls_oper;
+	/** TDLS ies for  MLAN_OID_MISC_GET_TDLS_IES */
+		mlan_ds_misc_tdls_ies tdls_ies;
 	/** Tx data pause for MLAN_OID_MISC_TX_DATAPAUSE */
 		mlan_ds_misc_tx_datapause tx_datapause;
 	/** IP address configuration */

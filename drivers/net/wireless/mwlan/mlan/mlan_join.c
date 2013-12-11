@@ -2091,13 +2091,22 @@ wlan_disconnect(IN mlan_private * pmpriv,
 				       bss_descriptor.mac_address,
 				       MLAN_MAC_ADDR_LENGTH);
 			}
-
-			ret = wlan_prepare_cmd(pmpriv,
-					       HostCmd_CMD_802_11_DEAUTHENTICATE,
-					       HostCmd_ACT_GEN_SET,
-					       0,
-					       (t_void *) pioctl_req,
-					       &mac_address);
+#ifdef WIFI_DIRECT_SUPPORT
+			if (pmpriv->bss_type == MLAN_BSS_TYPE_WIFIDIRECT)
+				ret = wlan_prepare_cmd(pmpriv,
+						       HostCmd_CMD_802_11_DISASSOCIATE,
+						       HostCmd_ACT_GEN_SET,
+						       0,
+						       (t_void *) pioctl_req,
+						       &mac_address);
+			else
+#endif
+				ret = wlan_prepare_cmd(pmpriv,
+						       HostCmd_CMD_802_11_DEAUTHENTICATE,
+						       HostCmd_ACT_GEN_SET,
+						       0,
+						       (t_void *) pioctl_req,
+						       &mac_address);
 
 			if (ret == MLAN_STATUS_SUCCESS && pioctl_req)
 				ret = MLAN_STATUS_PENDING;

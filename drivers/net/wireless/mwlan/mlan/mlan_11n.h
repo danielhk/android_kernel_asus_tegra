@@ -105,6 +105,8 @@ void wlan_11n_delete_bastream(mlan_private * priv, t_u8 * del_ba);
 int wlan_get_rxreorder_tbl(mlan_private * priv, rx_reorder_tbl * buf);
 /** get tx ba stream table */
 int wlan_get_txbastream_tbl(mlan_private * priv, tx_ba_stream_tbl * buf);
+/** send delba */
+void wlan_11n_delba(mlan_private * priv, int tid);
 /** Minimum number of AMSDU */
 #define MIN_NUM_AMSDU 2
 /** AMSDU Aggr control cmd resp */
@@ -258,6 +260,8 @@ wlan_is_ampdu_allowed(mlan_private * priv, raListTbl * ptr, int tid)
 #endif /* UAP_SUPPORT */
 	if (priv->sec_info.wapi_enabled && !priv->sec_info.wapi_key_on)
 		return MFALSE;
+	if (ptr->is_tdls_link)
+		return is_station_ampdu_allowed(priv, ptr, tid);
 
 	return (priv->aggr_prio_tbl[tid].ampdu_ap != BA_STREAM_NOT_ALLOWED)
 		? MTRUE : MFALSE;

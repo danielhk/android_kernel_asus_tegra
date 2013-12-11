@@ -89,7 +89,7 @@ Change log:
 
 #include	<linux/firmware.h>
 
-#include        "mlan.h"
+#include        "../mlan/mlan.h"
 #include        "moal_shim.h"
 /* Wireless header */
 #if defined(STA_CFG80211) || defined(UAP_CFG80211)
@@ -532,9 +532,9 @@ out:
 /** Custom event : AdHoc link lost */
 #define CUS_EVT_ADHOC_LINK_LOST		"EVENT=ADHOC_LINK_LOST"
 /** Custom event : MIC failure, unicast */
-#define CUS_EVT_MLME_MIC_ERR_UNI	"MLME-MICHAELMICFAILURE.indication unicast "
+#define CUS_EVT_MLME_MIC_ERR_UNI	"MLME-MICHAELMICFAILURE.indication unicast"
 /** Custom event : MIC failure, multicast */
-#define CUS_EVT_MLME_MIC_ERR_MUL	"MLME-MICHAELMICFAILURE.indication multicast "
+#define CUS_EVT_MLME_MIC_ERR_MUL	"MLME-MICHAELMICFAILURE.indication multicast"
 /** Custom event : Beacon RSSI low */
 #define CUS_EVT_BEACON_RSSI_LOW		"EVENT=BEACON_RSSI_LOW"
 /** Custom event : Beacon SNR low */
@@ -564,9 +564,9 @@ out:
 #define CUS_EVT_DEEP_SLEEP_AWAKE	"EVENT=DS_AWAKE"
 
 /** Custom event : Host Sleep activated */
-#define CUS_EVT_HS_ACTIVATED		"HS_ACTIVATED "
+#define CUS_EVT_HS_ACTIVATED		"HS_ACTIVATED"
 /** Custom event : Host Sleep deactivated */
-#define CUS_EVT_HS_DEACTIVATED		"HS_DEACTIVATED "
+#define CUS_EVT_HS_DEACTIVATED		"HS_DEACTIVATED"
 /** Custom event : Host Sleep wakeup */
 #define CUS_EVT_HS_WAKEUP		"HS_WAKEUP"
 
@@ -896,6 +896,8 @@ struct _moal_private {
 	u8 mrvl_rssi_low;
 	/** last event */
 	u32 last_event;
+	/** fake scan flag */
+	u8 fake_scan_complete;
 
 #endif				/* STA_SUPPORT */
 #endif				/* STA_CFG80211 */
@@ -1159,8 +1161,6 @@ struct _moal_handle {
 #endif
 	/** Driver spin lock */
 	spinlock_t driver_lock;
-	/** Card type */
-	t_u16 card_type;
 	/** Card specific driver version */
 	t_s8 driver_version[MLAN_MAX_VER_STR_LEN];
 };
@@ -1487,11 +1487,6 @@ typedef struct _HostCmd_DS_802_11_CFG_DATA {
 	t_u8 data[1];
 } __ATTRIB_PACK__ HostCmd_DS_802_11_CFG_DATA;
 
-/** SD8797 card type */
-#define CARD_TYPE_SD8797    0x01
-/** SD8782 card type */
-#define CARD_TYPE_SD8782    0x02
-
 /** combo scan header */
 #define WEXT_CSCAN_HEADER		"CSCAN S\x01\x00\x00S\x00"
 /** combo scan header size */
@@ -1760,6 +1755,8 @@ int woal_custom_ie_ioctl(struct net_device *dev, struct ifreq *req);
 int woal_send_host_packet(struct net_device *dev, struct ifreq *req);
 /** Private command ID to pass mgmt frame */
 #define WOAL_MGMT_FRAME_TX_IOCTL          (SIOCDEVPRIVATE + 12)
+/** common ioctl for TDLS */
+int woal_tdls_config_ioctl(struct net_device *dev, struct ifreq *req);
 
 int woal_get_bss_type(struct net_device *dev, struct ifreq *req);
 #if defined(STA_WEXT) || defined(UAP_WEXT)

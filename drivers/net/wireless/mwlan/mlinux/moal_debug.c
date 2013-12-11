@@ -91,6 +91,8 @@ static struct debug_data items[] = {
 	,
 	{"hs_activated", item_size(hs_activated), item_addr(hs_activated)}
 	,
+	{"rx_pkts_queued", item_size(rx_pkts_queued), item_addr(rx_pkts_queued)}
+	,
 	{"tx_pkts_queued", item_size(tx_pkts_queued), item_addr(tx_pkts_queued)}
 	,
 	{"pps_uapsd_mode", item_size(pps_uapsd_mode), item_addr(pps_uapsd_mode)}
@@ -285,6 +287,8 @@ static struct debug_data uap_items[] = {
 	 item_addr(is_hs_configured)}
 	,
 	{"hs_activated", item_size(hs_activated), item_addr(hs_activated)}
+	,
+	{"rx_pkts_queued", item_size(rx_pkts_queued), item_addr(rx_pkts_queued)}
 	,
 	{"tx_pkts_queued", item_size(tx_pkts_queued), item_addr(tx_pkts_queued)}
 	,
@@ -554,6 +558,30 @@ woal_debug_read(struct seq_file *sfp, void *data)
 			seq_printf(sfp, "\n");
 		}
 	}
+	if (info.tdls_peer_list) {
+		for (i = 0; i < info.tdls_peer_num; i++) {
+			unsigned int j;
+			seq_printf(sfp,
+				   "tdls peer: %02x:%02x:%02x:%02x:%02x:%02x snr=%d nf=%d\n",
+				   info.tdls_peer_list[i].mac_addr[0],
+				   info.tdls_peer_list[i].mac_addr[1],
+				   info.tdls_peer_list[i].mac_addr[2],
+				   info.tdls_peer_list[i].mac_addr[3],
+				   info.tdls_peer_list[i].mac_addr[4],
+				   info.tdls_peer_list[i].mac_addr[5],
+				   info.tdls_peer_list[i].snr,
+				   -info.tdls_peer_list[i].nf);
+			seq_printf(sfp, "htcap: ");
+			for (j = 0; j < sizeof(IEEEtypes_HTCap_t); j++)
+				seq_printf(sfp, "%02x ",
+					   info.tdls_peer_list[i].ht_cap[j]);
+			seq_printf(sfp, "\nExtcap: ");
+			for (j = 0; j < sizeof(IEEEtypes_ExtCap_t); j++)
+				seq_printf(sfp, "%02x ",
+					   info.tdls_peer_list[i].ext_cap[j]);
+			seq_printf(sfp, "\n");
+		}
+	}
 exit:
 	MODULE_PUT;
 	LEAVE();
@@ -648,16 +676,17 @@ woal_debug_write(struct file *f, const char __user * buf, size_t count,
 #ifdef DEBUG_LEVEL1
 	if (last_drvdbg != drvdbg) {
 		woal_set_drvdbg(priv, drvdbg);
+
 	}
 #endif
-
+#if 0
 	/* Set debug information */
 	if (woal_set_debug_info(priv, MOAL_PROC_WAIT, &info)) {
 		MODULE_PUT;
 		LEAVE();
 		return 0;
 	}
-
+#endif
 	MODULE_PUT;
 	LEAVE();
 	return count;

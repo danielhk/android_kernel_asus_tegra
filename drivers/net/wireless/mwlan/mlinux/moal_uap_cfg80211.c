@@ -21,6 +21,12 @@
 
 #include "moal_cfg80211.h"
 #include "moal_uap_cfg80211.h"
+/** secondary channel is below */
+#define SECOND_CHANNEL_BELOW    0x30
+/** secondary channel is above */
+#define SECOND_CHANNEL_ABOVE    0x10
+/** no secondary channel */
+#define SECONDARY_CHANNEL_NONE     0x00
 /********************************************************
 				Local Variables
 ********************************************************/
@@ -349,13 +355,7 @@ woal_find_wpa_ies(const t_u8 * ie, int len, mlan_uap_bss_param * sys_config)
 	return ret;
 }
 
-/** secondary channel is below */
-#define SECOND_CHANNEL_BELOW    0x30
-/** secondary channel is above */
-#define SECOND_CHANNEL_ABOVE    0x10
-/** no secondary channel */
-#define SECONDARY_CHANNEL_NONE     0x00
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 6, 0) || defined(WIFI_DIRECT_SUPPORT)
 /**
  * @brief Get second channel offset
  *
@@ -394,7 +394,6 @@ woal_get_second_channel_offset(int chan)
 	case 161:
 		chan2Offset = SECOND_CHANNEL_BELOW;
 		break;
-	case 140:
 	case 165:
 		/* Special Case: 20Mhz-only Channel */
 		chan2Offset = SECONDARY_CHANNEL_NONE;
@@ -402,6 +401,7 @@ woal_get_second_channel_offset(int chan)
 	}
 	return chan2Offset;
 }
+#endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 4, 0)
 /**
@@ -442,12 +442,12 @@ woal_cfg80211_beacon_config(moal_private * priv,
 		0x60, 0x6c, 0
 	};
 	t_u8 rates_a[9] = { 0x8c, 0x12, 0x98, 0x24, 0xb0, 0x48, 0x60, 0x6c, 0 };
-	t_u8 chan2Offset = 0;
 #ifdef WIFI_DIRECT_SUPPORT
 	t_u8 rates_wfd[9] =
 		{ 0x8c, 0x12, 0x18, 0x24, 0x30, 0x48, 0x60, 0x6c, 0 };
 #endif
-
+	t_u8 chan2Offset = 0;
+	t_u8 enable_11n = MTRUE;
 	ENTER();
 
 	if (params == NULL) {
@@ -493,6 +493,53 @@ woal_cfg80211_beacon_config(moal_private * priv,
 	}
 	if (priv->channel) {
 		memset(sys_config.rates, 0, sizeof(sys_config.rates));
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 6, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0)
+		switch (params->chandef.width) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 11, 0)
+		case NL80211_CHAN_WIDTH_5:
+		case NL80211_CHAN_WIDTH_10:
+#endif
+		case NL80211_CHAN_WIDTH_20_NOHT:
+			enable_11n = MFALSE;
+			break;
+		case NL80211_CHAN_WIDTH_20:
+			break;
+		case NL80211_CHAN_WIDTH_40:
+		case NL80211_CHAN_WIDTH_80:
+		case NL80211_CHAN_WIDTH_80P80:
+		case NL80211_CHAN_WIDTH_160:
+			if (params->chandef.center_freq1 <
+			    params->chandef.chan->center_freq)
+				chan2Offset = SECOND_CHANNEL_BELOW;
+			else
+				chan2Offset = SECOND_CHANNEL_ABOVE;
+			break;
+		default:
+			PRINTM(MWARN, "Unknown channel width: %d\n",
+			       params->chandef.width);
+			break;
+		}
+#else
+		switch (params->channel_type) {
+		case NL80211_CHAN_NO_HT:
+			enable_11n = MFALSE;
+			break;
+		case NL80211_CHAN_HT20:
+			break;
+		case NL80211_CHAN_HT40PLUS:
+			chan2Offset = SECOND_CHANNEL_ABOVE;
+			break;
+		case NL80211_CHAN_HT40MINUS:
+			chan2Offset = SECOND_CHANNEL_BELOW;
+			break;
+		default:
+			PRINTM(MWARN, "Unknown channel type: %d\n",
+			       params->channel_type);
+			break;
+		}
+#endif
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(3, 6, 0) */
 		sys_config.channel = priv->channel;
 		if (priv->channel <= MAX_BG_CHANNEL) {
 			sys_config.band_cfg = BAND_CONFIG_2G;
@@ -506,13 +553,19 @@ woal_cfg80211_beacon_config(moal_private * priv,
 				       sizeof(rates_bg));
 		} else {
 			sys_config.band_cfg = BAND_CONFIG_5G;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 6, 0)
 			chan2Offset =
 				woal_get_second_channel_offset(priv->channel);
-			if (chan2Offset) {
-				sys_config.band_cfg |= chan2Offset;
-				sys_config.ht_cap_info = 0x117e;
-				sys_config.ampdu_param = 3;
-			}
+#else
+#ifdef WIFI_DIRECT_SUPPORT
+			/* Force enable 40MHZ on WFD interface */
+			if (priv->bss_type == MLAN_BSS_TYPE_WIFIDIRECT)
+				chan2Offset =
+					woal_get_second_channel_offset(priv->
+								       channel);
+#endif
+#endif
+
 #ifdef WIFI_DIRECT_SUPPORT
 			if (priv->bss_type == MLAN_BSS_TYPE_WIFIDIRECT)
 				memcpy(sys_config.rates, rates_wfd,
@@ -522,6 +575,16 @@ woal_cfg80211_beacon_config(moal_private * priv,
 				memcpy(sys_config.rates, rates_a,
 				       sizeof(rates_a));
 		}
+		sys_config.ht_cap_info = 0x111c;
+		if (chan2Offset) {
+			sys_config.band_cfg |= chan2Offset;
+			sys_config.ht_cap_info |= 0x72;
+			sys_config.ampdu_param = 3;
+		}
+		PRINTM(MCMND,
+		       "11n=%d, ht_cap=0x%x, channel=%d, band_cfg=0x%x\n",
+		       enable_11n, sys_config.ht_cap_info, priv->channel,
+		       sys_config.band_cfg);
 	}
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0) || defined(COMPAT_WIRELESS)
 	if (!params->ssid || !params->ssid_len) {
@@ -664,11 +727,14 @@ woal_cfg80211_beacon_config(moal_private * priv,
 		sys_config.protocol = PROTOCOL_STATIC_WEP;
 		sys_config.key_mgmt = KEY_MGMT_NONE;
 		sys_config.wpa_cfg.length = 0;
-		sys_config.wep_cfg.key0.key_index = priv->key_index;
-		sys_config.wep_cfg.key0.is_default = 1;
-		sys_config.wep_cfg.key0.length = priv->key_len;
-		memcpy(sys_config.wep_cfg.key0.key, priv->key_material,
-		       priv->key_len);
+		memcpy(&sys_config.wep_cfg.key0, &priv->uap_wep_key[0],
+		       sizeof(wep_key));
+		memcpy(&sys_config.wep_cfg.key1, &priv->uap_wep_key[1],
+		       sizeof(wep_key));
+		memcpy(&sys_config.wep_cfg.key2, &priv->uap_wep_key[2],
+		       sizeof(wep_key));
+		memcpy(&sys_config.wep_cfg.key3, &priv->uap_wep_key[3],
+		       sizeof(wep_key));
 	} else {
 		/** Get cipher and key_mgmt from RSN/WPA IE */
 		if (capab_info & WLAN_CAPABILITY_PRIVACY) {
@@ -693,6 +759,8 @@ woal_cfg80211_beacon_config(moal_private * priv,
 	   wpa2-psk, it will automatically enable 11n */
 	if ((sys_config.protocol == PROTOCOL_STATIC_WEP) ||
 	    (sys_config.protocol == PROTOCOL_WPA))
+		enable_11n = MFALSE;
+	if (!enable_11n)
 		woal_uap_set_11n_status(&sys_config, MLAN_ACT_DISABLE);
 	else
 		woal_uap_set_11n_status(&sys_config, MLAN_ACT_ENABLE);

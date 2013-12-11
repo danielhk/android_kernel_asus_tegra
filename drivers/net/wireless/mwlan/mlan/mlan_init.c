@@ -370,6 +370,7 @@ wlan_init_priv(pmlan_private priv)
 	priv->wmm_required = MTRUE;
 	priv->wmm_enabled = MFALSE;
 	priv->wmm_qosinfo = 0;
+	priv->saved_wmm_qosinfo = 0;
 #ifdef STA_SUPPORT
 	priv->pcurr_bcn_buf = MNULL;
 	priv->curr_bcn_size = 0;
@@ -382,10 +383,8 @@ wlan_init_priv(pmlan_private priv)
 	priv->addba_reject[7] = ADDBA_RSP_STATUS_REJECT;
 	priv->max_amsdu = 0;
 
-	if (GET_BSS_ROLE(priv) == MLAN_BSS_ROLE_STA)
-		priv->port_ctrl_mode = MTRUE;
-	else
-		priv->port_ctrl_mode = MFALSE;
+	priv->port_ctrl_mode = MTRUE;
+
 	priv->port_open = MFALSE;
 
 	ret = wlan_add_bsspriotbl(priv);
@@ -565,6 +564,7 @@ wlan_init_adapter(pmlan_adapter pmadapter)
 #ifdef STA_SUPPORT
 	pmadapter->chan_bandwidth = 0;
 	pmadapter->adhoc_11n_enabled = MFALSE;
+	pmadapter->tdls_status = TDLS_NOT_SETUP;
 #endif /* STA_SUPPORT */
 
 	/* Initialize 802.11d */
@@ -593,6 +593,8 @@ wlan_init_adapter(pmlan_adapter pmadapter)
 	       sizeof(pmadapter->sleep_params));
 	memset(pmadapter, &pmadapter->sleep_period, 0,
 	       sizeof(pmadapter->sleep_period));
+	memset(pmadapter, &pmadapter->saved_sleep_period, 0,
+	       sizeof(pmadapter->saved_sleep_period));
 	pmadapter->tx_lock_flag = MFALSE;
 	pmadapter->null_pkt_interval = 0;
 	pmadapter->fw_bands = 0;
@@ -759,6 +761,11 @@ wlan_init_lock_list(IN pmlan_adapter pmadapter)
 					    &priv->sta_list, MTRUE,
 					    pmadapter->callbacks.
 					    moal_init_lock);
+			/* Initialize tdls_pending_txq */
+			util_init_list_head((t_void *) pmadapter->pmoal_handle,
+					    &priv->tdls_pending_txq, MTRUE,
+					    pmadapter->callbacks.
+					    moal_init_lock);
 			/* Initialize bypass_txq */
 			util_init_list_head((t_void *) pmadapter->pmoal_handle,
 					    &priv->bypass_txq, MTRUE,
@@ -853,6 +860,10 @@ wlan_free_lock_list(IN pmlan_adapter pmadapter)
 			util_free_list_head((t_void *) pmadapter->pmoal_handle,
 					    &priv->sta_list,
 					    priv->adapter->callbacks.
+					    moal_free_lock);
+			util_free_list_head((t_void *) pmadapter->pmoal_handle,
+					    &priv->tdls_pending_txq,
+					    pmadapter->callbacks.
 					    moal_free_lock);
 			util_free_list_head((t_void *) pmadapter->pmoal_handle,
 					    &priv->bypass_txq,

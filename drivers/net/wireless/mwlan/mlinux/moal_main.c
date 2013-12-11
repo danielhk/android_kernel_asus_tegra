@@ -68,11 +68,6 @@ char driver_version[] =
 #endif
 	" ";
 
-/** SD8797 Card */
-#define CARD_SD8797     "SD8797"
-/** SD8782 Card */
-#define CARD_SD8782     "SD8782"
-
 /** Firmware name */
 char *fw_name;
 int req_fw_nowait;
@@ -127,6 +122,8 @@ int max_vir_bss = DEF_VIRTUAL_BSS;
 #ifdef SDIO_SUSPEND_RESUME
 /** PM keep power */
 int pm_keep_power = 1;
+/** HS when shutdown */
+int shutdown_hs;
 #endif
 
 #if defined(STA_SUPPORT)
@@ -176,6 +173,12 @@ int rx_work;
 
 int hw_test;
 
+#if defined(WIFI_DIRECT_SUPPORT)
+#if LINUX_VERSION_CODE >= WIFI_DIRECT_KERNEL_VERSION
+int p2p_enh = 1;
+#endif
+#endif
+
 /** woal_callbacks */
 static mlan_callbacks woal_callbacks = {
 	.moal_get_fw_data = moal_get_fw_data,
@@ -216,7 +219,6 @@ static mlan_callbacks woal_callbacks = {
 	.moal_tcp_ack_tx_ind = moal_tcp_ack_tx_ind,
 };
 
-/** Default Driver mode */
 #if defined(STA_SUPPORT) && defined(UAP_SUPPORT)
 #if defined(WIFI_DIRECT_SUPPORT)
 int drv_mode = (DRV_MODE_STA | DRV_MODE_UAP | DRV_MODE_WIFIDIRECT);
@@ -746,21 +748,12 @@ woal_update_drv_tbl(moal_handle * handle, int drv_mode_local)
 		handle->drv_mode.fw_name = fw_name;
 	} else {
 #if defined(UAP_SUPPORT) && defined(STA_SUPPORT)
-		if (handle->card_type == CARD_TYPE_SD8782)
-			handle->drv_mode.fw_name = DEFAULT_AP_STA_FW_NAME_8782;
-		else
-			handle->drv_mode.fw_name = DEFAULT_AP_STA_FW_NAME;
+		handle->drv_mode.fw_name = DEFAULT_AP_STA_FW_NAME;
 #else
 #ifdef UAP_SUPPORT
-		if (handle->card_type == CARD_TYPE_SD8782)
-			handle->drv_mode.fw_name = DEFAULT_AP_FW_NAME_8782;
-		else
-			handle->drv_mode.fw_name = DEFAULT_AP_FW_NAME;
+		handle->drv_mode.fw_name = DEFAULT_AP_FW_NAME;
 #else
-		if (handle->card_type == CARD_TYPE_SD8782)
-			handle->drv_mode.fw_name = DEFAULT_FW_NAME_8782;
-		else
-			handle->drv_mode.fw_name = DEFAULT_FW_NAME;
+		handle->drv_mode.fw_name = DEFAULT_FW_NAME;
 #endif /* UAP_SUPPORT */
 #endif /* UAP_SUPPORT && STA_SUPPORT */
 	}
@@ -792,7 +785,7 @@ woal_init_sw(moal_handle * handle)
 	handle->main_state = MOAL_STATE_IDLE;
 
 #ifdef STA_SUPPORT
-	if (MTRUE
+	if ((drv_mode & DRV_MODE_STA)
 #ifdef STA_WEXT
 	    && !IS_STA_WEXT(cfg80211_wext)
 #endif
@@ -807,11 +800,16 @@ woal_init_sw(moal_handle * handle)
 	}
 #endif /* STA_SUPPORT */
 
-	/* Update driver version */
-	if (handle->card_type == CARD_TYPE_SD8782)
-		memcpy(driver_version, CARD_SD8782, strlen(CARD_SD8782));
-	else if (handle->card_type == CARD_TYPE_SD8797)
-		memcpy(driver_version, CARD_SD8797, strlen(CARD_SD8797));
+#if defined(STA_CFG80211) && defined(STA_SUPPORT)
+	if (IS_STA_CFG80211(cfg80211_wext))
+		cfg80211_wext |= STA_CFG80211_MASK | UAP_CFG80211_MASK;
+#endif
+
+#if defined(UAP_CFG80211) && defined(UAP_SUPPORT)
+	if (IS_UAP_CFG80211(cfg80211_wext))
+		cfg80211_wext |= STA_CFG80211_MASK | UAP_CFG80211_MASK;
+#endif
+
 	memcpy(handle->driver_version, driver_version, strlen(driver_version));
 
 	if (woal_update_drv_tbl(handle, drv_mode) != MLAN_STATUS_SUCCESS) {
@@ -911,9 +909,6 @@ woal_init_sw(moal_handle * handle)
 	device.mpa_rx_cfg = MLAN_INIT_PARA_DISABLED;
 #endif
 #endif
-	device.feature_control = FEATURE_CTRL_DEFAULT;
-	if (handle->card_type == CARD_TYPE_SD8782)
-		device.feature_control = 0;
 
 	if (rx_work == MLAN_INIT_PARA_ENABLED)
 		device.rx_work = MTRUE;
@@ -1828,12 +1823,14 @@ woal_init_fw(moal_handle * handle)
 	ENTER();
 
 	do_gettimeofday(&handle->req_fw_time);
+
 	ret = woal_request_fw(handle);
 	if (ret < 0) {
 		PRINTM(MFATAL, "woal_request_fw failed\n");
 		ret = MLAN_STATUS_FAILURE;
 		goto done;
 	}
+
 done:
 	LEAVE();
 	return ret;
@@ -2668,11 +2665,13 @@ woal_open(struct net_device *dev)
 #if defined(WIFI_DIRECT_SUPPORT)
 #if defined(STA_CFG80211) && defined(UAP_CFG80211)
 #if LINUX_VERSION_CODE >= WIFI_DIRECT_KERNEL_VERSION
-	if (priv->bss_type == MLAN_BSS_TYPE_WIFIDIRECT &&
-	    IS_STA_CFG80211(cfg80211_wext)) {
-		priv->phandle->wiphy->interface_modes |=
-			MBIT(NL80211_IFTYPE_P2P_GO) |
-			MBIT(NL80211_IFTYPE_P2P_CLIENT);
+	if (!p2p_enh) {
+		if (priv->bss_type == MLAN_BSS_TYPE_WIFIDIRECT &&
+		    IS_STA_CFG80211(cfg80211_wext)) {
+			priv->phandle->wiphy->interface_modes |=
+				MBIT(NL80211_IFTYPE_P2P_GO) |
+				MBIT(NL80211_IFTYPE_P2P_CLIENT);
+		}
 	}
 #endif
 #endif
@@ -2730,11 +2729,15 @@ woal_close(struct net_device *dev)
 #if defined(WIFI_DIRECT_SUPPORT)
 #if defined(STA_CFG80211) && defined(UAP_CFG80211)
 #if LINUX_VERSION_CODE >= WIFI_DIRECT_KERNEL_VERSION
-	if (priv->bss_type == MLAN_BSS_TYPE_WIFIDIRECT && !priv->bss_virtual &&
-	    IS_STA_CFG80211(cfg80211_wext) && IS_UAP_CFG80211(cfg80211_wext)) {
-		priv->phandle->wiphy->interface_modes &=
-			~(MBIT(NL80211_IFTYPE_P2P_GO) |
-			  MBIT(NL80211_IFTYPE_P2P_CLIENT));
+	if (!p2p_enh) {
+		if (priv->bss_type == MLAN_BSS_TYPE_WIFIDIRECT &&
+		    !priv->bss_virtual &&
+		    IS_STA_CFG80211(cfg80211_wext) &&
+		    IS_UAP_CFG80211(cfg80211_wext)) {
+			priv->phandle->wiphy->interface_modes &=
+				~(MBIT(NL80211_IFTYPE_P2P_GO) |
+				  MBIT(NL80211_IFTYPE_P2P_CLIENT));
+		}
 	}
 #endif
 #endif
@@ -2893,6 +2896,7 @@ woal_mlan_debug_info(moal_private * priv)
 	PRINTM(MERROR, "------------mlan_debug_info-------------\n");
 	PRINTM(MERROR, "mlan_processing =%d\n", info.mlan_processing);
 	PRINTM(MERROR, "mlan_rx_processing =%d\n", info.mlan_rx_processing);
+	PRINTM(MERROR, "rx_pkts_queued=%d\n", info.rx_pkts_queued);
 
 	PRINTM(MERROR, "num_cmd_timeout = %d\n", info.num_cmd_timeout);
 	PRINTM(MERROR, "Timeout cmd id = 0x%x, act = 0x%x \n",
@@ -3182,13 +3186,13 @@ woal_process_tcp_ack(moal_private * priv, mlan_buffer * pmbuf)
 
 	if (*((t_u8 *) tcph + 13) == 0x10) {
 		/* Only replace ACK */
-		priv->tcp_ack_cnt++;
 		if (ntohs(iph->tot_len) > (iph->ihl + tcph->doff) * 4) {
 			/* Don't drop ACK with payload */
 			/* TODO: should we delete previous TCP session */
 			LEAVE();
 			return ret;
 		}
+		priv->tcp_ack_cnt++;
 		spin_lock_irqsave(&priv->tcp_sess_lock, flags);
 		tcp_session = woal_get_tcp_sess(priv, iph->saddr,
 						tcph->source, iph->daddr,
@@ -3253,7 +3257,6 @@ woal_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct sk_buff *new_skb = NULL;
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 29)
 	t_u32 index = 0;
-	t_u32 tid = 0;
 #endif
 
 	ENTER();
@@ -3311,9 +3314,7 @@ woal_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	case MLAN_STATUS_PENDING:
 		atomic_inc(&priv->phandle->tx_pending);
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 29)
-		tid = pmbuf->priority;
-		index = mlan_select_wmm_queue(priv->phandle->pmlan_adapter,
-					      priv->bss_index, tid);
+		index = skb_get_queue_mapping(skb);
 		atomic_inc(&priv->wmm_tx_pending[index]);
 		if (atomic_read(&priv->wmm_tx_pending[index]) >= MAX_TX_PENDING) {
 			struct netdev_queue *txq =
@@ -4598,6 +4599,7 @@ woal_dump_mlan_drv_info(moal_private * priv, t_u8 * buf)
 	ptr += sprintf(ptr, "mlan_processing =%d\n", info.mlan_processing);
 	ptr += sprintf(ptr, "mlan_rx_processing =%d\n",
 		       info.mlan_rx_processing);
+	ptr += sprintf(ptr, "rx_pkts_queued =%d\n", info.rx_pkts_queued);
 	ptr += sprintf(ptr, "num_cmd_timeout = %d\n", info.num_cmd_timeout);
 	ptr += sprintf(ptr, "Timeout cmd id = 0x%x, act = 0x%x \n",
 		       info.timeout_cmd_id, info.timeout_cmd_act);
@@ -5293,7 +5295,7 @@ mlan_status
 woal_request_country_power_table(moal_private * priv, char *country)
 {
 	mlan_status ret = MLAN_STATUS_SUCCESS;
-	moal_handle *handle = priv->phandle;
+	moal_handle *handle = NULL;
 	char country_name[] = "txpower_XX.bin";
 	char file_path[256];
 	char *last_slash = NULL;
@@ -5312,12 +5314,15 @@ woal_request_country_power_table(moal_private * priv, char *country)
 		return MLAN_STATUS_FAILURE;
 	}
 
+	handle = priv->phandle;
+
 	/* Replace XX with ISO 3166-1 alpha-2 country code */
 	strncpy(strstr(country_name, "XX"), country, strlen(country));
 
 	memset(file_path, 0, sizeof(file_path));
-	if (fw_name) {
-		strncpy(file_path, fw_name, sizeof(file_path));
+	/* file_path should be Null terminated */
+	if (fw_name && (strlen(fw_name) < sizeof(file_path))) {
+		strncpy(file_path, fw_name, strlen(fw_name));
 		last_slash = strrchr(file_path, '/');
 		if (last_slash)
 			memset(last_slash + 1, 0,
@@ -5515,9 +5520,6 @@ woal_add_card(void *card)
 			woal_mac2u8(handle->mac_addr, temp);
 		}
 	}
-
-	/* Update card type */
-	woal_sdio_update_card_type(handle, card);
 
 	((struct sdio_mmc_card *)card)->handle = handle;
 
@@ -6126,6 +6128,9 @@ MODULE_PARM_DESC(max_tx_buf, "Maximum Tx buffer size (2048/4096/8192)");
 #ifdef SDIO_SUSPEND_RESUME
 module_param(pm_keep_power, int, 1);
 MODULE_PARM_DESC(pm_keep_power, "1: PM keep power; 0: PM no power");
+module_param(shutdown_hs, int, 0);
+MODULE_PARM_DESC(shutdown_hs,
+		 "1: Enable HS when shutdown; 0: No HS when shutdown");
 #endif
 #if defined(STA_SUPPORT)
 module_param(cfg_11d, int, 0);
@@ -6171,6 +6176,13 @@ MODULE_PARM_DESC(wq_sched_policy,
 module_param(rx_work, int, 0);
 MODULE_PARM_DESC(rx_work,
 		 "0: default; 1: Enable rx_work_queue; 2: Disable rx_work_queue");
+#if defined(WIFI_DIRECT_SUPPORT)
+#if LINUX_VERSION_CODE >= WIFI_DIRECT_KERNEL_VERSION
+module_param(p2p_enh, int, 0);
+MODULE_PARM_DESC(p2p_enh, "1: Enable enhanced P2P; 0: Disable enhanced P2P");
+#endif
+#endif
+
 MODULE_DESCRIPTION("M-WLAN Driver");
 MODULE_AUTHOR("Marvell International Ltd.");
 MODULE_VERSION(MLAN_RELEASE_VERSION);

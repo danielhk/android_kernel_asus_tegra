@@ -495,7 +495,11 @@ wlan_11n_create_rxreorder_tbl(mlan_private * priv, t_u8 * ta, int tid,
 			PRINTM(MINFO, "UAP/ADHOC:last_seq=%d start_win=%d\n",
 			       last_seq, new_node->start_win);
 		} else {
-			last_seq = priv->rx_seq[tid];
+			sta_ptr = wlan_get_station_entry(priv, ta);
+			if (sta_ptr)
+				last_seq = sta_ptr->rx_seq[tid];
+			else
+				last_seq = priv->rx_seq[tid];
 		}
 		new_node->last_seq = last_seq;
 		new_node->win_size = win_size;
@@ -695,6 +699,7 @@ wlan_cmd_11n_addba_rspgen(mlan_private * priv,
 	win_size =
 		(padd_ba_rsp->block_ack_param_set & BLOCKACKPARAM_WINSIZE_MASK)
 		>> BLOCKACKPARAM_WINSIZE_POS;
+
 	if (win_size == 0)
 		padd_ba_rsp->status_code =
 			wlan_cpu_to_le16(ADDBA_RSP_STATUS_DECLINED);

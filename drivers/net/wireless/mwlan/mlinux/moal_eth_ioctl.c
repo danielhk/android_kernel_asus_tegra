@@ -26,7 +26,7 @@ Change log:
 
 #include    "moal_main.h"
 #include    "moal_eth_ioctl.h"
-#include    "mlan_ioctl.h"
+#include    "../mlan/mlan_ioctl.h"
 #if defined(STA_WEXT) || defined(UAP_WEXT)
 #include    "moal_priv.h"
 #endif
@@ -1027,6 +1027,314 @@ woal_priv_rejectaddbareq(moal_private * priv, t_u8 * respbuf, t_u32 respbuflen)
 
 done:
 	kfree(req);
+	LEAVE();
+	return ret;
+
+}
+
+/**
+ *  @brief Set/Get the addba reject setting
+ *
+ *  @param priv         A pointer to moal_private structure
+ *  @param action       Action set or get
+ *  @param addba_reject A pointer to addba_reject array.
+ *
+ *  @return             MLAN_STATUS_SUCCESS/MLAN_STATUS_PENDING -- success, otherwise fail
+ */
+mlan_status
+woal_ioctl_addba_reject(moal_private * priv, t_u32 action, t_u8 * addba_reject)
+{
+	mlan_ioctl_req *req = NULL;
+	mlan_ds_11n_cfg *cfg_11n = NULL;
+	mlan_status ret = MLAN_STATUS_SUCCESS;
+
+	ENTER();
+	req = woal_alloc_mlan_ioctl_req(sizeof(mlan_ds_11n_cfg));
+	if (req == NULL) {
+		ret = -ENOMEM;
+		goto done;
+	}
+
+	cfg_11n = (mlan_ds_11n_cfg *) req->pbuf;
+	cfg_11n->sub_command = MLAN_OID_11N_CFG_ADDBA_REJECT;
+	req->req_id = MLAN_IOCTL_11N_CFG;
+
+	req->action = action;
+	if (action == MLAN_ACT_SET)
+		memcpy(cfg_11n->param.addba_reject, addba_reject,
+		       sizeof(cfg_11n->param.addba_reject));
+	/* Send IOCTL request to MLAN */
+	ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (ret != MLAN_STATUS_SUCCESS)
+		goto done;
+	if (action == MLAN_ACT_GET)
+		memcpy(addba_reject, cfg_11n->param.addba_reject,
+		       sizeof(cfg_11n->param.addba_reject));
+done:
+	if (ret != MLAN_STATUS_PENDING)
+		kfree(req);
+	LEAVE();
+	return ret;
+}
+
+/**
+ *  @brief Set/Get addba prio_tbl
+ *
+ *  @param priv         A pointer to moal_private structure
+ *  @param action       Action set or get
+ *  @param aggr_prio_tbl  A pointer to mlan_ds_11n_aggr_prio_tbl.
+ *
+ *  @return             MLAN_STATUS_SUCCESS/MLAN_STATUS_PENDING -- success, otherwise fail
+ */
+mlan_status
+woal_ioctl_aggr_prio_tbl(moal_private * priv, t_u32 action,
+			 mlan_ds_11n_aggr_prio_tbl * aggr_prio_tbl)
+{
+	mlan_ioctl_req *req = NULL;
+	mlan_ds_11n_cfg *cfg_11n = NULL;
+	mlan_status ret = MLAN_STATUS_SUCCESS;
+
+	ENTER();
+
+	req = woal_alloc_mlan_ioctl_req(sizeof(mlan_ds_11n_cfg));
+	if (req == NULL) {
+		ret = -ENOMEM;
+		goto done;
+	}
+
+	cfg_11n = (mlan_ds_11n_cfg *) req->pbuf;
+	cfg_11n->sub_command = MLAN_OID_11N_CFG_AGGR_PRIO_TBL;
+	req->req_id = MLAN_IOCTL_11N_CFG;
+
+	req->action = action;
+	if (action == MLAN_ACT_SET)
+		memcpy(&cfg_11n->param.aggr_prio_tbl, aggr_prio_tbl,
+		       sizeof(mlan_ds_11n_aggr_prio_tbl));
+	/* Send IOCTL request to MLAN */
+	ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (ret != MLAN_STATUS_SUCCESS)
+		goto done;
+	if (action == MLAN_ACT_GET)
+		memcpy(aggr_prio_tbl, &cfg_11n->param.aggr_prio_tbl,
+		       sizeof(mlan_ds_11n_aggr_prio_tbl));
+done:
+	if (ret != MLAN_STATUS_PENDING)
+		kfree(req);
+	LEAVE();
+	return ret;
+
+}
+
+/**
+ *  @brief Set/Get addba_param
+ *
+ *  @param priv         A pointer to moal_private structure
+ *  @param action       Action set or get
+ *  @param addba_param  A pointer to mlan_ds_11n_addba_param.
+ *
+ *  @return             MLAN_STATUS_SUCCESS/MLAN_STATUS_PENDING -- success, otherwise fail
+ */
+mlan_status
+woal_ioctl_addba_param(moal_private * priv, t_u32 action,
+		       mlan_ds_11n_addba_param * addba_param)
+{
+	mlan_ioctl_req *req = NULL;
+	mlan_ds_11n_cfg *cfg_11n = NULL;
+	mlan_status ret = MLAN_STATUS_SUCCESS;
+
+	ENTER();
+
+	req = woal_alloc_mlan_ioctl_req(sizeof(mlan_ds_11n_cfg));
+	if (req == NULL) {
+		ret = -ENOMEM;
+		goto done;
+	}
+
+	cfg_11n = (mlan_ds_11n_cfg *) req->pbuf;
+	cfg_11n->sub_command = MLAN_OID_11N_CFG_ADDBA_PARAM;
+	req->req_id = MLAN_IOCTL_11N_CFG;
+
+	req->action = action;
+	if (action == MLAN_ACT_SET)
+		memcpy(&cfg_11n->param.addba_param, addba_param,
+		       sizeof(mlan_ds_11n_addba_param));
+	/* Send IOCTL request to MLAN */
+	ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (ret != MLAN_STATUS_SUCCESS)
+		goto done;
+	if (action == MLAN_ACT_GET)
+		memcpy(addba_param, &cfg_11n->param.addba_param,
+		       sizeof(mlan_ds_11n_addba_param));
+done:
+	if (ret != MLAN_STATUS_PENDING)
+		kfree(req);
+	LEAVE();
+	return ret;
+
+}
+
+/**
+ *   @brief Configuring rx block-ack window size
+ *
+ *  @param priv         A pointer to moal_private structure
+ *  @param respbuf      A pointer to response buffer
+ *  @param respbuflen   Available length of response buffer
+ *
+ *  @return             0 --success, otherwise failure
+ */
+int
+woal_set_rx_ba_winsize(moal_private * priv, t_u8 * respbuf, int respbuflen)
+{
+	t_u32 data[2];
+	t_u8 addba_reject[MAX_NUM_TID];
+	mlan_ds_11n_addba_param addba_param;
+	int ret = 0;
+	int user_data_len = 0;
+
+	ENTER();
+
+	memset((char *)data, 0, sizeof(data));
+	parse_arguments(respbuf, data, ARRAY_SIZE(data), &user_data_len);
+
+	if (user_data_len != 2) {
+		PRINTM(MERROR, "Invalid arguments for ba_winsize command\n");
+		ret = -EINVAL;
+		goto done;
+	}
+	if (data[0] > 7 || data[0] < 0) {
+		PRINTM(MERROR, "Invalid tid %d\n", data[0]);
+		ret = -EINVAL;
+		goto done;
+	}
+	if (data[1] < 0) {
+		PRINTM(MERROR, "Invalid winsize %d\n", data[1]);
+		ret = -EINVAL;
+		goto done;
+	}
+	memset(addba_reject, 0, sizeof(addba_reject));
+	if (MLAN_STATUS_SUCCESS !=
+	    woal_ioctl_addba_reject(priv, MLAN_ACT_GET, addba_reject)) {
+		ret = -EFAULT;
+		goto done;
+	}
+	/* disable tx ba */
+	if (data[1] == 0) {
+		addba_reject[data[0]] = MTRUE;
+		if (MLAN_STATUS_SUCCESS !=
+		    woal_ioctl_addba_reject(priv, MLAN_ACT_SET, addba_reject))
+			ret = -EFAULT;
+	} else {
+		if (addba_reject[data[0]] == MTRUE) {
+			addba_reject[data[0]] = MFALSE;
+			if (MLAN_STATUS_SUCCESS !=
+			    woal_ioctl_addba_reject(priv, MLAN_ACT_SET,
+						    addba_reject)) {
+				ret = -EFAULT;
+				goto done;
+			}
+		}
+		memset(&addba_param, 0, sizeof(addba_param));
+		if (MLAN_STATUS_SUCCESS !=
+		    woal_ioctl_addba_param(priv, MLAN_ACT_GET, &addba_param)) {
+			ret = -EFAULT;
+			goto done;
+		}
+		if (data[1] != addba_param.rxwinsize) {
+			addba_param.rxwinsize = data[1];
+			if (MLAN_STATUS_SUCCESS !=
+			    woal_ioctl_addba_param(priv, MLAN_ACT_SET,
+						   &addba_param))
+				ret = -EFAULT;
+		}
+
+	}
+done:
+	LEAVE();
+	return ret;
+
+}
+
+/**
+ *   @brief Configuring trx block-ack window size
+ *
+ *  @param priv         A pointer to moal_private structure
+ *  @param respbuf      A pointer to response buffer
+ *  @param respbuflen   Available length of response buffer
+ *
+ *  @return             0 --success, otherwise failure
+ */
+int
+woal_set_tx_ba_winsize(moal_private * priv, t_u8 * respbuf, int respbuflen)
+{
+	t_u32 data[2];
+	mlan_ds_11n_aggr_prio_tbl aggr_prio_tbl;
+	mlan_ds_11n_addba_param addba_param;
+	t_u8 tos_to_tid_inv[] =
+		{ 0x02, 0x00, 0x01, 0x03, 0x04, 0x05, 0x06, 0x07 };
+	int ret = 0;
+	int user_data_len = 0;
+
+	ENTER();
+
+	memset((char *)data, 0, sizeof(data));
+	parse_arguments(respbuf, data, ARRAY_SIZE(data), &user_data_len);
+
+	if (user_data_len != 2) {
+		PRINTM(MERROR, "Invalid arguments for ba_winsize command\n");
+		ret = -EINVAL;
+		goto done;
+	}
+	if (data[0] > 7 || data[0] < 0) {
+		PRINTM(MERROR, "Invalid tid %d\n", data[0]);
+		ret = -EINVAL;
+		goto done;
+	}
+	if (data[1] < 0) {
+		PRINTM(MERROR, "Invalid winsize %d\n", data[1]);
+		ret = -EINVAL;
+		goto done;
+	}
+	memset(&aggr_prio_tbl, 0, sizeof(aggr_prio_tbl));
+	if (MLAN_STATUS_SUCCESS !=
+	    woal_ioctl_aggr_prio_tbl(priv, MLAN_ACT_GET, &aggr_prio_tbl)) {
+		ret = -EFAULT;
+		goto done;
+	}
+	/* disable tx ba */
+	if (data[1] == 0) {
+		if (aggr_prio_tbl.ampdu[data[0]] != 0xff) {
+			aggr_prio_tbl.ampdu[data[0]] = 0xff;
+			if (MLAN_STATUS_SUCCESS !=
+			    woal_ioctl_aggr_prio_tbl(priv, MLAN_ACT_SET,
+						     &aggr_prio_tbl))
+				ret = -EFAULT;
+		}
+	} else {
+		if (aggr_prio_tbl.ampdu[data[0]] == 0xff) {
+			aggr_prio_tbl.ampdu[data[0]] = tos_to_tid_inv[data[0]];
+			if (MLAN_STATUS_SUCCESS !=
+			    woal_ioctl_aggr_prio_tbl(priv, MLAN_ACT_SET,
+						     &aggr_prio_tbl)) {
+				ret = -EFAULT;
+				goto done;
+			}
+		}
+		memset(&addba_param, 0, sizeof(addba_param));
+		if (MLAN_STATUS_SUCCESS !=
+		    woal_ioctl_addba_param(priv, MLAN_ACT_GET, &addba_param)) {
+			ret = -EFAULT;
+			goto done;
+		}
+		if (data[1] != addba_param.txwinsize) {
+			addba_param.txwinsize = data[1];
+			if (MLAN_STATUS_SUCCESS !=
+			    woal_ioctl_addba_param(priv, MLAN_ACT_SET,
+						   &addba_param))
+				ret = -EFAULT;
+		}
+
+	}
+done:
 	LEAVE();
 	return ret;
 
@@ -2237,7 +2545,7 @@ woal_priv_extcapcfg(moal_private * priv, t_u8 * respbuf, t_u32 respbuflen)
 			goto done;
 		}
 		req->action = MLAN_ACT_SET;
-		memset(&cfg->param.ext_cap, 0, sizeof(ExtCap_t) - ie->len);
+		memset(&cfg->param.ext_cap, 0, sizeof(ExtCap_t));
 		memcpy(&cfg->param.ext_cap, ie + 1, ie->len);
 	}
 
@@ -2253,7 +2561,7 @@ woal_priv_extcapcfg(moal_private * priv, t_u8 * respbuf, t_u32 respbuflen)
 	ie->len = sizeof(ExtCap_t);
 	memcpy(ie + 1, &cfg->param.ext_cap, sizeof(ExtCap_t));
 
-	ret = sizeof(ie) + ie->len;
+	ret = sizeof(IEEEtypes_Header_t) + ie->len;
 
 done:
 	kfree(req);
@@ -8391,98 +8699,6 @@ woal_priv_bypassed_packet(moal_private * priv, t_u8 * respbuf, t_u32 respbuflen)
 }
 
 #if defined(WIFI_DIRECT_SUPPORT)
-#if defined(UAP_CFG80211)
-#if LINUX_VERSION_CODE >= WIFI_DIRECT_KERNEL_VERSION
-/**
- * @brief               Set/Get P2P NoA (Notice of Absence) parameters
- * @param priv          Pointer to moal_private structure
- * @param respbuf       Pointer to response buffer
- * @param resplen       Response buffer length
- *
- *  @return             Number of bytes written, negative for failure.
- */
-static int
-woal_priv_noa_cfg(moal_private * priv, t_u8 * respbuf, t_u32 respbuflen)
-{
-	int header_len = 0, user_data_len = 0;
-	int ret = 0, data[7];
-	mlan_ds_wifi_direct_config noa_cfg;
-
-	ENTER();
-
-	header_len = strlen(CMD_MARVELL) + strlen(PRIV_CMD_NOA_CFG);
-	memset(&noa_cfg, 0, sizeof(noa_cfg));
-	if (woal_p2p_config(priv, MLAN_ACT_GET, &noa_cfg) !=
-	    MLAN_STATUS_SUCCESS) {
-		PRINTM(MERROR, "Could not get P2P noa config\n");
-		ret = -EINVAL;
-		goto done;
-	}
-
-	memset(data, 0, sizeof(data));
-	if (strlen(respbuf) == header_len) {
-		/* GET operation */
-		memcpy(respbuf, &noa_cfg, sizeof(noa_cfg));
-		ret = sizeof(noa_cfg);
-	} else {
-		/* SET operation */
-		parse_arguments(respbuf + header_len, data, ARRAY_SIZE(data),
-				&user_data_len);
-		if (user_data_len > 7) {
-			ret = -EINVAL;
-			goto done;
-		}
-		switch (user_data_len) {
-		case 7:
-			noa_cfg.ct_window = (t_u8) data[6];
-		case 6:
-			if (data[5] < 0 || data[5] > 1) {
-				PRINTM(MERROR, "Invalid ps enable\n");
-				ret = -EINVAL;
-				goto done;
-			}
-			noa_cfg.opp_ps_enable = (t_u8) data[5];
-			noa_cfg.flags |= WIFI_DIRECT_OPP_PS;
-		case 5:
-			noa_cfg.noa_interval = (t_u32) data[4];
-		case 4:
-			noa_cfg.noa_duration = (t_u32) data[3];
-		case 3:
-			if (data[2] < 1 || data[2] > 255) {
-				PRINTM(MERROR,
-				       "Invalid number of absence intervals\n");
-				ret = -EINVAL;
-				goto done;
-			}
-			noa_cfg.noa_count = (t_u8) data[2];
-		case 2:
-			if (data[1] < 0 || data[1] > 255) {
-				PRINTM(MERROR, "Invalid Index\n");
-				ret = -EINVAL;
-				goto done;
-			}
-			noa_cfg.index = (t_u16) data[1];
-		case 1:
-			if (data[0] < 0 || data[0] > 1) {
-				PRINTM(MERROR, "Invalid noa enable\n");
-				ret = -EINVAL;
-				goto done;
-			}
-			noa_cfg.noa_enable = (t_u8) data[0];
-			noa_cfg.flags |= WIFI_DIRECT_NOA;
-			break;
-		default:
-			break;
-		}
-		woal_p2p_config(priv, MLAN_ACT_SET, &noa_cfg);
-	}
-done:
-
-	LEAVE();
-	return ret;
-}
-#endif
-#endif
 #endif
 
 /**
@@ -9275,16 +9491,6 @@ woal_android_priv_cmd(struct net_device *dev, struct ifreq *req)
 							priv_cmd.total_len);
 			goto handled;
 #if defined(WIFI_DIRECT_SUPPORT)
-#if defined(UAP_CFG80211)
-#if LINUX_VERSION_CODE >= WIFI_DIRECT_KERNEL_VERSION
-		} else if (strnicmp
-			   (buf + strlen(CMD_MARVELL), PRIV_CMD_NOA_CFG,
-			    strlen(PRIV_CMD_NOA_CFG)) == 0) {
-			/* Set/Get P2P NoA (Notice of Absence) parameters */
-			len = woal_priv_noa_cfg(priv, buf, priv_cmd.total_len);
-			goto handled;
-#endif
-#endif
 #endif
 		} else {
 			/* Fall through, after stripping off the custom header */
@@ -9397,6 +9603,18 @@ woal_android_priv_cmd(struct net_device *dev, struct ifreq *req)
 		}
 #endif
 		len = sprintf(buf, "OK\n") + 1;
+	} else if (strncmp(buf, "ROAM", strlen("ROAM")) == 0) {
+		pdata = buf + strlen("ROAM") + 1;
+#ifdef STA_CFG80211
+		if (*pdata == '1') {
+			priv->roaming_enabled = MTRUE;
+			PRINTM(MIOCTL, "Roaming enabled\n");
+		} else if (*pdata == '0') {
+			priv->roaming_enabled = MFALSE;
+			PRINTM(MIOCTL, "Roaming disabled\n");
+		}
+#endif
+		len = sprintf(buf, "OK\n") + 1;
 	} else if (strncmp(buf, "COUNTRY", strlen("COUNTRY")) == 0) {
 		if ((strlen(buf) - strlen("COUNTRY") - 1) > COUNTRY_CODE_LEN
 		    || (strlen(buf) - strlen("COUNTRY") - 1) <= 0) {
@@ -9459,13 +9677,13 @@ woal_android_priv_cmd(struct net_device *dev, struct ifreq *req)
 	}
 #ifdef UAP_SUPPORT
 	else if (strncmp(buf, "AP_BSS_START", strlen("AP_BSS_START")) == 0) {
-		if ((ret ==
-		     woal_uap_bss_ctrl(priv, MOAL_IOCTL_WAIT, UAP_BSS_START)))
+		ret = woal_uap_bss_ctrl(priv, MOAL_IOCTL_WAIT, UAP_BSS_START);
+		if (ret)
 			goto done;
 		len = sprintf(buf, "OK\n") + 1;
 	} else if (strncmp(buf, "AP_BSS_STOP", strlen("AP_BSS_STOP")) == 0) {
-		if ((ret ==
-		     woal_uap_bss_ctrl(priv, MOAL_IOCTL_WAIT, UAP_BSS_STOP)))
+		ret = woal_uap_bss_ctrl(priv, MOAL_IOCTL_WAIT, UAP_BSS_STOP);
+		if (ret)
 			goto done;
 		len = sprintf(buf, "OK\n") + 1;
 	} else if (strncmp(buf, "AP_SET_CFG", strlen("AP_SET_CFG")) == 0) {
@@ -9624,6 +9842,38 @@ woal_android_priv_cmd(struct net_device *dev, struct ifreq *req)
 			ret = -EFAULT;
 			goto done;
 		}
+		len = sprintf(buf, "OK\n") + 1;
+	} else if (strnicmp(buf, "BA_WSIZE_RX", strlen("BA_WSIZE_RX")) == 0) {
+		pdata = buf + strlen("BA_WSIZE_RX") + 1;
+		len = priv_cmd.total_len - strlen("BA_WSIZE_RX") - 1;
+		if (MLAN_STATUS_SUCCESS !=
+		    woal_set_rx_ba_winsize(priv, pdata, len)) {
+			ret = -EFAULT;
+			goto done;
+		}
+		len = sprintf(buf, "OK\n") + 1;
+	} else if (strnicmp(buf, "BA_WSIZE_TX", strlen("BA_WSIZE_TX")) == 0) {
+		pdata = buf + strlen("BA_WSIZE_TX") + 1;
+		len = priv_cmd.total_len - strlen("BA_WSIZE_TX") - 1;
+		if (MLAN_STATUS_SUCCESS !=
+		    woal_set_tx_ba_winsize(priv, pdata, len)) {
+			ret = -EFAULT;
+			goto done;
+		}
+		len = sprintf(buf, "OK\n") + 1;
+	} else if (strncmp
+		   (buf, "FAKE_SCAN_COMPLETE",
+		    strlen("FAKE_SCAN_COMPLETE")) == 0) {
+		pdata = buf + strlen("FAKE_SCAN_COMPLETE") + 1;
+#ifdef STA_CFG80211
+		if (*pdata == '1') {
+			priv->fake_scan_complete = MTRUE;
+			PRINTM(MIOCTL, "fake scan complete enabled\n");
+		} else if (*pdata == '0') {
+			priv->fake_scan_complete = MFALSE;
+			PRINTM(MIOCTL, "fake scan complete disabled\n");
+		}
+#endif
 		len = sprintf(buf, "OK\n") + 1;
 	} else {
 		PRINTM(MIOCTL, "Unknown PRIVATE command: %s, ignored\n", buf);
@@ -9899,6 +10149,9 @@ woal_do_ioctl(struct net_device *dev, struct ifreq *req, int cmd)
 		break;
 	case WOAL_MGMT_FRAME_TX:
 		ret = woal_send_host_packet(dev, req);
+		break;
+	case WOAL_TDLS_CONFIG:
+		ret = woal_tdls_config_ioctl(dev, req);
 		break;
 	case WOAL_ANDROID_PRIV_CMD:
 		ret = woal_android_priv_cmd(dev, req);

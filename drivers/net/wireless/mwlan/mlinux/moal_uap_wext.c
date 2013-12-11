@@ -392,10 +392,11 @@ woal_get_freq(struct net_device *dev, struct iw_request_info *info,
 		LEAVE();
 		return -EFAULT;
 	}
+
 	band = ap_cfg.band_cfg & BAND_CONFIG_5GHZ;
+	fwrq->m = (long)channel_to_frequency(ap_cfg.channel, band);
 	fwrq->i = (long)ap_cfg.channel;
-	fwrq->m = (long)(channel_to_frequency(ap_cfg.channel, band)) * 100000;
-	fwrq->e = 1;
+	fwrq->e = 6;
 
 	LEAVE();
 	return ret;
