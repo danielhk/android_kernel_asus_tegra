@@ -254,7 +254,7 @@ int tegra_dc_program_mode(struct tegra_dc *dc, struct tegra_dc_mode *mode)
 
 	div = (rate * 2 / pclk) - 2;
 
-	/* SW WAR for bug 1045373. To make the shift clk dividor effect under
+	/* SW WAR for bug 1045373. To make the shift clk divider effect under
 	 * all circumstances, write N+2 to SHIFT_CLK_DIVIDER and activate it.
 	 * After 2us delay, write the target values to it. */
 #if defined(CONFIG_ARCH_TEGRA_11x_SOC) || defined(CONFIG_ARCH_TEGRA_14x_SOC)

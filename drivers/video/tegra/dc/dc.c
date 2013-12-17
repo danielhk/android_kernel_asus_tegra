@@ -57,6 +57,7 @@
 #include "dc_priv.h"
 #include "dev.h"
 #include "nvsd.h"
+#include "hdmi.h"
 
 #define TEGRA_CRC_LATCHED_DELAY		34
 
@@ -76,6 +77,7 @@ static struct fb_videomode tegra_dc_hdmi_fallback_mode = {
 	.lower_margin = 10,	/* v_front_porch */
 	.vmode = 0,
 	.sync = 0,
+	.flag = FB_FLAG_RATIO_4_3,
 };
 
 static struct tegra_dc_mode override_disp_mode[3];
@@ -1042,7 +1044,7 @@ int _tegra_dc_update_cmu(struct tegra_dc *dc, struct tegra_dc_cmu *cmu)
 		return 0;
 	}
 
-	if (cmu != &dc->cmu) {
+	if (memcmp(cmu, &dc->cmu, sizeof(*cmu)) != 0) {
 		tegra_dc_cache_cmu(&dc->cmu, cmu);
 
 		/* Disable CMU */
@@ -1288,12 +1290,6 @@ static void tegra_dc_set_out(struct tegra_dc *dc, struct tegra_dc_out *out)
 	struct tegra_dc_mode *mode;
 
 	dc->out = out;
-	mode = tegra_dc_get_override_mode(dc);
-
-	if (mode)
-		tegra_dc_set_mode(dc, mode);
-	else if (out->n_modes > 0)
-		tegra_dc_set_mode(dc, &dc->out->modes[0]);
 
 	switch (out->type) {
 	case TEGRA_DC_OUT_RGB:
@@ -1315,6 +1311,40 @@ static void tegra_dc_set_out(struct tegra_dc *dc, struct tegra_dc_out *out)
 
 	if (dc->out_ops && dc->out_ops->init)
 		dc->out_ops->init(dc);
+
+	/* do this after calling init on the out.
+	 * tegra_hdmi_override_mode_parse() needs to
+	 * be after tegra_dc_hdmi_init() has run.
+	 */
+	mode = tegra_dc_get_override_mode(dc);
+	if (mode) {
+		if (out->type == TEGRA_DC_OUT_HDMI) {
+			/* override modes don't have ability
+			 * to set some of the mode struct fields
+			 * needed by HDMI so we have to do figure
+			 * out the right values for those fields
+			 * in the kernel.
+			 */
+			tegra_hdmi_override_mode_parse(dc, mode);
+#ifdef CONFIG_TEGRA_DC_CMU
+			/* set cmu cache directly so we don't
+			 * change it during init thinking it hasn't
+			 * been set yet by the bootloader
+			 */
+			if (mode->avi_q == TEGRA_DC_MODE_AVI_Q_LIMITED) {
+				pr_info("copying limited_cmu to cache\n");
+				tegra_dc_cache_cmu(&dc->cmu,
+						   &default_limited_cmu);
+			} else {
+				pr_info("copying unlimited_cmu to cache\n");
+				tegra_dc_cache_cmu(&dc->cmu, &default_cmu);
+			}
+#endif
+		}
+		tegra_dc_set_mode(dc, mode);
+	} else if (out->n_modes > 0) {
+		tegra_dc_set_mode(dc, &dc->out->modes[0]);
+	}
 }
 
 /* returns on error: -EINVAL
@@ -2135,11 +2165,24 @@ static int _tegra_dc_set_default_videomode(struct tegra_dc *dc)
 	if (dc->mode.pclk == 0) {
 		switch (dc->out->type) {
 		case TEGRA_DC_OUT_HDMI:
-		/* DC enable called but no videomode is loaded.
-		     Check if HDMI is connected, then set fallback mode */
-		if (tegra_dc_hpd(dc)) {
+		/* If DC is enabled, and HDMI is connected,
+		 * but no override mode has been selected,
+		 * then set a fallback mode.  Normally the
+		 * bootloader should have already selected
+		 * a mode and informed the kernel via
+		 * cmdline disp_param arg to set an override
+		 * mode.  If it didn't then tegra_dc_set_out()
+		 * should still set the first mode from the
+		 * board file provided mode list.
+		 * Only if all those fail should we get here
+		 * and select a fallback mode.
+		 */
+		if (tegra_dc_hpd(dc) &&
+		    (tegra_dc_get_override_mode(dc) == NULL)) {
+			pr_info("%s: setting fallback mode\n",
+				__func__);
 			return tegra_dc_set_fb_mode(dc,
-					&tegra_dc_hdmi_fallback_mode, 0);
+				    &tegra_dc_hdmi_fallback_mode, 0);
 		} else
 			return false;
 
@@ -2822,6 +2865,15 @@ static int tegra_dc_resume(struct platform_device *ndev)
 	mutex_lock(&dc->lock);
 	dc->suspended = false;
 
+#ifdef CONFIG_TEGRA_DC_CMU
+	/* clear the cmu cache so next set will trigger
+	 * disable/enable of the cmu registers which
+	 * are lost on suspend
+	 */
+	if (dc->pdata->cmu_enable)
+		memset(&dc->cmu, 0, sizeof(dc->cmu));
+#endif
+
 	/* To pan the fb on resume */
 	tegra_fb_pan_display_reset(dc->fb);
 
@@ -2918,6 +2970,9 @@ static int __init parse_disp_params(char *options, struct tegra_dc_mode *mode)
 	mode->v_back_porch  = params[8];
 	mode->h_front_porch = params[9];
 	mode->v_front_porch = params[10];
+
+	mode->stereo_mode = 0;
+	mode->flags = 0;
 
 	return 0;
 }

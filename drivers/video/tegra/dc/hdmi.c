@@ -2103,3 +2103,49 @@ int tegra_hdmi_connector_is_dvi(struct tegra_dc *dc)
 	const struct tegra_dc_hdmi_data *hdmi = tegra_dc_get_outdata(dc);
 	return hdmi->dvi;
 }
+
+/* override modes specified by cmdline can't specify all the
+ * fields of the tegra_dc_mode structure.  this function
+ * tries to come up with the additional info heuristically.
+ */
+void tegra_hdmi_override_mode_parse(struct tegra_dc *dc,
+				    struct tegra_dc_mode *mode)
+{
+	const struct fb_videomode *cea_mode;
+	int cea_vic = tegra_dc_find_cea_vic(mode);
+
+	pr_info("%s: mode %dx%d\n",
+		__func__, mode->h_active, mode->v_active);
+	if ((cea_vic == 1) ||
+	    tegra_hdmi_connector_is_dvi(dc)) {
+		pr_info("%s: using FULL range\n", __func__);
+		mode->avi_q = TEGRA_DC_MODE_AVI_Q_FULL;
+	} else {
+		pr_info("%s: using LIMITED range\n", __func__);
+		mode->avi_q = TEGRA_DC_MODE_AVI_Q_LIMITED;
+	}
+
+	if (cea_vic) {
+		/* copy the ratio info from the cea modedb */
+		cea_mode = &cea_modes[cea_vic];
+		if (cea_mode->flag & FB_FLAG_RATIO_16_9) {
+			pr_info("%s: cea_vic %d, ratio 16x9\n",
+				__func__, cea_vic);
+			mode->avi_m = TEGRA_DC_MODE_AVI_M_16_9;
+		} else if (cea_mode->flag & FB_FLAG_RATIO_4_3) {
+			pr_info("%s: cea_vic %d, ratio 4x3\n",
+				__func__, cea_vic);
+			mode->avi_m = TEGRA_DC_MODE_AVI_M_4_3;
+		}
+	} else if (tegra_dc_find_hdmi_vic(mode)) {
+		/* it wasn't a cea mode, try a HDMI extended
+		 * mode.  all HDMI extended modes are 16x9
+		 */
+		pr_info("%s: hdmi vic, using 16_9\n", __func__);
+		mode->avi_m = TEGRA_DC_MODE_AVI_M_16_9;
+	} else {
+		pr_warn("Unable to find a mode, using 16_9\n");
+		mode->avi_m = TEGRA_DC_MODE_AVI_M_16_9;
+	}
+
+}

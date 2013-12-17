@@ -280,4 +280,6 @@ int tegra_hdmi_connector_is_dvi(struct tegra_dc *dc);
 int tegra_dc_find_cea_vic_from_fb_vmode(const struct fb_videomode *mode);
 bool tegra_dc_hdmi_mode_filter(const struct tegra_dc *dc,
 			       struct fb_videomode *mode);
+void tegra_hdmi_override_mode_parse(struct tegra_dc *dc,
+				    struct tegra_dc_mode *mode);
 #endif
