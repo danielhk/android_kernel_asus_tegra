@@ -188,6 +188,7 @@ static struct tegra_dc_mode hdmi_panel_modes[] = {
 		.h_front_porch = 176, /* right_margin */
 		.v_front_porch = 8,   /* lower_margin */
 		.avi_m = TEGRA_DC_MODE_AVI_M_16_9,
+		.avi_q = TEGRA_DC_MODE_AVI_Q_LIMITED,
 	},
 	/* 1920x1080p@59.94Hz/60Hz CEA mode 16 */
 	{
@@ -203,6 +204,7 @@ static struct tegra_dc_mode hdmi_panel_modes[] = {
 		.h_front_porch = 88,  /* right_margin */
 		.v_front_porch = 4,   /* lower_margin */
 		.avi_m = TEGRA_DC_MODE_AVI_M_16_9,
+		.avi_q = TEGRA_DC_MODE_AVI_Q_LIMITED,
 	},
 	/* 1280x720p@59.94Hz/60Hz CEA mode 4 */
 	{
@@ -218,6 +220,7 @@ static struct tegra_dc_mode hdmi_panel_modes[] = {
 		.h_front_porch = 110, /* right_margin */
 		.v_front_porch = 5,   /* lower_margin */
 		.avi_m = TEGRA_DC_MODE_AVI_M_16_9,
+		.avi_q = TEGRA_DC_MODE_AVI_Q_LIMITED,
 	},
 	/* 720x480p@59.94Hz/60Hz CEA mode 3 */
 	{
@@ -233,6 +236,7 @@ static struct tegra_dc_mode hdmi_panel_modes[] = {
 		.h_front_porch = 16,  /* right_margin */
 		.v_front_porch = 9,   /* lower_margin */
 		.avi_m = TEGRA_DC_MODE_AVI_M_16_9,
+		.avi_q = TEGRA_DC_MODE_AVI_Q_LIMITED,
 	},
 };
 
