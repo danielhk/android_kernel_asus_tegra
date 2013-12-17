@@ -2,7 +2,7 @@
   *
   * @brief This file contains private ioctl functions
   *
-  * Copyright (C) 2012, Marvell International Ltd.
+  * Copyright (C) 2013, Marvell International Ltd.
   *
   * This software file (the "File") is distributed by Marvell International
   * Ltd. under the terms of the GNU General Public License Version 2, June 1991
