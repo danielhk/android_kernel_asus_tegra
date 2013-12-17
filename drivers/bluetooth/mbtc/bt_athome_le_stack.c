@@ -485,72 +485,89 @@ static int aahbt_do_aes128_l(const uint8_t* key,
 	return 0;
 }
 
+/* Convenience routine for sending a command to the 8797.
+ * Returns non-zero on error sending command.
+ * Warning: does not return error if command completion status is bad.
+ */
+static int aahbt_send_command_easy(uint16_t ogf,
+			      uint16_t ocf,
+			      uint8_t *buf_p,
+			      size_t inLen,
+			      size_t outLen,
+			      const char *message)
+{
+	uint8_t *evt_data = buf_p + HCI_EVENT_HDR_SIZE;
+	uint8_t *cmd_cmpl_data = evt_data + sizeof(struct hci_ev_cmd_complete);
+	int sta;
+	int err = aahbt_simple_cmd_l(ogf, ocf,
+				 inLen, buf_p,
+				 outLen, buf_p);
+	if (err) {
+		aahlog("failed to %s, err = %d\n", message, err);
+		return err;
+	}
+	sta = *cmd_cmpl_data;
+	if (sta) {    /* log failure but do not return error code */
+		aahlog("failed to %s, sta = 0x%02x.\n",
+			message, sta);
+	}
+	return 0;
+}
+
 /*
+ * This is a special vendor command provided by Marvell
+ * to reserve extra frames after BTLE so BT does not clobber last frame.
+ */
+static int aahbt_set_extra_attempts(int extra, uint8_t *buf_p, size_t blen)
+{
+	uint8_t *parP = buf_p;
+	aahlog("set extra attempts to %d\n", extra);
+	put8LE(&parP, extra); /* how many extra frames to reserve for BTLE */
+	return aahbt_send_command_easy(HCI_OGF_Vendor,
+				 HCI_CMD_Marvell_BLE_Set_Extra_Spacing,
+				 buf_p,
+				 parP - buf_p,
+				 blen, "set extra attempts");
+}
+
+/*
+ * Enable or disable scan.
  * The buf array should contain at least EVT_PACKET_LEN bytes.
  * We pass in the buf to avoid allocating large arrays on the stack.
  */
 static int aahbt_set_scan_enabled(bool enabled, uint8_t *buf_p, size_t blen)
 {
-	char *mode = enabled ? "enabled" : "disabled";
-	uint8_t *evt_data = buf_p + HCI_EVENT_HDR_SIZE;
-	uint8_t *cmd_cmpl_data = evt_data + sizeof(struct hci_ev_cmd_complete);
-	uint8_t *parP;
-	int err;
-	int sta;
-
-	parP = buf_p;
+	uint8_t *parP = buf_p;
 	put8LE(&parP, enabled ? 1 : 0);	/* scanning enabled or disabled */
 	put8LE(&parP, 0);	/* duplicate filter off */
-	err = aahbt_simple_cmd_l(HCI_OGF_LE,
+	return aahbt_send_command_easy(HCI_OGF_LE,
 				 HCI_LE_Set_Scan_Enable,
-				 parP - buf_p, buf_p,
-				 blen, buf_p);
-	if (err) {
-		aahlog("failed to send cmd to set scan parameters.\n");
-		return err;
-	}
-	sta = *cmd_cmpl_data;
-	if (sta)	/* check status */
-		aahlog("failed to set scan %s, sta = 0x%02x.\n", mode, sta);
-	else
-		aahlog("scan %s\n", mode);
-	return 0;
+				 buf_p,
+				 parP - buf_p,
+				 blen, "set scan mode");
 }
 
 /*
+ * Set scan timing interval and window length.
  * The buf array should contain at least EVT_PACKET_LEN bytes.
  * We pass in the buf to avoid allocating large arrays on the stack.
  */
 static int aahbt_set_scan_timing(int scan_interval, int scan_window,
 				 uint8_t *buf_p, size_t blen)
 {
-	uint8_t *evt_data = buf_p + HCI_EVENT_HDR_SIZE;
-	uint8_t *cmd_cmpl_data = evt_data + sizeof(struct hci_ev_cmd_complete);
-	uint8_t *parP;
-	int err;
-	int sta;
-
+	uint8_t *parP = buf_p;
 	aahlog("set scan timing: interval = %d, window = %d\n",
 	       scan_interval, scan_window);
-	parP = buf_p;
 	put8LE(&parP, 0);	/* passive scan */
 	put16LE(&parP, scan_interval); /* time between listens per channel */
 	put16LE(&parP, scan_window); /* time spent listening per interval */
 	put8LE(&parP,  0);	/* use real mac address on packets we send */
 	put8LE(&parP, 0);	/* accept all advertisement packets */
-	err = aahbt_simple_cmd_l(HCI_OGF_LE,
+	return aahbt_send_command_easy(HCI_OGF_LE,
 				 HCI_LE_Set_Scan_Parameters,
-				 parP - buf_p, buf_p,
-				 blen, buf_p);
-	if (err) {
-		aahlog("failed to send cmd to set scan parameters.\n");
-		return err;
-	}
-
-	sta = *cmd_cmpl_data;
-	if (sta)	/* check status */
-		aahlog("failed to set scan timing, sta = 0x%02x\n", sta);
-	return 0;
+				 buf_p,
+				 parP - buf_p,
+				 blen, "set scan timing");
 }
 
 static int aahbt_host_setup(void)
@@ -705,6 +722,12 @@ static int aahbt_host_setup(void)
 
 	err = aahbt_set_scan_timing(AAH_BT_NORMAL_SCAN_INTERVAL,
 				    AAH_BT_SCAN_WINDOW, buf, sizeof(buf));
+	if (err)
+		return err;
+
+	/* Vendor command provided by Marvell to reserve extra frames
+	 * so BT does not clobber last BTLE frame. */
+	err = aahbt_set_extra_attempts( 1, buf, sizeof(buf));
 	if (err)
 		return err;
 

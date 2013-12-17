@@ -37,6 +37,7 @@
 #define HCI_OGF_Vendor					0x3F
 # define HCI_CMD_Marvell_Set_MCA			0x71
 # define HCI_CMD_Marvell_BLE_COEX_MODE_CONFIG		0x8A
+# define HCI_CMD_Marvell_BLE_Set_Extra_Spacing		0x8F
 /* params: BT_MCA, LE_MCA */
 #  define HCI_Marvell_MCA_500_ppm			0x00
 #  define HCI_Marvell_MCA_250_ppm			0x01
