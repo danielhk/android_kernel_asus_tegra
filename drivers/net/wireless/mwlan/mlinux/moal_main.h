@@ -627,6 +627,11 @@ out:
 /** Offset for subcommand */
 #define SUBCMD_OFFSET       4
 
+/** default scan channel gap  */
+#define DEF_SCAN_CHAN_GAP   50
+/** default scan time per channel in miracast mode */
+#define DEF_MIRACAST_SCAN_TIME   40
+
 /** Macro to extract the TOS field from a skb */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 22)
 #define SKB_TOS(skb) (ip_hdr(skb)->tos)
@@ -1085,7 +1090,13 @@ struct _moal_handle {
 	enum ieee80211_band band;
     /** first scan done flag */
 	t_u8 first_scan_done;
+    /** scan channel gap */
+	t_u16 scan_chan_gap;
 #ifdef WIFI_DIRECT_SUPPORT
+    /** miracast mode */
+	t_u8 miracast_mode;
+	/** scan time in miracast mode */
+	t_u16 miracast_scan_time;
 	/** remain on channel flag */
 	t_u8 remain_on_channel;
 	/** bss index for remain on channel */

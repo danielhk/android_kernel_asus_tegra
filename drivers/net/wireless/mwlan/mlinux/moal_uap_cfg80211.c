@@ -57,7 +57,7 @@ woal_deauth_station(moal_private * priv, u8 * mac_addr)
 	mlan_ioctl_req *ioctl_req = NULL;
 	mlan_ds_bss *bss = NULL;
 	int ret = 0;
-	mlan_status status;
+	mlan_status status = MLAN_STATUS_SUCCESS;
 
 	ENTER();
 
@@ -82,7 +82,8 @@ woal_deauth_station(moal_private * priv, u8 * mac_addr)
 	}
 
 done:
-	kfree(ioctl_req);
+	if (status != MLAN_STATUS_PENDING)
+		kfree(ioctl_req);
 	LEAVE();
 	return ret;
 }
@@ -102,7 +103,7 @@ woal_deauth_all_station(moal_private * priv)
 	int i = 0;
 	mlan_ds_get_info *info = NULL;
 	mlan_ioctl_req *ioctl_req = NULL;
-	mlan_status status;
+	mlan_status status = MLAN_STATUS_SUCCESS;
 
 	ENTER();
 	if (priv->media_connected == MFALSE) {
@@ -139,7 +140,8 @@ woal_deauth_all_station(moal_private * priv)
 	}
 	woal_sched_timeout(200);
 done:
-	kfree(ioctl_req);
+	if (status != MLAN_STATUS_PENDING)
+		kfree(ioctl_req);
 	return ret;
 }
 
@@ -1642,7 +1644,7 @@ woal_uap_cfg80211_get_station(struct wiphy *wiphy, struct net_device *dev,
 	int i = 0;
 	mlan_ds_get_info *info = NULL;
 	mlan_ioctl_req *ioctl_req = NULL;
-	mlan_status status;
+	mlan_status status = MLAN_STATUS_SUCCESS;
 
 	ENTER();
 	if (priv->media_connected == MFALSE) {
@@ -1684,7 +1686,8 @@ woal_uap_cfg80211_get_station(struct wiphy *wiphy, struct net_device *dev,
 		}
 	}
 done:
-	kfree(ioctl_req);
+	if (status != MLAN_STATUS_PENDING)
+		kfree(ioctl_req);
 	LEAVE();
 	return ret;
 }

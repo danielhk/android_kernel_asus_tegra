@@ -674,7 +674,8 @@ woal_request_set_mac_address(moal_private * priv)
 		       status, req->status_code);
 	}
 done:
-	kfree(req);
+	if (status != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return status;
 }
@@ -770,7 +771,7 @@ woal_disconnect(moal_private * priv, t_u8 wait_option, t_u8 * mac)
 	status = woal_request_ioctl(priv, req, wait_option);
 
 done:
-	if (wait_option || status != MLAN_STATUS_PENDING)
+	if (status != MLAN_STATUS_PENDING)
 		kfree(req);
 #ifdef REASSOCIATION
 	priv->reassoc_required = MFALSE;
@@ -829,7 +830,8 @@ woal_bss_start(moal_private * priv, t_u8 wait_option,
 #endif
 #endif
 done:
-	kfree(req);
+	if (status != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return status;
 }
@@ -1112,11 +1114,9 @@ woal_set_get_gen_ie(moal_private * priv, t_u32 action, t_u8 * ie, int *ie_len)
 			memcpy(misc->param.gen_ie.ie_data, ie, *ie_len);
 	}
 
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
-		ret = MLAN_STATUS_FAILURE;
+	ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (ret != MLAN_STATUS_SUCCESS)
 		goto done;
-	}
 
 	if (action == MLAN_ACT_GET) {
 		*ie_len = misc->param.gen_ie.len;
@@ -1125,7 +1125,8 @@ woal_set_get_gen_ie(moal_private * priv, t_u32 action, t_u8 * ie, int *ie_len)
 	}
 
 done:
-	kfree(req);
+	if (ret != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -1161,9 +1162,9 @@ woal_set_get_tx_power(moal_private * priv,
 		memcpy(&pcfg->param.power_cfg, power_cfg,
 		       sizeof(mlan_power_cfg_t));
 
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT))
-		ret = MLAN_STATUS_FAILURE;
+	ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (ret != MLAN_STATUS_SUCCESS)
+		goto done;
 
 	if (ret == MLAN_STATUS_SUCCESS && power_cfg)
 		memcpy(power_cfg, &pcfg->param.power_cfg,
@@ -1232,10 +1233,9 @@ woal_set_get_power_mgmt(moal_private * priv,
 		}
 	}
 
-	if (MLAN_STATUS_SUCCESS != woal_request_ioctl(priv, req, wait_option)) {
-		ret = MLAN_STATUS_FAILURE;
+	ret = woal_request_ioctl(priv, req, wait_option);
+	if (ret != MLAN_STATUS_SUCCESS)
 		goto done;
-	}
 
 	if (ret == MLAN_STATUS_SUCCESS && action == MLAN_ACT_GET)
 		*disabled = pm_cfg->param.ps_mode;
@@ -1254,7 +1254,8 @@ woal_set_get_power_mgmt(moal_private * priv,
 #endif
 
 done:
-	kfree(req);
+	if (ret != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -1288,7 +1289,8 @@ woal_set_region_code(moal_private * priv, char *region)
 	ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
 
 done:
-	kfree(req);
+	if (ret != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -1328,17 +1330,14 @@ woal_set_get_data_rate(moal_private * priv,
 		memcpy(&rate->param.rate_cfg, datarate,
 		       sizeof(mlan_rate_cfg_t));
 
-	if (MLAN_STATUS_SUCCESS ==
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
-		if (datarate && (action == MLAN_ACT_GET))
-			memcpy(datarate, &rate->param.rate_cfg,
-			       sizeof(mlan_rate_cfg_t));
-	} else {
-		ret = MLAN_STATUS_FAILURE;
-	}
+	ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (ret == MLAN_STATUS_SUCCESS && datarate && action == MLAN_ACT_GET)
+		memcpy(datarate, &rate->param.rate_cfg,
+		       sizeof(mlan_rate_cfg_t));
 
 done:
-	kfree(req);
+	if (ret != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -1372,16 +1371,14 @@ woal_get_assoc_rsp(moal_private * priv, mlan_ds_misc_assoc_rsp * assoc_rsp)
 	misc->sub_command = MLAN_OID_MISC_ASSOC_RSP;
 	req->action = MLAN_ACT_GET;
 
-	if (MLAN_STATUS_SUCCESS ==
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
-		if (assoc_rsp)
-			memcpy(assoc_rsp, &misc->param.assoc_resp,
-			       sizeof(mlan_ds_misc_assoc_rsp));
-	} else {
-		ret = MLAN_STATUS_FAILURE;
-	}
+	ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (ret == MLAN_STATUS_SUCCESS && assoc_rsp)
+		memcpy(assoc_rsp, &misc->param.assoc_resp,
+		       sizeof(mlan_ds_misc_assoc_rsp));
+
 done:
-	kfree(req);
+	if (ret != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -1437,7 +1434,8 @@ woal_request_get_fw_info(moal_private * priv, t_u8 wait_option,
 		       "get fw info failed! status=%d, error_code=0x%x\n",
 		       status, req->status_code);
 done:
-	kfree(req);
+	if (status != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return status;
 }
@@ -1557,6 +1555,7 @@ woal_host_command(moal_private * priv, struct iwreq *wrq)
 	int ret = 0;
 	mlan_ds_misc_cfg *misc = NULL;
 	mlan_ioctl_req *req = NULL;
+	mlan_status status = MLAN_STATUS_SUCCESS;
 
 	ENTER();
 
@@ -1603,8 +1602,8 @@ woal_host_command(moal_private * priv, struct iwreq *wrq)
 	misc->sub_command = MLAN_OID_MISC_HOST_CMD;
 	req->req_id = MLAN_IOCTL_MISC_CFG;
 
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
+	status = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (status != MLAN_STATUS_SUCCESS) {
 		ret = -EFAULT;
 		goto done;
 	}
@@ -1616,7 +1615,8 @@ woal_host_command(moal_private * priv, struct iwreq *wrq)
 	}
 	wrq->u.data.length = misc->param.hostcmd.len;
 done:
-	kfree(req);
+	if (status != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -1647,6 +1647,7 @@ woal_hostcmd_ioctl(struct net_device *dev, struct ifreq *req)
 	int ret = 0;
 	mlan_ds_misc_cfg *misc = NULL;
 	mlan_ioctl_req *ioctl_req = NULL;
+	mlan_status status = MLAN_STATUS_SUCCESS;
 
 	ENTER();
 
@@ -1702,8 +1703,8 @@ woal_hostcmd_ioctl(struct net_device *dev, struct ifreq *req)
 	misc->sub_command = MLAN_OID_MISC_HOST_CMD;
 	ioctl_req->req_id = MLAN_IOCTL_MISC_CFG;
 
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, ioctl_req, MOAL_IOCTL_WAIT)) {
+	status = woal_request_ioctl(priv, ioctl_req, MOAL_IOCTL_WAIT);
+	if (status != MLAN_STATUS_SUCCESS) {
 		ret = -EFAULT;
 		goto done;
 	}
@@ -1721,7 +1722,8 @@ woal_hostcmd_ioctl(struct net_device *dev, struct ifreq *req)
 		goto done;
 	}
 done:
-	kfree(ioctl_req);
+	if (status != MLAN_STATUS_PENDING)
+		kfree(ioctl_req);
 	LEAVE();
 	return ret;
 }
@@ -1742,6 +1744,7 @@ woal_custom_ie_ioctl(struct net_device *dev, struct ifreq *req)
 	mlan_ds_misc_cfg *misc = NULL;
 	mlan_ds_misc_custom_ie *custom_ie = NULL;
 	int ret = 0;
+	mlan_status status = MLAN_STATUS_SUCCESS;
 
 	ENTER();
 
@@ -1783,8 +1786,8 @@ woal_custom_ie_ioctl(struct net_device *dev, struct ifreq *req)
 
 	memcpy(&misc->param.cust_ie, custom_ie, sizeof(mlan_ds_misc_custom_ie));
 
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, ioctl_req, MOAL_IOCTL_WAIT)) {
+	status = woal_request_ioctl(priv, ioctl_req, MOAL_IOCTL_WAIT);
+	if (status != MLAN_STATUS_SUCCESS) {
 		ret = -EFAULT;
 		goto done;
 	}
@@ -1803,7 +1806,8 @@ woal_custom_ie_ioctl(struct net_device *dev, struct ifreq *req)
 	}
 
 done:
-	kfree(ioctl_req);
+	if (status != MLAN_STATUS_PENDING)
+		kfree(ioctl_req);
 	kfree(custom_ie);
 	LEAVE();
 	return ret;
@@ -1915,6 +1919,7 @@ woal_set_get_custom_ie(moal_private * priv, t_u16 mask, t_u8 * ie, int ie_len)
 	mlan_ds_misc_custom_ie *misc_ie = NULL;
 	int ret = 0;
 	custom_ie *pcust_bcn_ie = NULL;
+	mlan_status status = MLAN_STATUS_SUCCESS;
 
 	ENTER();
 
@@ -1941,12 +1946,12 @@ woal_set_get_custom_ie(moal_private * priv, t_u16 mask, t_u8 * ie, int ie_len)
 	pcust_bcn_ie->ie_length = ie_len;
 	memcpy(pcust_bcn_ie->ie_buffer, ie, ie_len);
 
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, ioctl_req, MOAL_IOCTL_WAIT)) {
+	status = woal_request_ioctl(priv, ioctl_req, MOAL_IOCTL_WAIT);
+	if (status != MLAN_STATUS_SUCCESS)
 		ret = -EFAULT;
-	}
 
-	kfree(ioctl_req);
+	if (status != MLAN_STATUS_PENDING)
+		kfree(ioctl_req);
 	LEAVE();
 	return ret;
 }
@@ -1967,6 +1972,7 @@ woal_tdls_config_ioctl(struct net_device *dev, struct ifreq *req)
 	mlan_ds_misc_cfg *misc = NULL;
 	mlan_ds_misc_tdls_config *tdls_data = NULL;
 	int ret = 0;
+	mlan_status status = MLAN_STATUS_SUCCESS;
 
 	ENTER();
 
@@ -2009,8 +2015,8 @@ woal_tdls_config_ioctl(struct net_device *dev, struct ifreq *req)
 	memcpy(&misc->param.tdls_config, tdls_data,
 	       sizeof(mlan_ds_misc_tdls_config));
 
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, ioctl_req, MOAL_IOCTL_WAIT)) {
+	status = woal_request_ioctl(priv, ioctl_req, MOAL_IOCTL_WAIT);
+	if (status != MLAN_STATUS_SUCCESS) {
 		ret = -EFAULT;
 		goto done;
 	}
@@ -2026,7 +2032,8 @@ woal_tdls_config_ioctl(struct net_device *dev, struct ifreq *req)
 	}
 
 done:
-	kfree(ioctl_req);
+	if (status != MLAN_STATUS_PENDING)
+		kfree(ioctl_req);
 	kfree(tdls_data);
 	LEAVE();
 	return ret;
@@ -2077,6 +2084,7 @@ woal_bss_role_cfg(moal_private * priv, t_u8 action,
 	mlan_ds_bss *bss = NULL;
 	mlan_ioctl_req *req = NULL;
 	struct net_device *dev = priv->netdev;
+	mlan_status status = MLAN_STATUS_SUCCESS;
 
 	ENTER();
 
@@ -2097,7 +2105,8 @@ woal_bss_role_cfg(moal_private * priv, t_u8 action,
 			bss->param.bss_role = *bss_role;
 		}
 	}
-	if (MLAN_STATUS_SUCCESS != woal_request_ioctl(priv, req, wait_option)) {
+	status = woal_request_ioctl(priv, req, wait_option);
+	if (status != MLAN_STATUS_SUCCESS) {
 		ret = -EFAULT;
 		goto done;
 	}
@@ -2158,7 +2167,8 @@ woal_bss_role_cfg(moal_private * priv, t_u8 action,
 	}
 
 done:
-	kfree(req);
+	if (status != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -2547,7 +2557,8 @@ woal_request_soft_reset(moal_handle * handle)
 
 	handle->surprise_removed = MTRUE;
 	woal_sched_timeout(5);
-	kfree(req);
+	if (ret != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -2671,6 +2682,7 @@ woal_get_driver_verext(moal_private * priv, struct ifreq *ireq)
 	mlan_ds_get_info *info = NULL;
 	mlan_ioctl_req *req = NULL;
 	int ret = 0;
+	mlan_status status = MLAN_STATUS_SUCCESS;
 
 	ENTER();
 
@@ -2704,8 +2716,8 @@ woal_get_driver_verext(moal_private * priv, struct ifreq *ireq)
 		}
 	}
 
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
+	status = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (status != MLAN_STATUS_SUCCESS) {
 		ret = -EFAULT;
 		goto done;
 	}
@@ -2724,7 +2736,8 @@ woal_get_driver_verext(moal_private * priv, struct ifreq *ireq)
 	PRINTM(MINFO, "MOAL EXTENDED VERSION: %s\n",
 	       info->param.ver_ext.version_str);
 done:
-	kfree(req);
+	if (status != MLAN_STATUS_PENDING)
+		kfree(req);
 
 	LEAVE();
 	return ret;
@@ -2861,18 +2874,17 @@ woal_set_get_tx_bf_cfg(moal_private * priv, t_u16 action,
 	memcpy(&bf_cfg->param.tx_bf, tx_bf_cfg, sizeof(mlan_ds_11n_tx_bf_cfg));
 
 	/* Send IOCTL request to MLAN */
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
-		ret = MLAN_STATUS_FAILURE;
+	ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (ret != MLAN_STATUS_SUCCESS)
 		goto done;
-	}
 
 	if (action == MLAN_ACT_GET)
 		memcpy(tx_bf_cfg, &bf_cfg->param.tx_bf,
 		       sizeof(mlan_ds_11n_tx_bf_cfg));
 
 done:
-	kfree(req);
+	if (ret != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -2993,6 +3005,7 @@ woal_get_deep_sleep(moal_private * priv, t_u32 * data)
 	int ret = 0;
 	mlan_ioctl_req *req = NULL;
 	mlan_ds_pm_cfg *pm = NULL;
+	mlan_status status = MLAN_STATUS_SUCCESS;
 
 	ENTER();
 
@@ -3006,8 +3019,8 @@ woal_get_deep_sleep(moal_private * priv, t_u32 * data)
 	req->req_id = MLAN_IOCTL_PM_CFG;
 
 	req->action = MLAN_ACT_GET;
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
+	status = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (status != MLAN_STATUS_SUCCESS) {
 		ret = -EFAULT;
 		goto done;
 	}
@@ -3015,7 +3028,8 @@ woal_get_deep_sleep(moal_private * priv, t_u32 * data)
 	*(data + 1) = pm->param.auto_deep_sleep.idletime;
 
 done:
-	kfree(req);
+	if (status != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -3116,6 +3130,7 @@ woal_11h_channel_check_ioctl(moal_private * priv)
 	int ret = 0;
 	mlan_ioctl_req *req = NULL;
 	mlan_ds_11h_cfg *ds_11hcfg = NULL;
+	mlan_status status = MLAN_STATUS_SUCCESS;
 
 	ENTER();
 
@@ -3130,8 +3145,8 @@ woal_11h_channel_check_ioctl(moal_private * priv)
 	req->req_id = MLAN_IOCTL_11H_CFG;
 	req->action = MLAN_ACT_SET;
 	/* Send Channel Check command and wait until the report is ready */
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
+	status = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (status != MLAN_STATUS_SUCCESS) {
 		ret = -EFAULT;
 		goto done;
 	}
@@ -3141,7 +3156,8 @@ woal_11h_channel_check_ioctl(moal_private * priv)
 	priv->phandle->meas_start_jiffies = jiffies;
 
 done:
-	kfree(req);
+	if (status != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -3182,7 +3198,8 @@ woal_wifi_direct_mode_cfg(moal_private * priv, t_u16 action, t_u16 * mode)
 		PRINTM(MIOCTL, "ACT=%d, wifi_direct_mode=%d\n", action, *mode);
 	}
 done:
-	kfree(req);
+	if (ret == MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -3504,11 +3521,10 @@ woal_change_adhoc_chan(moal_private * priv, int channel)
 	req->action = MLAN_ACT_GET;
 
 	/* Send IOCTL request to MLAN */
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
-		ret = MLAN_STATUS_FAILURE;
+	ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (ret != MLAN_STATUS_SUCCESS)
 		goto done;
-	}
+
 	if (bss->param.bss_chan.channel == (unsigned int)channel) {
 		ret = MLAN_STATUS_SUCCESS;
 		goto done;
@@ -3526,11 +3542,9 @@ woal_change_adhoc_chan(moal_private * priv, int channel)
 	memset((t_u8 *) & bss->param.bssid, 0, ETH_ALEN);
 
 	/* Send IOCTL request to MLAN */
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
-		ret = MLAN_STATUS_FAILURE;
+	ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (ret != MLAN_STATUS_SUCCESS)
 		goto done;
-	}
 
 	/* Do specific SSID scanning */
 	if (MLAN_STATUS_SUCCESS !=
@@ -3545,13 +3559,11 @@ woal_change_adhoc_chan(moal_private * priv, int channel)
 	       sizeof(mlan_802_11_ssid));
 
 	/* Send IOCTL request to MLAN */
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
-		ret = MLAN_STATUS_FAILURE;
-	}
+	ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
 
 done:
-	kfree(req);
+	if (ret != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -3608,7 +3620,8 @@ woal_find_best_network(moal_private * priv, t_u8 wait_option,
 	}
 
 done:
-	kfree(req);
+	if (ret != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -3995,17 +4008,13 @@ woal_get_scan_config(moal_private * priv, mlan_scan_cfg * scan_cfg)
 	req->req_id = MLAN_IOCTL_SCAN;
 	req->action = MLAN_ACT_GET;
 	memset(&scan->param.scan_cfg, 0, sizeof(mlan_scan_cfg));
-	if (MLAN_STATUS_SUCCESS ==
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
-		if (scan_cfg) {
-			memcpy(scan_cfg, &scan->param.scan_cfg,
-			       sizeof(mlan_scan_cfg));
-		}
-	} else {
-		ret = MLAN_STATUS_FAILURE;
-	}
+	ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (ret == MLAN_STATUS_SUCCESS && scan_cfg)
+		memcpy(scan_cfg, &scan->param.scan_cfg, sizeof(mlan_scan_cfg));
+
 done:
-	kfree(req);
+	if (ret != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -4053,11 +4062,11 @@ woal_set_scan_time(moal_private * priv, t_u16 active_scan_time,
 	       (int)active_scan_time, (int)passive_scan_time,
 	       (int)specific_scan_time);
 	memcpy(&scan->param.scan_cfg, &scan_cfg, sizeof(mlan_scan_cfg));
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT))
-		ret = MLAN_STATUS_FAILURE;
+	ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+
 done:
-	kfree(req);
+	if (ret != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -4149,7 +4158,8 @@ woal_cancel_scan(moal_private * priv, t_u8 wait_option)
 	}
 #endif
 done:
-	kfree(req);
+	if (ret != MLAN_STATUS_PENDING)
+		kfree(req);
 	return ret;
 }
 
@@ -4645,11 +4655,11 @@ woal_set_scan_type(moal_private * priv, t_u32 scan_type)
 	scan_cfg.scan_type = scan_type;
 	PRINTM(MIOCTL, "Set scan_type=%d\n", (int)scan_type);
 	memcpy(&scan->param.scan_cfg, &scan_cfg, sizeof(mlan_scan_cfg));
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT))
-		ret = MLAN_STATUS_FAILURE;
+	ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+
 done:
-	kfree(req);
+	if (ret != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -4690,11 +4700,11 @@ woal_enable_ext_scan(moal_private * priv, t_u8 enable)
 	scan_cfg.ext_scan = enable;
 	PRINTM(MIOCTL, "Set ext_scan=%d\n", (int)enable);
 	memcpy(&scan->param.scan_cfg, &scan_cfg, sizeof(mlan_scan_cfg));
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT))
-		ret = MLAN_STATUS_FAILURE;
+	ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+
 done:
-	kfree(req);
+	if (ret != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -4894,11 +4904,10 @@ woal_get_band(moal_private * priv, int *band)
 	/* Get config_bands, adhoc_start_band and adhoc_channel values from
 	   MLAN */
 	req->action = MLAN_ACT_GET;
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
-		ret = MLAN_STATUS_FAILURE;
+	ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (ret != MLAN_STATUS_SUCCESS)
 		goto done;
-	}
+
 	if (radio_cfg->param.band_cfg.
 	    config_bands & (BAND_B | BAND_G | BAND_GN))
 		support_band |= WIFI_FREQUENCY_BAND_2GHZ;
@@ -4908,7 +4917,8 @@ woal_get_band(moal_private * priv, int *band)
 	if (support_band == WIFI_FREQUENCY_ALL_BAND)
 		*band = WIFI_FREQUENCY_BAND_AUTO;
 done:
-	kfree(req);
+	if (ret != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -4941,11 +4951,10 @@ woal_set_band(moal_private * priv, char *pband)
 
 	/* Get fw supported values from MLAN */
 	req->action = MLAN_ACT_GET;
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
-		ret = MLAN_STATUS_FAILURE;
+	ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (ret != MLAN_STATUS_SUCCESS)
 		goto done;
-	}
+
 	if (*pband == '0') {
 		PRINTM(MIOCTL, "Set band to AUTO\n");
 		band = radio_cfg->param.band_cfg.fw_bands;
@@ -4998,13 +5007,11 @@ woal_set_band(moal_private * priv, char *pband)
 	memset(&radio_cfg->param.band_cfg, 0, sizeof(mlan_ds_band_cfg));
 	radio_cfg->param.band_cfg.config_bands = band;
 	radio_cfg->param.band_cfg.adhoc_start_band = band;
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
-		ret = MLAN_STATUS_FAILURE;
-		goto done;
-	}
+	ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+
 done:
-	kfree(req);
+	if (ret != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -5122,13 +5129,13 @@ woal_priv_qos_cfg(moal_private * priv, t_u32 action, char *qos_cfg)
 		cfg->param.qos_cfg = (t_u8) qosinfo;
 		PRINTM(MIOCTL, "set qosinfo=%d\n", qosinfo);
 	}
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT))
-		ret = MLAN_STATUS_FAILURE;
+	ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+
 	if (action == MLAN_ACT_GET)
 		*qos_cfg = cfg->param.qos_cfg;
 done:
-	kfree(req);
+	if (ret != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -5175,13 +5182,11 @@ woal_set_sleeppd(moal_private * priv, char *psleeppd)
 		goto done;
 	}
 
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
-		ret = MLAN_STATUS_FAILURE;
-		goto done;
-	}
+	ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+
 done:
-	kfree(req);
+	if (ret != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -5279,6 +5284,7 @@ woal_set_radio(moal_private * priv, t_u8 option)
 	int ret = 0;
 	mlan_ds_radio_cfg *radio = NULL;
 	mlan_ioctl_req *req = NULL;
+	mlan_status status = MLAN_STATUS_SUCCESS;
 	ENTER();
 	if ((option != 0) && (option != 1)) {
 		ret = -EINVAL;
@@ -5294,13 +5300,13 @@ woal_set_radio(moal_private * priv, t_u8 option)
 	req->req_id = MLAN_IOCTL_RADIO_CFG;
 	req->action = MLAN_ACT_SET;
 	radio->param.radio_on_off = option;
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
+	status = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (status != MLAN_STATUS_SUCCESS)
 		ret = -EFAULT;
-		goto done;
-	}
+
 done:
-	kfree(req);
+	if (status != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }

@@ -573,6 +573,7 @@ woal_wps_cfg(moal_private * priv, int enable)
 	int ret = 0;
 	mlan_ds_wps_cfg *pwps = NULL;
 	mlan_ioctl_req *req = NULL;
+	mlan_status status = MLAN_STATUS_SUCCESS;
 
 	ENTER();
 
@@ -593,14 +594,15 @@ woal_wps_cfg(moal_private * priv, int enable)
 	else
 		pwps->param.wps_session = MLAN_WPS_CFG_SESSION_END;
 
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
+	status = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (status != MLAN_STATUS_SUCCESS) {
 		ret = -EFAULT;
 		goto done;
 	}
 
 done:
-	kfree(req);
+	if (status != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -712,6 +714,7 @@ woal_send_domain_info_cmd_fw(moal_private * priv, t_u8 wait_option)
 	t_u8 i, flag = 0;
 	mlan_ds_11d_cfg *cfg_11d = NULL;
 	mlan_ioctl_req *req = NULL;
+	mlan_status status = MLAN_STATUS_SUCCESS;
 
 	ENTER();
 
@@ -802,14 +805,16 @@ woal_send_domain_info_cmd_fw(moal_private * priv, t_u8 wait_option)
 	cfg_11d->param.domain_info.no_of_sub_band = no_of_sub_band;
 
 	/* Send domain info command to FW */
-	if (MLAN_STATUS_SUCCESS != woal_request_ioctl(priv, req, wait_option)) {
+	status = woal_request_ioctl(priv, req, wait_option);
+	if (status != MLAN_STATUS_SUCCESS) {
 		ret = MLAN_STATUS_FAILURE;
 		PRINTM(MERROR, "11D: Error setting domain info in FW\n");
 		goto done;
 	}
 
 done:
-	kfree(req);
+	if (status != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -833,6 +838,7 @@ woal_set_rf_channel(moal_private * priv,
 	t_u32 mode, config_bands = 0;
 	mlan_ioctl_req *req = NULL;
 	mlan_ds_radio_cfg *radio_cfg = NULL;
+	mlan_status status = MLAN_STATUS_SUCCESS;
 
 	ENTER();
 
@@ -852,8 +858,8 @@ woal_set_rf_channel(moal_private * priv,
 	/* Get config_bands, adhoc_start_band and adhoc_channel values from
 	   MLAN */
 	req->action = MLAN_ACT_GET;
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
+	status = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (status != MLAN_STATUS_SUCCESS) {
 		ret = -EFAULT;
 		goto done;
 	}
@@ -873,8 +879,8 @@ woal_set_rf_channel(moal_private * priv,
 	radio_cfg->param.band_cfg.sec_chan_offset =
 		woal_cfg80211_channel_type_to_channel(channel_type);
 
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
+	status = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (status != MLAN_STATUS_SUCCESS) {
 		ret = -EFAULT;
 		goto done;
 	}
@@ -895,7 +901,8 @@ woal_set_rf_channel(moal_private * priv,
 	}
 
 done:
-	kfree(req);
+	if (status != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -1222,6 +1229,7 @@ woal_process_country_ie(moal_private * priv, struct cfg80211_bss *bss)
 	int ret = 0;
 	mlan_ioctl_req *req = NULL;
 	mlan_ds_11d_cfg *cfg_11d = NULL;
+	mlan_status status = MLAN_STATUS_SUCCESS;
 
 	ENTER();
 	country_ie = (u8 *) ieee80211_bss_get_ie(bss, WLAN_EID_COUNTRY);
@@ -1278,14 +1286,15 @@ woal_process_country_ie(moal_private * priv, struct cfg80211_bss *bss)
 	       &country_ie[2] + COUNTRY_CODE_LEN, country_ie_len);
 
 	/* Send domain info command to FW */
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
+	status = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (status != MLAN_STATUS_SUCCESS) {
 		ret = MLAN_STATUS_FAILURE;
 		PRINTM(MERROR, "11D: Error setting domain info in FW\n");
 		goto done;
 	}
 done:
-	kfree(req);
+	if (status != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -1402,6 +1411,7 @@ woal_cfg80211_assoc(moal_private * priv, void *sme)
 	t_u16 beacon_interval = 0;
 	bool privacy;
 	struct cfg80211_bss *bss = NULL;
+	mlan_status status = MLAN_STATUS_SUCCESS;
 
 	ENTER();
 
@@ -1509,8 +1519,8 @@ woal_cfg80211_assoc(moal_private * priv, void *sme)
 		req->req_id = MLAN_IOCTL_RADIO_CFG;
 		req->action = MLAN_ACT_GET;
 
-		if (MLAN_STATUS_SUCCESS !=
-		    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
+		status = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+		if (status != MLAN_STATUS_SUCCESS) {
 			ret = -EFAULT;
 			goto done;
 		}
@@ -1640,8 +1650,8 @@ woal_cfg80211_assoc(moal_private * priv, void *sme)
 		req->action = MLAN_ACT_SET;
 		bss->sub_command = MLAN_OID_IBSS_BCN_INTERVAL;
 		bss->param.bcn_interval = beacon_interval;
-		if (MLAN_STATUS_SUCCESS !=
-		    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
+		status = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+		if (status != MLAN_STATUS_SUCCESS) {
 			ret = -EFAULT;
 			goto done;
 		}
@@ -1747,7 +1757,8 @@ done:
 			ret = -EFAULT;
 		}
 	}
-	kfree(req);
+	if (status != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return ret;
 }
@@ -1848,11 +1859,9 @@ woal_cfg80211_dump_station_info(moal_private * priv, struct station_info *sinfo)
 	rate->sub_command = MLAN_OID_GET_DATA_RATE;
 	req->req_id = MLAN_IOCTL_RATE;
 	req->action = MLAN_ACT_GET;
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT)) {
-		ret = MLAN_STATUS_FAILURE;
+	ret = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (ret != MLAN_STATUS_SUCCESS)
 		goto done;
-	}
 	if (rate->param.data_rate.tx_data_rate >= MLAN_RATE_INDEX_MCS0) {
 		sinfo->txrate.flags = RATE_INFO_FLAGS_MCS;
 		if (rate->param.data_rate.tx_ht_bw == MLAN_HT_BW40)
@@ -1896,7 +1905,8 @@ woal_cfg80211_dump_station_info(moal_private * priv, struct station_info *sinfo)
 #endif
 
 done:
-	kfree(req);
+	if (ret != MLAN_STATUS_PENDING)
+		kfree(req);
 
 	LEAVE();
 	return ret;
@@ -2088,6 +2098,9 @@ woal_cfg80211_scan(struct wiphy *wiphy, struct net_device *dev,
 	priv->scan_request = request;
 	spin_unlock(&priv->scan_req_lock);
 	memset(&scan_req, 0x00, sizeof(scan_req));
+
+#ifdef WIFI_DIRECT_SUPPORT
+#endif
 	for (i = 0; i < priv->scan_request->n_ssids; i++) {
 		memcpy(scan_req.ssid_list[i].ssid,
 		       priv->scan_request->ssids[i].ssid,
@@ -2130,6 +2143,8 @@ woal_cfg80211_scan(struct wiphy *wiphy, struct net_device *dev,
 					MIN_SPECIFIC_SCAN_CHAN_TIME;
 		}
 #endif
+#endif
+#ifdef WIFI_DIRECT_SUPPORT
 #endif
 	}
 	if (priv->scan_request->ie && priv->scan_request->ie_len) {
@@ -3158,6 +3173,8 @@ woal_cfg80211_sched_scan_start(struct wiphy *wiphy,
 			priv->scan_cfg.chan_list[i].scan_type =
 				MLAN_SCAN_TYPE_ACTIVE;
 		priv->scan_cfg.chan_list[i].scan_time = 0;
+#ifdef WIFI_DIRECT_SUPPORT
+#endif
 	}
 
 	/** set scan request IES */
@@ -3192,6 +3209,8 @@ woal_cfg80211_sched_scan_start(struct wiphy *wiphy,
 	priv->scan_cfg.bss_type = MLAN_BSS_MODE_INFRA;
 	priv->scan_cfg.action = BG_SCAN_ACT_SET;
 	priv->scan_cfg.enable = MTRUE;
+#ifdef WIFI_DIRECT_SUPPORT
+#endif
 
 	if (MLAN_STATUS_SUCCESS ==
 	    woal_request_bgscan(priv, MOAL_IOCTL_WAIT, &priv->scan_cfg)) {
@@ -3308,6 +3327,7 @@ woal_tdls_oper(moal_private * priv, u8 * peer, t_u8 action)
 	mlan_ioctl_req *ioctl_req = NULL;
 	mlan_ds_misc_cfg *misc = NULL;
 	int ret = 0;
+	mlan_status status = MLAN_STATUS_SUCCESS;
 
 	ENTER();
 
@@ -3322,13 +3342,14 @@ woal_tdls_oper(moal_private * priv, u8 * peer, t_u8 action)
 	ioctl_req->action = MLAN_ACT_SET;
 	misc->param.tdls_oper.tdls_action = action;
 	memcpy(misc->param.tdls_oper.peer_mac, peer, ETH_ALEN);
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, ioctl_req, MOAL_IOCTL_WAIT)) {
+	status = woal_request_ioctl(priv, ioctl_req, MOAL_IOCTL_WAIT);
+	if (status != MLAN_STATUS_SUCCESS) {
 		ret = -EFAULT;
 		goto done;
 	}
 done:
-	kfree(ioctl_req);
+	if (status != MLAN_STATUS_PENDING)
+		kfree(ioctl_req);
 	LEAVE();
 	return ret;
 }
@@ -3350,6 +3371,7 @@ woal_tdls_get_ies(moal_private * priv, u8 * peer,
 	mlan_ioctl_req *ioctl_req = NULL;
 	mlan_ds_misc_cfg *misc = NULL;
 	int ret = 0;
+	mlan_status status = MLAN_STATUS_SUCCESS;
 
 	ENTER();
 
@@ -3364,8 +3386,8 @@ woal_tdls_get_ies(moal_private * priv, u8 * peer,
 	ioctl_req->action = MLAN_ACT_GET;
 	misc->param.tdls_ies.flags = flags;
 	memcpy(misc->param.tdls_ies.peer_mac, peer, ETH_ALEN);
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, ioctl_req, MOAL_IOCTL_WAIT)) {
+	status = woal_request_ioctl(priv, ioctl_req, MOAL_IOCTL_WAIT);
+	if (status != MLAN_STATUS_SUCCESS) {
 		ret = -EFAULT;
 		goto done;
 	}
@@ -3373,7 +3395,7 @@ woal_tdls_get_ies(moal_private * priv, u8 * peer,
 		memcpy(tdls_ies, &misc->param.tdls_ies,
 		       sizeof(mlan_ds_misc_tdls_ies));
 done:
-	if (ioctl_req)
+	if (status != MLAN_STATUS_PENDING)
 		kfree(ioctl_req);
 	LEAVE();
 	return ret;
@@ -4202,6 +4224,7 @@ woal_cfg80211_change_station(struct wiphy *wiphy, struct net_device *dev,
 	mlan_ioctl_req *ioctl_req = NULL;
 	mlan_ds_misc_cfg *misc = NULL;
 	int ret = 0;
+	mlan_status status = MLAN_STATUS_SUCCESS;
 
 	ENTER();
 
@@ -4248,14 +4271,15 @@ woal_cfg80211_change_station(struct wiphy *wiphy, struct net_device *dev,
 	}
 #endif
 
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(priv, ioctl_req, MOAL_IOCTL_WAIT)) {
+	status = woal_request_ioctl(priv, ioctl_req, MOAL_IOCTL_WAIT);
+	if (status != MLAN_STATUS_SUCCESS) {
 		ret = -EFAULT;
 		goto done;
 	}
 
 done:
-	kfree(ioctl_req);
+	if (status != MLAN_STATUS_PENDING)
+		kfree(ioctl_req);
 	LEAVE();
 	return ret;
 }
@@ -4510,10 +4534,9 @@ woal_cfg80211_init_wiphy(moal_private * priv, t_u8 wait_option)
 	req->action = MLAN_ACT_GET;
 	cfg_11n->param.htcap_cfg.hw_cap_req = MTRUE;
 
-	if (MLAN_STATUS_SUCCESS != woal_request_ioctl(priv, req, wait_option)) {
-		ret = MLAN_STATUS_FAILURE;
+	ret = woal_request_ioctl(priv, req, wait_option);
+	if (ret != MLAN_STATUS_SUCCESS)
 		goto done;
-	}
 	hw_dev_cap = cfg_11n->param.htcap_cfg.htcap;
 
 	/* Get supported MCS sets */
@@ -4522,10 +4545,9 @@ woal_cfg80211_init_wiphy(moal_private * priv, t_u8 wait_option)
 	req->req_id = MLAN_IOCTL_11N_CFG;
 	req->action = MLAN_ACT_GET;
 
-	if (MLAN_STATUS_SUCCESS != woal_request_ioctl(priv, req, wait_option)) {
-		ret = MLAN_STATUS_FAILURE;
+	ret = woal_request_ioctl(priv, req, wait_option);
+	if (ret != MLAN_STATUS_SUCCESS)
 		goto done;
-	}
 
 	/* Initialize parameters for 2GHz and 5GHz bands */
 	woal_cfg80211_setup_ht_cap(&wiphy->bands[IEEE80211_BAND_2GHZ]->ht_cap,
@@ -4551,10 +4573,9 @@ woal_cfg80211_init_wiphy(moal_private * priv, t_u8 wait_option)
 	req->req_id = MLAN_IOCTL_RADIO_CFG;
 	req->action = MLAN_ACT_GET;
 
-	if (MLAN_STATUS_SUCCESS != woal_request_ioctl(priv, req, wait_option)) {
-		ret = MLAN_STATUS_FAILURE;
+	ret = woal_request_ioctl(priv, req, wait_option);
+	if (ret != MLAN_STATUS_SUCCESS)
 		goto done;
-	}
 
 	/* Set available antennas to wiphy */
 	wiphy->available_antennas_tx = radio->param.ant_cfg.tx_antenna;
@@ -4602,7 +4623,8 @@ woal_cfg80211_init_wiphy(moal_private * priv, t_u8 wait_option)
 
 done:
 	LEAVE();
-	kfree(req);
+	if (ret != MLAN_STATUS_PENDING)
+		kfree(req);
 	return ret;
 }
 

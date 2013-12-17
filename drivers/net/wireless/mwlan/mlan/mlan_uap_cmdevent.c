@@ -3154,6 +3154,7 @@ wlan_ops_uap_process_cmdresp(IN t_void * priv,
 
 		if (pmpriv->adapter->state_rdh.stage == RDH_STOP_INTFS)
 			wlan_11h_radar_detected_callback((t_void *) pmpriv);
+
 		break;
 	case HOST_CMD_APCMD_BSS_START:
 		if (pmpriv->adapter->state_rdh.stage == RDH_RESTART_INTFS)

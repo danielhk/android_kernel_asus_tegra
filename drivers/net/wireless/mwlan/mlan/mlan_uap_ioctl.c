@@ -1359,6 +1359,8 @@ wlan_ops_uap_ioctl(t_void * adapter, pmlan_ioctl_req pioctl_req)
 			pget_info->param.fw_info.fw_bands = pmadapter->fw_bands;
 			pget_info->param.fw_info.hw_dev_mcs_support =
 				pmadapter->hw_dev_mcs_support;
+			pget_info->param.fw_info.hw_dot_11n_dev_cap =
+				pmadapter->hw_dot_11n_dev_cap;
 			pget_info->param.fw_info.region_code =
 				pmadapter->region_code;
 		}

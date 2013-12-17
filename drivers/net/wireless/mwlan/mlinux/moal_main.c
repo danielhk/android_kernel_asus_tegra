@@ -174,8 +174,10 @@ int rx_work;
 int hw_test;
 
 #if defined(WIFI_DIRECT_SUPPORT)
+#if defined(STA_CFG80211) && defined(UAP_CFG80211)
 #if LINUX_VERSION_CODE >= WIFI_DIRECT_KERNEL_VERSION
 int p2p_enh = 1;
+#endif
 #endif
 #endif
 
@@ -838,6 +840,8 @@ woal_init_sw(moal_handle * handle)
 	handle->cmd52_func = 0;
 	handle->cmd52_reg = 0;
 	handle->cmd52_val = 0;
+#if defined(STA_CFG80211) || defined(UAP_CFG80211)
+#endif
 	init_waitqueue_head(&handle->hs_activate_wait_q);
 #endif
 
@@ -1093,15 +1097,16 @@ woal_process_regrdwr(moal_handle * handle, t_u8 * type_string,
 	reg->param.reg_rw.value = value;
 
 	/* request ioctl for STA */
-	if (MLAN_STATUS_SUCCESS !=
-	    woal_request_ioctl(handle->priv[0], ioctl_req, MOAL_IOCTL_WAIT))
+	ret = woal_request_ioctl(handle->priv[0], ioctl_req, MOAL_IOCTL_WAIT);
+	if (ret != MLAN_STATUS_SUCCESS)
 		goto done;
 	PRINTM(MINFO, "Register type: %d, offset: 0x%x, value: 0x%x\n", type,
 	       offset, value);
 	ret = MLAN_STATUS_SUCCESS;
 
 done:
-	kfree(ioctl_req);
+	if (ret != MLAN_STATUS_PENDING)
+		kfree(ioctl_req);
 	LEAVE();
 	return ret;
 }
@@ -2392,7 +2397,8 @@ woal_shutdown_fw(moal_private * priv, t_u8 wait_option)
 	/* add 100 ms delay to avoid back to back init/shutdown */
 	mdelay(100);
 done:
-	kfree(req);
+	if (status != MLAN_STATUS_PENDING)
+		kfree(req);
 	LEAVE();
 	return status;
 }
@@ -3202,6 +3208,8 @@ woal_process_tcp_ack(moal_private * priv, mlan_buffer * pmbuf)
 				kmalloc(sizeof(struct tcp_sess), GFP_ATOMIC);
 			if (!tcp_session) {
 				PRINTM(MERROR, "Fail to allocate tcp_sess.\n");
+				spin_unlock_irqrestore(&priv->tcp_sess_lock,
+						       flags);
 				goto done;
 			}
 			tcp_session->ack_skb = pmbuf->pdesc;
@@ -4224,11 +4232,12 @@ woal_reassociation_thread(void *data)
 					rate->param.rate_cfg.rate =
 						priv->rate_index;
 
-					if (MLAN_STATUS_SUCCESS
-					    != woal_request_ioctl(priv, req,
-								  MOAL_CMD_WAIT))
-					{
-						kfree(req);
+					status = woal_request_ioctl(priv, req,
+								    MOAL_CMD_WAIT);
+					if (status != MLAN_STATUS_SUCCESS) {
+						if (status !=
+						    MLAN_STATUS_PENDING)
+							kfree(req);
 						LEAVE();
 						return MLAN_STATUS_FAILURE;
 					}
@@ -6177,9 +6186,11 @@ module_param(rx_work, int, 0);
 MODULE_PARM_DESC(rx_work,
 		 "0: default; 1: Enable rx_work_queue; 2: Disable rx_work_queue");
 #if defined(WIFI_DIRECT_SUPPORT)
+#if defined(STA_CFG80211) && defined(UAP_CFG80211)
 #if LINUX_VERSION_CODE >= WIFI_DIRECT_KERNEL_VERSION
 module_param(p2p_enh, int, 0);
 MODULE_PARM_DESC(p2p_enh, "1: Enable enhanced P2P; 0: Disable enhanced P2P");
+#endif
 #endif
 #endif
 

@@ -307,6 +307,7 @@ mlan_status wlan_enable_host_int(pmlan_adapter pmadapter);
 mlan_status wlan_sdio_probe(pmlan_adapter pmadapter);
 /** multi interface download check */
 mlan_status wlan_check_winner_status(mlan_adapter * pmadapter, t_u32 * val);
+
 /** Firmware status check */
 mlan_status wlan_check_fw_status(mlan_adapter * pmadapter, t_u32 pollnum);
 /** Read interrupt status */
