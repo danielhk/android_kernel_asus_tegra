@@ -287,7 +287,7 @@ static int tegra_fb_blank(int blank, struct fb_info *info)
 
 	switch (blank) {
 	case FB_BLANK_UNBLANK:
-		dev_dbg(&tegra_fb->ndev->dev, "unblank\n");
+		dev_info(&tegra_fb->ndev->dev, "unblank\n");
 		tegra_fb->win->flags = TEGRA_WIN_FLAG_ENABLED;
 		tegra_dc_enable(tegra_fb->win->dc);
 		tegra_dc_update_windows(&tegra_fb->win, 1);
@@ -295,7 +295,7 @@ static int tegra_fb_blank(int blank, struct fb_info *info)
 		return 0;
 
 	case FB_BLANK_NORMAL:
-		dev_dbg(&tegra_fb->ndev->dev, "blank - normal\n");
+		dev_info(&tegra_fb->ndev->dev, "blank - normal\n");
 		/* To pan fb at the unblank */
 		if (tegra_fb->win->dc->enabled)
 			tegra_fb->curr_xoffset = -1;
@@ -305,7 +305,7 @@ static int tegra_fb_blank(int blank, struct fb_info *info)
 	case FB_BLANK_VSYNC_SUSPEND:
 	case FB_BLANK_HSYNC_SUSPEND:
 	case FB_BLANK_POWERDOWN:
-		dev_dbg(&tegra_fb->ndev->dev, "blank - powerdown\n");
+		dev_info(&tegra_fb->ndev->dev, "blank - powerdown\n");
 		/* To pan fb while switching from X */
 		if (!tegra_fb->win->dc->suspended && tegra_fb->win->dc->enabled)
 			tegra_fb->curr_xoffset = -1;

@@ -251,7 +251,9 @@ static void handle_check_edid_l(struct tegra_dc_hdmi_data *hdmi)
 		pr_err("error populating eld\n");
 		goto end_disabled;
 	}
+	spin_lock(&hdmi->state_lock);
 	hdmi->eld_retrieved = true;
+	spin_unlock(&hdmi->state_lock);
 
 	pr_info("panel size %d by %d\n", specs.max_x, specs.max_y);
 
@@ -273,12 +275,27 @@ static void handle_check_edid_l(struct tegra_dc_hdmi_data *hdmi)
 #endif
 	hdmi->dc->connected = true;
 	tegra_dc_ext_process_hotplug(hdmi->dc->ndev->id);
+
+	if (unlikely(tegra_is_clk_enabled(hdmi->clk))) {
+		/* the only time this should happen is on boot, where the
+		 * sequence is that hdmi is enabled before EDID is read.
+		 * hdmi_enable() doesn't have EDID information yet so can't
+		 * setup audio and infoframes, so we have to do so here.
+		 */
+		pr_info("%s: setting audio and infoframes\n", __func__);
+		tegra_dc_io_start(hdmi->dc);
+		tegra_dc_hdmi_setup_audio_and_infoframes(hdmi->dc);
+		tegra_dc_io_end(hdmi->dc);
+	}
+
 	hdmi_state_machine_set_state_l(HDMI_STATE_DONE_ENABLED, -1);
 
 	return;
 
 end_disabled:
+	spin_lock(&hdmi->state_lock);
 	hdmi->eld_retrieved = false;
+	spin_unlock(&hdmi->state_lock);
 	hdmi_disable_l(hdmi);
 	hdmi_state_machine_set_state_l(HDMI_STATE_DONE_DISABLED, -1);
 }

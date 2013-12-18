@@ -260,7 +260,15 @@ struct tegra_dc_hdmi_data {
 
 	spinlock_t			suspend_lock;
 	bool				suspended;
+
+	/* eld_retrieved is set by hdmi_state_machine worker thread
+	 * but read by other threads, so needs smp coherency.  memory
+	 * barriers might be enough but locks are clearer and this
+	 * isn't performance critical.
+	 */
+	spinlock_t			state_lock;
 	bool				eld_retrieved;
+
 	bool				clk_enabled;
 	unsigned			audio_freq;
 	unsigned			audio_source;
@@ -282,4 +290,5 @@ bool tegra_dc_hdmi_mode_filter(const struct tegra_dc *dc,
 			       struct fb_videomode *mode);
 void tegra_hdmi_override_mode_parse(struct tegra_dc *dc,
 				    struct tegra_dc_mode *mode);
+void tegra_dc_hdmi_setup_audio_and_infoframes(struct tegra_dc *dc);
 #endif
