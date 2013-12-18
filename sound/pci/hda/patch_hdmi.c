@@ -1626,6 +1626,18 @@ static int generic_hdmi_build_controls(struct hda_codec *codec)
 	int err;
 	int pin_idx;
 
+#ifdef CONFIG_SWITCH
+	/* This function is called only once, where as
+	 * generic_hdmi_init() is called multiple times.  It is
+	 * called at init, but also called on resume because
+	 * there is no resume hook.  If ever a resume hook is
+	 * added, this could be moved into generic_hdmi_init().
+	 */
+	spec->hdmi_audio_switch.name = "hdmi_audio";
+	pin_idx = switch_dev_register(&spec->hdmi_audio_switch);
+	BUG_ON(pin_idx != 0);
+#endif
+
 	for (pin_idx = 0; pin_idx < spec->num_pins; pin_idx++) {
 		struct hdmi_spec_per_pin *per_pin = &spec->pins[pin_idx];
 
@@ -1658,18 +1670,6 @@ static int generic_hdmi_build_controls(struct hda_codec *codec)
 
 		hdmi_present_sense(per_pin, 0);
 	}
-
-#ifdef CONFIG_SWITCH
-	/* This function is called only once, where as
-	 * generic_hdmi_init() is called multiple times.  It is
-	 * called at init, but also called on resume because
-	 * there is no resume hook.  If ever a resume hook is
-	 * added, this could be moved into generic_hdmi_init().
-	 */
-	spec->hdmi_audio_switch.name = "hdmi_audio";
-	pin_idx = switch_dev_register(&spec->hdmi_audio_switch);
-	BUG_ON(pin_idx != 0);
-#endif
 
 	return 0;
 }
