@@ -35,6 +35,7 @@
 #include <linux/gpio.h>
 #include <linux/interrupt.h>
 #include <linux/regulator/userspace-consumer.h>
+#include <linux/wakelock.h>
 
 #include <asm/mach-types.h>
 #include <linux/power/sbs-battery.h>
@@ -463,6 +464,8 @@ static struct platform_device *fixed_reg_devs_molly[] = {
 	ADD_FIXED_REG(avdd_hdmi_pll),
 };
 
+static struct wake_lock molly_evt2_wakelock;
+
 int __init molly_palmas_regulator_init(void)
 {
 	void __iomem *pmc = IO_ADDRESS(TEGRA_PMC_BASE);
@@ -623,6 +626,25 @@ int __init molly_suspend_init(void)
 	tegra_init_suspend(&molly_suspend_data);
 	return 0;
 }
+
+static __init int molly_suspend_late_init(void)
+{
+	if (molly_hw_rev == MOLLY_REV_EVT2) {
+		/* This is a workaround for a hardware bug on Molly EVT2.
+		 * On Molly EVT2, the 10K ohm pull up resistor on
+		 * ENET_RESET_N_3V3 pin is removed accidentally, which causes
+		 * SMSC LAN9730 would be reset every time when Molly EVT2
+		 * enters LP0.
+		 */
+		wake_lock_init(&molly_evt2_wakelock, WAKE_LOCK_SUSPEND,
+			"molly_evt2_not_support_lp0");
+		wake_lock(&molly_evt2_wakelock);
+		pr_info("%s: WAR: acquire a wakelock to prevent enter suspend\n",
+			__func__);
+	}
+	return 0;
+}
+late_initcall(molly_suspend_late_init);
 
 int __init molly_edp_init(void)
 {
