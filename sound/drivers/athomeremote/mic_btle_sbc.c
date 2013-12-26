@@ -388,22 +388,40 @@ static int debug_decoder_callback_stats[ATHOME_SBC_FORMAT_COUNT];
  * This gives us an indirect measure of the BTLE connection quality.
  * When BTLE is working well, we should get all packet format 3.
  */
-static void athome_bt_dump_sbc_stats(void)
+static void athome_bt_dump_sbc_stats(struct snd_btlesbc *btlesbc)
 {
+	int i;
 	if (sbc_packet_counter > 0) {
-/* Ignore warning from checkpatch.pl  about string concatenation. */
-		pr_info("%d SBC packets decoded, format count (bad to good): "
-			"%2d%%, %2d%%, %2d%%, %2d%%\n",
-			sbc_packet_counter,
-			PERCENT_SBC_PACKETS(0),
-			PERCENT_SBC_PACKETS(1),
-			PERCENT_SBC_PACKETS(2),
-			PERCENT_SBC_PACKETS(3)
-			);
-		/* The code above is dependant on there being 4 formats.
+		int weighted_average;
+		int score_int;
+		int score_fraction;
+		/* Print average score as a fake floating point value.
+		 * This score is used to evaluate SBC compression quality,
+		 * which is used to infer the BTLE transmission quality. */
+		int sum = 0;
+		for (i = 0; i < 4; i++)
+			sum += i * debug_decoder_callback_stats[i];
+		weighted_average = 100 * sum / sbc_packet_counter;
+		score_int = weighted_average / 100;
+		score_fraction = weighted_average - (score_int * 100);
+
+		/* The code below is dependent on there being 4 formats.
 		 * I could have used a for-loop but I did not want
 		 * to spew 5 lines into the log. */
 		BUG_ON(ATHOME_SBC_FORMAT_COUNT != 4);
+		/* Ignore warning from checkpatch.pl about
+		 * string concatenation. */
+		btlesbc_log("%4d SBC packets decoded at %5d Hz"
+			", formats (bad to good): "
+			"%3d%% %3d%% %3d%% %3d%%, quality = %d.%02d\n",
+			sbc_packet_counter,
+			btlesbc->sample_rate,
+			PERCENT_SBC_PACKETS(0),
+			PERCENT_SBC_PACKETS(1),
+			PERCENT_SBC_PACKETS(2),
+			PERCENT_SBC_PACKETS(3),
+			score_int, score_fraction
+			);
 	}
 }
 
@@ -845,7 +863,7 @@ static int btlesbc_pcm_close(struct snd_pcm_substream *substream)
 {
 	struct snd_btlesbc *btlesbc = snd_pcm_substream_chip(substream);
 #if LOG_PACKET_COUNTS
-	athome_bt_dump_sbc_stats();
+	athome_bt_dump_sbc_stats(btlesbc);
 #endif
 	if (btlesbc->timer_callback_count > 0)
 		btlesbc_log("processed %d packets in %d timer callbacks\n",
