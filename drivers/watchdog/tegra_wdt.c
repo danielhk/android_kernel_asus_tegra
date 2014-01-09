@@ -472,7 +472,11 @@ static void watchdog_debug_fiq(struct fiq_glue_handler *h, void *regs,
 	} while_each_thread(g, p);
 
 	pr_crit("Watchdog Triggered: restarting...\n");
-	emergency_restart();
+	/* cause watchdog to trip ASAP by setting a short timeout */
+	tegra_wdt_disable(tegra_wdt[0]);
+	tegra_wdt[0]->timeout = 0;
+	tegra_wdt_enable(tegra_wdt[0]);
+	while(1);
 }
 
 static int tegra_wdt_probe(struct platform_device *pdev)
