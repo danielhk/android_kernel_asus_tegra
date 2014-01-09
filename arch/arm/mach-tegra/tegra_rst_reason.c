@@ -28,6 +28,27 @@
 
 #include "board.h"
 
+static char *pmc_rst_reason_msg[] = {
+	"power on reset",
+	"watchdog timeout",
+	"thermal overheating",
+	"software reset",
+	"lp0 wakeup",
+};
+
+static char *pmic_rst_reason_msg[] = {
+	"invalid reason",
+	"no reason",
+	"long pressing poweron key",
+	"pressing powerdown key",
+	"watchdog timeout",
+	"pmic overheating",
+	"pressing reset key",
+	"software reset",
+	"low voltage on power supply",
+	"gpadc shutdown",
+};
+
 static enum pmic_rst_reason pmic_rst_reason_data = INVALID;
 
 static struct kobject *rst_reason_kobj;

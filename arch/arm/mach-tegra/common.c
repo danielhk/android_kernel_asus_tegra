@@ -50,6 +50,7 @@
 #include <mach/tegra_smmu.h>
 #include <mach/gpio-tegra.h>
 #include <mach/nct.h>
+#include <mach/tegra_rst_reason.h>
 
 #include "apbio.h"
 #include "board.h"
@@ -62,6 +63,8 @@
 #include "pmc.h"
 #include "common.h"
 #include "atomics.h"
+
+#include <../drivers/staging/android/ram_console.h>
 
 #define MC_SECURITY_CFG2	0x7c
 
@@ -76,10 +79,23 @@
 #define   ENB_FAST_REARBITRATE	BIT(2)
 #define   DONT_SPLIT_AHB_WR     BIT(7)
 
+/* bits of PMC_SCRATCH0. bits 0-2 are reserved for use by
+ * the ROM bootloader and the meaning must not be changed.
+ * bits 3-31 are SW configurable.
+ * 28-31 are used to communicate a reboot request to the
+ * bootloader (fastboot).
+ * bits 27:17 seem to be set to 0 by something (PMIC itself?  ROM?)
+ *  and we can't use it to pass information
+ * bits 11:8 seem to be set to 2 by something (PMIC itself?  ROM?)
+ *  and we can't use it to pass information
+ * bits 4-7 and 12-15 appear available so we use bit 15 to
+ *  indicate to next boot that the reset is due to a kernel panic.
+ */
 #define   RECOVERY_MODE			BIT(31)
 #define   BOOTLOADER_MODE		BIT(30)
 #define   RECOVERY_FACTORY_RESET_MODE	BIT(29)
 #define   NORMAL_REBOOT_MODE		BIT(28)
+#define   KERNEL_PANIC_OCCURRED		BIT(15)
 #define   FORCED_RECOVERY_MODE		BIT(1)
 
 #define AHB_GIZMO_USB		0x1c
@@ -1696,17 +1712,85 @@ static struct resource ram_console_resources[] = {
 	},
 };
 
+static struct ram_console_platform_data ram_console_pdata;
+
 static struct platform_device ram_console_device = {
 	.name		= "ram_console",
 	.id		= -1,
 	.num_resources	= ARRAY_SIZE(ram_console_resources),
 	.resource	= ram_console_resources,
+	.dev		= {
+		.platform_data	= &ram_console_pdata,
+	},
+};
+
+static char boot_reason[128];
+enum reset_reason_value {
+	RESET_REASON_POR,
+	RESET_REASON_WATCHDOG,
+	RESET_REASON_SENSOR,
+	RESET_REASON_REBOOT,
+	RESET_REASON_SUSPEND
+};
+static const char *reset_reasons[] = {
+	"power on reset\n",
+	"watchdog\n",
+	"sensor\n",
+	"reboot\n",
+	"suspend\n"
+};
+
+static char *get_boot_reason(void)
+{
+#if defined(CONFIG_ARCH_TEGRA_3x_SOC) || defined(CONFIG_ARCH_TEGRA_11x_SOC)
+	void __iomem *pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
+	u32 val = readl(pmc_base + PMC_RST_STATUS) & 0x7;
+
+	strlcpy(boot_reason, "Boot info:\nLast boot reason: ",
+		sizeof(boot_reason));
+
+	if (val >= ARRAY_SIZE(reset_reasons))
+		strlcat(boot_reason, "unknown", sizeof(boot_reason));
+	else {
+		/* check if last reset was due to kernel panic */
+		u32 scratch0 = readl_relaxed(pmc_base + PMC_SCRATCH0);
+		if (scratch0 & KERNEL_PANIC_OCCURRED) {
+			strlcat(boot_reason, "kernel_panic\n",
+				sizeof(boot_reason));
+			scratch0 &= ~KERNEL_PANIC_OCCURRED;
+			writel_relaxed(scratch0, pmc_base + PMC_SCRATCH0);
+		} else {
+			strlcat(boot_reason, reset_reasons[val],
+				sizeof(boot_reason));
+		}
+	}
+#endif
+	return boot_reason;
+}
+
+static int boot_reason_panic_handler(struct notifier_block *this,
+				     unsigned long event, void *unused)
+{
+#if defined(CONFIG_ARCH_TEGRA_3x_SOC) || defined(CONFIG_ARCH_TEGRA_11x_SOC)
+	void __iomem *pmc_base = IO_ADDRESS(TEGRA_PMC_BASE);
+	u32 val = readl_relaxed(pmc_base + PMC_SCRATCH0);
+	val |= KERNEL_PANIC_OCCURRED;
+	writel_relaxed(val, pmc_base + PMC_SCRATCH0);
+#endif
+	return NOTIFY_OK;
+}
+
+static struct notifier_block boot_reason_panic_notifier = {
+	.notifier_call  = boot_reason_panic_handler,
 };
 
 void __init tegra_ram_console_debug_init(void)
 {
 	int err;
 
+	atomic_notifier_chain_register(&panic_notifier_list,
+				       &boot_reason_panic_notifier);
+	ram_console_pdata.bootinfo = get_boot_reason();
 	err = platform_device_register(&ram_console_device);
 	if (err)
 		pr_err("%s: ram console registration failed (%d)!\n",

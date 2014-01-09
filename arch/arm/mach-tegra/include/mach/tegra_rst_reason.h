@@ -27,14 +27,6 @@
 #define PMC_SCRATCH0   0x50
 #define PMC_RST_FLAG   PMC_SCRATCH0
 
-static char *pmc_rst_reason_msg[] = {
-	"power on reset",
-	"watchdog timeout",
-	"thermal overheating",
-	"software reset",
-	"lp0 wakeup",
-};
-
 enum pmic_rst_reason {
 	INVALID,
 	NO_REASON,
@@ -48,19 +40,6 @@ enum pmic_rst_reason {
 	GPADC,
 	NUM_REASONS,
 	FORCE32 = 0x7FFFFFFF,
-};
-
-static char *pmic_rst_reason_msg[] = {
-	"invalid reason",
-	"no reason",
-	"long pressing poweron key",
-	"pressing powerdown key",
-	"watchdog timeout",
-	"pmic overheating",
-	"pressing reset key",
-	"software reset",
-	"low voltage on power supply",
-	"gpadc shutdown",
 };
 
 #endif
