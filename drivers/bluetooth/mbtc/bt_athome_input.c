@@ -98,9 +98,19 @@ static struct dentry *debugfs_dir;
 
 /* to see events live: in adb do "getevent -lt /dev/input/event1" */
 
-static unsigned short ikeys[] = {KEY_BACK, KEY_HOMEPAGE, KEY_VOLUMEUP,
-					KEY_VOLUMEDOWN, AAH_BT_KEY_DPAD_CENTER,
-					AAH_BT_KEY_POWER, AAH_BT_KEY_INPUT};
+static unsigned short ikeys[] = {
+	KEY_BACK,
+	KEY_HOMEPAGE,
+	KEY_VOLUMEUP,
+	KEY_VOLUMEDOWN,
+	AAH_BT_KEY_DPAD_CENTER,
+	AAH_BT_KEY_POWER,
+	AAH_BT_KEY_INPUT,
+	KEY_UP,
+	KEY_DOWN,
+	KEY_LEFT,
+	KEY_RIGHT,
+};
 
 static int aahbt_input_init_device(struct input_dev **idevP)
 {
