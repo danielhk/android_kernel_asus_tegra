@@ -88,9 +88,10 @@ static const char const *molly_hw_name[] = {
     [MOLLY_REV_PROTO2] = "Molly PROTO2",
     [MOLLY_REV_EVT1]   = "Molly EVT1",
     [MOLLY_REV_EVT2]   = "Molly EVT2",
+    [MOLLY_REV_EVT3]   = "Molly EVT3",
     [MOLLY_REV_DVT1]   = "Molly DVT1",
     [MOLLY_REV_DVT2]   = "Molly DVT2",
-    [MOLLY_REV_PVT]    = "Molly PVT",
+    [MOLLY_REV_PVT1]   = "Molly PVT1",
     [MOLLY_REV_PROD]   = "Molly PROD",
 };
 
