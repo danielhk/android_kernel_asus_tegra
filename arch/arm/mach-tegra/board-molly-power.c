@@ -245,8 +245,7 @@ PALMAS_REGS_PDATA(smps8, 1800,  1800, NULL, 1, 1, 1, NORMAL,
 PALMAS_REGS_PDATA(smps9, 2900,  2900, NULL, 1, 0, 1, NORMAL,
 		  0, 0, 0, 0, 0);
 /* vdd_hdmi_5v0 - always on, hdmi level shifter */
-PALMAS_REGS_PDATA(smps10, 5000, 5000, palmas_rails(smps6), 1, 0, 1, 0,
-                  0, 0, 0, 0, 0);
+PALMAS_REGS_PDATA(smps10, 5000, 5000, NULL, 1, 0, 1, 0, 0, 0, 0, 0, 0);
 
 /* va_pllx - boot on? - 1.05V, should be always on */
 PALMAS_REGS_PDATA(ldo1, 1050,  1050, palmas_rails(smps7), 1, 0, 1, 0,
@@ -488,6 +487,13 @@ int __init molly_palmas_regulator_init(void)
 		pr_info("%s: smps10 is not enabled\n", __func__);
 		molly_reg_data[PALMAS_REG_SMPS10] = NULL;
 		molly_reg_init[PALMAS_REG_SMPS10] = NULL;
+		break;
+	case MOLLY_REV_EVT2:
+		/* smps10 is supplied by smps6 for EVT2, but for newer
+		 * versions is supplied from 5V input
+		 */
+		reg_idata_smps10.supply_regulator = palmas_rails(smps6);
+		break;
 	}
 
 	for (i = 0; i < PALMAS_NUM_REGS ; i++) {
