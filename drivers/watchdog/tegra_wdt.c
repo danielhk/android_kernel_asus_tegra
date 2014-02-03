@@ -461,14 +461,13 @@ static void watchdog_debug_fiq(struct fiq_glue_handler *h, void *regs,
 
 	watchdog_dumpstack(regs, svc_sp);
 
-	pr_crit("Watchdog Triggered: dumping all stacks...\n");
+	pr_crit("Watchdog Triggered: dumping stacks for running "
+			"threads...\n");
 	do_each_thread(g, p) {
-		/*
-		 * reset the NMI-timeout, listing all files on a slow
-		 * console might take a lot of time:
-		 */
+		/* reset the NMI timeout before doing the stack dump. */
 		touch_nmi_watchdog();
-		sched_show_task(p);
+		if (p->state == TASK_RUNNING)
+			sched_show_task(p);
 	} while_each_thread(g, p);
 
 	pr_crit("Watchdog Triggered: restarting...\n");
