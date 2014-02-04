@@ -59,6 +59,7 @@
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/setup.h>
+#include <asm/system_info.h>
 #include <mach/usb_phy.h>
 #include <mach/gpio-tegra.h>
 #include <mach/tegra_fiq_debugger.h>
@@ -108,6 +109,12 @@ static const char *molly_hw_rev_name(void)
 
 static void __init molly_init_hw_rev(void)
 {
+	/* ATAG_REVISION is not processed when device trees are used
+	 * which causes system_rev to not be set.  Set system_rev based
+	 * on the Molly board revision.
+	 */
+	system_rev = molly_hw_rev;
+
 	pr_info("Molly HW revision: %02x (%s)\n",
 		molly_hw_rev, molly_hw_rev_name());
 }
