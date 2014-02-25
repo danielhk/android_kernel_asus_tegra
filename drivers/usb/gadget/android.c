@@ -28,6 +28,8 @@
 #include <linux/usb/composite.h>
 #include <linux/usb/gadget.h>
 
+#include <linux/wakelock.h>
+
 #include "gadget_chips.h"
 
 /*
@@ -117,6 +119,10 @@ struct android_dev {
 
 static struct class *android_class;
 static struct android_dev *_android_dev;
+#ifdef CONFIG_USB_ADB_WAKELOCK
+static struct wake_lock adb_wakelock;
+#endif
+
 static int android_bind_config(struct usb_configuration *c);
 static void android_unbind_config(struct usb_configuration *c);
 
@@ -1237,7 +1243,6 @@ static ssize_t enable_store(struct device *pdev, struct device_attribute *attr,
 	struct android_usb_function *f;
 	int enabled = 0;
 
-
 	if (!cdev)
 		return -ENODEV;
 
@@ -1445,6 +1450,21 @@ static int android_bind(struct usb_composite_dev *cdev)
 	return 0;
 }
 
+#ifdef CONFIG_USB_ADB_WAKELOCK
+/*
+ * Tegra-specific work-around that uses USB interface suspend signal
+ * as cable disconnection hint.  This signal could also happen a few
+ * times during USB hotplug but the hotplug process will get a hold
+ * back to the wake_lock in the end.
+ */
+static void android_usb_suspend(struct usb_composite_dev *cdev)
+{
+	pr_info("adb: USB interface suspened/disconnected. "
+	        "Give up wake lock.\n");
+	wake_unlock(&adb_wakelock);
+}
+#endif
+
 static int android_usb_unbind(struct usb_composite_dev *cdev)
 {
 	struct android_dev *dev = _android_dev;
@@ -1458,6 +1478,9 @@ static struct usb_composite_driver android_usb_driver = {
 	.name		= "android_usb",
 	.dev		= &device_desc,
 	.strings	= dev_strings,
+#ifdef CONFIG_USB_ADB_WAKELOCK
+	.suspend	= android_usb_suspend,
+#endif
 	.unbind		= android_usb_unbind,
 	.max_speed	= USB_SPEED_HIGH,
 };
@@ -1496,6 +1519,11 @@ android_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *c)
 
 	spin_lock_irqsave(&cdev->lock, flags);
 	if (!dev->connected) {
+#ifdef CONFIG_USB_ADB_WAKELOCK
+		pr_info("adb: USB interface connected/activated. "
+			"Hold wake lock.\n");
+		wake_lock(&adb_wakelock);
+#endif
 		dev->connected = 1;
 		schedule_work(&dev->work);
 	} else if (c->bRequest == USB_REQ_SET_CONFIGURATION &&
@@ -1577,6 +1605,9 @@ static int __init init(void)
 	}
 
 	_android_dev = dev;
+#ifdef CONFIG_USB_ADB_WAKELOCK
+	wake_lock_init(&adb_wakelock, WAKE_LOCK_SUSPEND, "adb");
+#endif
 
 	/* Override composite driver functions */
 	composite_driver.setup = android_setup;
@@ -1589,6 +1620,9 @@ module_init(init);
 static void __exit cleanup(void)
 {
 	usb_composite_unregister(&android_usb_driver);
+#ifdef CONFIG_USB_ADB_WAKELOCK
+	wake_lock_destroy(&adb_wakelock);
+#endif
 	class_destroy(android_class);
 	kfree(_android_dev);
 	_android_dev = NULL;

@@ -866,6 +866,13 @@ config USB_G_ANDROID
 	  Each function can be configured and enabled/disabled
 	  dynamically from userspace through a sysfs interface.
 
+config USB_ADB_WAKELOCK
+	depends on USB_TEGRA && USB_G_ANDROID
+	boolean "ADB Wake Lock"
+	help
+	  Tegra specific work-around that hold wake lock if
+	  USB debugging is enabled and debug cable connected.
+
 config USB_CDC_COMPOSITE
 	tristate "CDC Composite Device (Ethernet and ACM)"
 	depends on NET
