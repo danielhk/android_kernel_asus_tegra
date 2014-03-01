@@ -52,6 +52,12 @@ void aahbt_led_show_event(int event_type);
 #define AAH_RAW_X_MAX 0xffff
 #define AAH_RAW_Y_MAX 0xffff
 
+enum aahbt_key_states {
+	AAH_KEY_UP = 0,
+	AAH_KEY_DOWN,
+	AAH_KEY_REPEAT,
+};
+
 int aahbt_input_init(void);
 void aahbt_input_deinit(void);
 void aahbt_input_reset_state(void);
@@ -61,10 +67,11 @@ void aahbt_input_send_touch(unsigned which,
 				uint16_t y,
 				bool is_down);
 void aahbt_input_send_buttons(unsigned which, uint32_t mask);
-void aahbt_input_send_button(unsigned which, uint8_t id, bool down);
+void aahbt_input_send_button(unsigned which, uint8_t id, uint8_t state);
 void aahbt_input_calculate_time(unsigned which, long usec_since_last);
 void aahbt_input_frame(unsigned which);
 void aahbt_input_led_show_event(int event_type);
+bool aahbt_input_dpad_enabled(void);
 
 #endif
 

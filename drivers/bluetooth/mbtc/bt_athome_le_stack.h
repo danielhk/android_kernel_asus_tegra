@@ -99,5 +99,8 @@ int  aahbt_queue_acl_for_tx(const bdaddr_t *MAC, const void* data, size_t len);
  */
 bool aahbt_tx_pipeline_has_room(void);
 
+/* Utility function used to get a simple, hi-res, monotonic, 64-bit timestamp */
+uint64_t aahbt_get_time(void);
+
 #endif
 

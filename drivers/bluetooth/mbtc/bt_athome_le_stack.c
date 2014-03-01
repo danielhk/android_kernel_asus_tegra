@@ -190,7 +190,7 @@ static bool connection_in_progress = false;
 static u64 next_listen_attempt_time;
 
 /* Utility function used to get a simple, hi-res, monotonic, 64-bit timestamp */
-static uint64_t get_time(void)
+uint64_t aahbt_get_time(void)
 {
 	struct timespec t;
 	uint64_t ret;
@@ -234,7 +234,7 @@ static void aahbt_reset_conn_state_l(struct aahbt_conn *c,
 }
 
 /* Utility function which computes the timeout in mSec (rounded up) from two 64
- * bit timestamps taken from the get_time timeline.
+ * bit timestamps taken from the aahbt_get_time timeline.
  */
 static uint32_t compute_msec_timeout(uint64_t now, uint64_t timeout)
 {
@@ -1626,7 +1626,12 @@ static int aahbt_process_input_evt_l(struct aahbt_conn *c,
 				       get_unaligned_le16(&evt->y) << 1,
 				       (0 != (tmp & 0x8000)));
 
-		aahbt_input_frame(which);
+		/* DPAD code handles its own sync frames so we don't want the touch
+		 * handler to do it. Otherwise we'll send a great deal of needless
+		 * sync events
+		 */
+		if (!aahbt_input_dpad_enabled())
+			aahbt_input_frame(which);
 	} break;
 
 	case ATHOME_PKT_RX_BTN_V2: {
@@ -1918,7 +1923,7 @@ static int aahbt_thread(void *unusedData)
 
 	/* While its not time to shutdown, do work */
 	while (!aahbt_should_quit()) {
-		uint64_t now            = get_time();
+		uint64_t now            = aahbt_get_time();
 		uint32_t timeout_msec   = INFINITE;
 		size_t i;
 
@@ -1934,7 +1939,7 @@ static int aahbt_thread(void *unusedData)
 			/* Time has passed while we sent commands to the radio.
 			 * We need to update now with the current time.
 			 */
-			now = get_time();
+			now = aahbt_get_time();
 		}
 
 		/* Go over our current list of connections states, and for
@@ -2028,7 +2033,7 @@ static void aahbt_set_listening_l(bool should_listen)
 {
 	if (should_be_listening != should_listen) {
 		should_be_listening = should_listen;
-		next_listen_attempt_time = get_time();
+		next_listen_attempt_time = aahbt_get_time();
 		aahbt_wake_thread();
 	}
 }
@@ -2101,7 +2106,7 @@ int aahbt_start_connecting(const bdaddr_t *macP, uint32_t timeout_msec)
 			goto bailout;
 		}
 
-		c->conn_timeout = get_time() +
+		c->conn_timeout = aahbt_get_time() +
 				  (((uint64_t)timeout_msec) * 1000000);
 		goto bailout;
 	}
@@ -2122,7 +2127,7 @@ int aahbt_start_connecting(const bdaddr_t *macP, uint32_t timeout_msec)
 	 * The next time we have the chance to make a connection attempt, the
 	 * work thread will do so.
 	 */
-	c->conn_timeout  = get_time() + (((uint64_t)timeout_msec) * 1000000);
+	c->conn_timeout  = aahbt_get_time() + (((uint64_t)timeout_msec) * 1000000);
 	c->state         = CONN_STATE_PRE_CONNECTING;
 	c->conn_settings = default_conn_settings;
 	bacpy(&c->MAC, macP);
@@ -2162,7 +2167,7 @@ int aahbt_start_disconnecting_l(struct aahbt_conn* c)
 	 */
 	case CONN_STATE_CONNECTING:
 		c->disconnect_asap = true;
-		c->conn_timeout = get_time();
+		c->conn_timeout = aahbt_get_time();
 		aahbt_wake_thread();
 		break;
 

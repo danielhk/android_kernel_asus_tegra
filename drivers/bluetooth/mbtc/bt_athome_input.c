@@ -17,10 +17,10 @@
 #include <linux/input/mt.h>
 #include <linux/kernel.h>
 #include <linux/ktime.h>
+#include "bt_athome_gestures.h"
 #include "bt_athome_input.h"
 #include "bt_athome_logging.h"
 #include "bt_athome_proto.h"
-
 
 #if HACK_DEBUG_USING_LED
 #define HACK_LED_BLUE     0x0000FF
@@ -95,6 +95,7 @@ static struct {
 };
 
 static struct dentry *debugfs_dir;
+static u32 send_dpad_events = true;
 
 /* to see events live: in adb do "getevent -lt /dev/input/event1" */
 
@@ -106,6 +107,7 @@ static unsigned short ikeys[] = {
 	AAH_BT_KEY_DPAD_CENTER,
 	AAH_BT_KEY_POWER,
 	AAH_BT_KEY_INPUT,
+	/* dpad starts at 7 */
 	KEY_UP,
 	KEY_DOWN,
 	KEY_LEFT,
@@ -135,6 +137,7 @@ static int aahbt_input_init_device(struct input_dev **idevP)
 	set_bit(EV_SYN, idev->evbit);
 	set_bit(EV_ABS, idev->evbit);
 	set_bit(EV_MSC, idev->evbit);
+	set_bit(EV_REP, idev->evbit);
 
 	/* we support the following buttons */
 	set_bit(EV_KEY, idev->evbit);
@@ -213,7 +216,14 @@ static int aahbt_input_init_debug(void)
 				"enabled attr.\n");
 		return -ENODEV;
 	}
-	return 0;
+	entry = debugfs_create_bool("enable_dpad", 0600, debugfs_dir,
+			&send_dpad_events);
+	if (!entry) {
+		aahlog("Failed to create dpad preferences attr.\n");
+		return -ENODEV;
+	}
+
+	return aahbt_input_dpad_init(debugfs_dir);
 }
 
 static void aahbt_input_deinit_debug(void)
@@ -328,21 +338,30 @@ void aahbt_input_send_touch(unsigned which,
 	if (!is_down && !wasdown)
 		return;
 
-	input_mt_slot(idev, pointer_idx);
-	input_mt_report_slot_state(idev, MT_TOOL_FINGER, is_down);
-
+	/* if we're configured to send dpad events then send them and then
+	 * skip the rest of the touch processing. The bookkeeping below
+	 * will only confuse the input system otherwise */
+	if (!send_dpad_events) {
+		input_mt_slot(idev, pointer_idx);
+		input_mt_report_slot_state(idev, MT_TOOL_FINGER, is_down);
+	}
 	inputs[which].touch_count++;
 
 	if (is_down) {
-		aahbt_input_apply_ab_filter(which, &x, &y);
-		aahbt_input_apply_distance_filter(which, &x, &y);
 
-		input_report_abs(idev, ABS_MT_POSITION_X, x);
-		input_report_abs(idev, ABS_MT_POSITION_Y, y);
+		if (!send_dpad_events) {
+			aahbt_input_apply_ab_filter(which, &x, &y);
+			aahbt_input_apply_distance_filter(which, &x, &y);
+			input_report_abs(idev, ABS_MT_POSITION_X, x);
+			input_report_abs(idev, ABS_MT_POSITION_Y, y);
+		} else {
+			aahbt_input_handle_dpad_down(idev, which, is_down, wasdown, x, y);
+		}
+
 		if (LOG_INPUT_EVENTS) {
 			if (aahbt_input_should_report_touch(inputs[which].touch_count))
-				aahlog("[%d] finger down, %4u touch events, x = %5d, y = %5d\n",
-					pointer_idx, inputs[which].touch_count, x, y);
+				aahlog("[%d] finger down, %4u touch events, x = %5d, y = "
+						"%5d\n", pointer_idx, inputs[which].touch_count, x, y);
 		}
 
 		inputs[which].fingers_down |= mask;
@@ -356,6 +375,9 @@ void aahbt_input_send_touch(unsigned which,
 					x - inputs[which].px,
 					y - inputs[which].py);
 	} else { /* was down */
+		if (send_dpad_events)
+			aahbt_input_handle_dpad_up(idev, which);
+
 		inputs[which].fingers_down &= ~mask;
 
 		if (LOG_INPUT_EVENTS)
@@ -450,11 +472,13 @@ void aahbt_input_send_buttons(unsigned which, uint32_t mask)
 	}
 }
 
-void aahbt_input_send_button(unsigned which, uint8_t id, bool down)
+void aahbt_input_send_button(unsigned which, uint8_t id, uint8_t state)
 {
 	struct input_dev *idev;
+	bool down = (state >= AAH_KEY_DOWN);
 
 	BUG_ON(which >= ARRAY_SIZE(inputs));
+	BUG_ON(state > 2);
 
 	if (LOG_INPUT_EVENTS)
 		aahlog("[%d] button %d %s\n", which, id, (down ? "down" : "up"));
@@ -465,7 +489,7 @@ void aahbt_input_send_button(unsigned which, uint8_t id, bool down)
 	if (id < ARRAY_SIZE(ikeys)) {
 		idev = inputs[which].idev;
 		input_event(idev, EV_MSC, MSC_SCAN, id);
-		input_report_key(idev, ikeys[id], down);
+		input_report_key(idev, ikeys[id], state);
 	}
 }
 
@@ -495,3 +519,7 @@ void aahbt_input_frame(unsigned which)
 	input_sync(inputs[which].idev);
 }
 
+bool aahbt_input_dpad_enabled(void)
+{
+	return send_dpad_events;
+}
