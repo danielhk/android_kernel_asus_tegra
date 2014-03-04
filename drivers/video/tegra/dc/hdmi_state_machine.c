@@ -98,6 +98,14 @@ static void hdmi_state_machine_set_state_l(int target_state, int resched_time)
 		target_state, state_names[target_state]);
 	work_state.state = target_state;
 
+	if (target_state == HDMI_STATE_DONE_ENABLED &&
+		likely(tegra_is_clk_enabled(work_state.hdmi->clk))) {
+		/* enable hdcp */
+		pr_info("%s: calling tegra_nvhdcp_set_plug(hpd = true)\n",
+			__func__);
+		tegra_nvhdcp_set_plug(work_state.hdmi->nvhdcp, true);
+	}
+
 	/* If the pending_hpd_evt flag is already set, don't bother to
 	 * reschedule the state machine worker.  We should be able to assert
 	 * that there is a worker callback already scheduled, and that it is
@@ -139,6 +147,15 @@ static void hdmi_state_machine_handle_hpd_l(int cur_hpd)
 		/* Looks like HPD dropped but came back quickly, ignore it.
 		 */
 		pr_info("%s: ignoring bouncing hpd\n", __func__);
+
+		/* enable hdcp */
+		if (likely(tegra_is_clk_enabled(work_state.hdmi->clk)))
+		{
+			pr_info("%s: calling tegra_nvhdcp_set_plug(hpd = %d)\n",
+				__func__, cur_hpd);
+			tegra_nvhdcp_set_plug(work_state.hdmi->nvhdcp, cur_hpd);
+		}
+
 		return;
 	} else
 	if (HDMI_STATE_INIT_FROM_BOOTLOADER == work_state.state && cur_hpd) {
@@ -174,7 +191,6 @@ static void hdmi_disable_l(struct tegra_dc_hdmi_data *hdmi)
 	switch_set_state(&hdmi->hpd_switch, 0);
 	pr_info("%s: hpd_switch 0\n", __func__);
 #endif
-	tegra_nvhdcp_set_plug(hdmi->nvhdcp, 0);
 	if (hdmi->dc->connected) {
 		pr_info("HDMI from connected to disconnected\n");
 		hdmi->dc->connected = false;
@@ -440,6 +456,14 @@ static void hdmi_state_machine_worker(struct work_struct *work)
 		/* If we were woken up because of HPD activity, just schedule
 		 * the next appropriate task and get out.
 		 */
+
+		/* disable hdcp on hpd drop */
+		if (!cur_hpd) {
+			pr_info("%s: calling tegra_nvhdcp_set_plug(hpd = %d)\n",
+				__func__, cur_hpd);
+			tegra_nvhdcp_set_plug(work_state.hdmi->nvhdcp, cur_hpd);
+		}
+
 		hdmi_state_machine_handle_hpd_l(cur_hpd);
 	} else if (work_state.state < ARRAY_SIZE(state_machine_dispatch)) {
 		dispatch_func_t func = state_machine_dispatch[work_state.state];
