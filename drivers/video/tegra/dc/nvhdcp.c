@@ -58,6 +58,7 @@ DECLARE_WAIT_QUEUE_HEAD(wq_worker);
 #define BSTATUS_MAX_DEVS_EXCEEDED	(1 << 7)
 #define BSTATUS_MAX_CASCADE_EXCEEDED	(1 << 11)
 
+#define VERBOSE_DEBUG
 #ifdef VERBOSE_DEBUG
 #define nvhdcp_vdbg(...)	\
 		printk("nvhdcp: " __VA_ARGS__)
@@ -900,17 +901,19 @@ static void nvhdcp_downstream_worker(struct work_struct *work)
 
 	nvhdcp_vdbg("read Bcaps = 0x%02x\n", b_caps);
 
-	nvhdcp_vdbg("kfuse loading ...\n");
+	nvhdcp_vdbg("set_bksv()\n");
 
 	/* repeater flag in Bskv must be configured before loading fuses */
 	set_bksv(hdmi, 0, (b_caps & BCAPS_REPEATER));
 
+	nvhdcp_vdbg("kfuse loading ...\n");
 	e = load_kfuse(hdmi);
 	if (e) {
 		nvhdcp_err("kfuse could not be loaded\n");
 		goto failure;
 	}
 
+	nvhdcp_vdbg("calling hdcp_ctrl_run()\n");
 	hdcp_ctrl_run(hdmi, 1);
 
 	nvhdcp_vdbg("wait AN_VALID ...\n");
@@ -1025,11 +1028,16 @@ static void nvhdcp_downstream_worker(struct work_struct *work)
 	nvhdcp->print_error_messages = true;
 
 	while (1) {
-		if (!nvhdcp_is_plugged(nvhdcp))
+		if (!nvhdcp_is_plugged(nvhdcp)) {
+			nvhdcp_vdbg("%s: unplugged, goto lost_hdmi\n", __func__);
 			goto lost_hdmi;
+		}
 
-		if (nvhdcp->state != STATE_LINK_VERIFY)
+		if (nvhdcp->state != STATE_LINK_VERIFY) {
+			nvhdcp_vdbg("%s: state not LINK_VERIFY, goto failure\n",
+				    __func__);
 			goto failure;
+		}
 
 		e = verify_link(nvhdcp, true);
 		if (e) {
@@ -1102,6 +1110,7 @@ static int tegra_nvhdcp_off(struct tegra_nvhdcp *nvhdcp)
 	bool plugged_at_start = nvhdcp_is_plugged(nvhdcp);
 
 	mutex_lock(&nvhdcp->lock);
+	nvhdcp_vdbg("%s: set state to off\n", __func__);
 	nvhdcp->state = STATE_OFF;
 	nvhdcp_set_plugged(nvhdcp, false);
 	mutex_unlock(&nvhdcp->lock);
@@ -1109,15 +1118,17 @@ static int tegra_nvhdcp_off(struct tegra_nvhdcp *nvhdcp)
 	cancel_delayed_work_sync(&nvhdcp->work);
 
 	/* wait for communication to halt */
-	if (plugged_at_start)
+	if (plugged_at_start) {
+		nvhdcp_vdbg("%s: sleeping for 1sec\n", __func__);
 		msleep(1000);
+	}
 
 	return 0;
 }
 
 void tegra_nvhdcp_set_plug(struct tegra_nvhdcp *nvhdcp, bool hpd)
 {
-	nvhdcp_debug("hdmi hotplug detected (hpd = %d)\n", hpd);
+	nvhdcp_vdbg("hdmi hotplug detected (hpd = %d)\n", hpd);
 
 	if (hpd) {
 		nvhdcp_set_plugged(nvhdcp, true);
