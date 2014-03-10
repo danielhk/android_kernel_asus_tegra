@@ -106,7 +106,7 @@ static unsigned short ikeys[] = {
 	KEY_VOLUMEDOWN,
 	AAH_BT_KEY_DPAD_CENTER,
 	AAH_BT_KEY_POWER,
-	AAH_BT_KEY_INPUT,
+	KEY_SEARCH,
 	/* dpad starts at 7 */
 	KEY_UP,
 	KEY_DOWN,
