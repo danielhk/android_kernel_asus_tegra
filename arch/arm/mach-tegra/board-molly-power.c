@@ -118,7 +118,6 @@ static struct regulator_consumer_supply palmas_smps8_supply[] = {
 							of USB */
 	REGULATOR_SUPPLY("avdd_usb_pll", "tegra-ehci.1"), /* AVDD_USB_PLL
 							of USB */
-	REGULATOR_SUPPLY("vdd_1v8_ubik", NULL), /* VCCA of UBIK module */
 	REGULATOR_SUPPLY("pwrdet_audio", NULL),
 };
 
@@ -169,10 +168,7 @@ static struct regulator_consumer_supply palmas_ldo5_supply[] = {
 	REGULATOR_SUPPLY("vpp_fuse", NULL), /* VPP_FUSE */
 };
 
-/* ldo6 - vdd_u3v3 for ubik */
-static struct regulator_consumer_supply palmas_ldo6_supply[] = {
-	REGULATOR_SUPPLY("vpp_u3v3", NULL), /* VCCB and VCCIO of UBIK module */
-};
+/* ldo6 is unused */
 
 /* ldo7 is unused */
 
@@ -228,7 +224,7 @@ PALMAS_REGS_PDATA(smps45, 873,  1288, NULL, 0, 0, 0, NORMAL,
 		  0, PALMAS_EXT_CONTROL_NSLEEP, 0, 3, 0);
 
 /* vdd_3v3 - 3.3V,
- * XXX: vdd_3v3 supplies to INA3221, GEN1_I2C, Wifi/BT module, UBIK,
+ * XXX: vdd_3v3 supplies to INA3221, GEN1_I2C, Wifi/BT module,
  *      and LAN9730, but these device drivers are not implemented
  *      to configure the vdd currently.  So, set vdd_3v3 as "always on"
  *      temporarily.
@@ -262,10 +258,6 @@ PALMAS_REGS_PDATA(ldo4, 1200,  1200, palmas_rails(smps8), 0, 0, 1, 0,
 /* vd_fuse - 1.8V, should we move this to a fixed regulator? */
 PALMAS_REGS_PDATA(ldo5, 1800,  1800, NULL, 0, 0, 1, 0,
 		  0, 0, 0, 0, 0);
-/* always on at 3.3V for Ubik -
-   should we move this to a fixed regulator? */
-PALMAS_REGS_PDATA(ldo6, 3300,  3300, NULL, 1, 0, 1, 0,
-		  0, 0, 0, 0, 0);
 /* vdd_rtc should follow vdd_core when vdd_core is on (tracking mode)
  * when vdd_core is off, vdd_rtc can be set as 0.9V */
 PALMAS_REGS_PDATA(ldo8, 900,  900, NULL, 1, 1, 1, 0,
@@ -295,7 +287,7 @@ static struct regulator_init_data *molly_reg_data[PALMAS_NUM_REGS] = {
 	PALMAS_REG_PDATA(ldo3),
 	PALMAS_REG_PDATA(ldo4),
 	PALMAS_REG_PDATA(ldo5),
-	PALMAS_REG_PDATA(ldo6),
+	NULL,
 	NULL,
 	PALMAS_REG_PDATA(ldo8),
 	NULL,
@@ -325,7 +317,7 @@ static struct palmas_reg_init *molly_reg_init[PALMAS_NUM_REGS] = {
 	PALMAS_REG_INIT_DATA(ldo3),
 	PALMAS_REG_INIT_DATA(ldo4),
 	PALMAS_REG_INIT_DATA(ldo5),
-	PALMAS_REG_INIT_DATA(ldo6),
+	NULL,
 	NULL,
 	PALMAS_REG_INIT_DATA(ldo8),
 	NULL,
