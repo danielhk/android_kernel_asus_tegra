@@ -495,6 +495,10 @@ int __init molly_palmas_regulator_init(void)
 
 	i2c_register_board_info(4, palma_device,
 			ARRAY_SIZE(palma_device));
+
+	/* The regulator details have complete constraints */
+	regulator_has_full_constraints();
+
 	return 0;
 }
 
