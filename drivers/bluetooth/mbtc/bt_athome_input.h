@@ -24,9 +24,9 @@
 #endif
 
 #if HACK_DEBUG_USING_LED
-void aahbt_led_show_event(int event_type);
+void aahbt_input_led_show_event(int event_type);
 #else
-#define aahbt_led_show_event(c) /* noop */
+#define aahbt_input_led_show_event(c) /* noop */
 #endif
 
 #define HACK_LED_EVENT_CONNECT       0
@@ -70,7 +70,6 @@ void aahbt_input_send_buttons(unsigned which, uint32_t mask);
 void aahbt_input_send_button(unsigned which, uint8_t id, uint8_t state);
 void aahbt_input_calculate_time(unsigned which, long usec_since_last);
 void aahbt_input_frame(unsigned which);
-void aahbt_input_led_show_event(int event_type);
 bool aahbt_input_dpad_enabled(void);
 
 #endif

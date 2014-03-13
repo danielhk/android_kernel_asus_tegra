@@ -23,6 +23,10 @@
 #include "bt_athome_proto.h"
 
 #if HACK_DEBUG_USING_LED
+
+int aah_io_led_hack( uint rgb_color );
+int aah_io_led_hack_enable( bool enable );
+
 #define HACK_LED_BLUE     0x0000FF
 #define HACK_LED_GREEN    0x00FF00
 #define HACK_LED_RED      0xFF0000
@@ -30,15 +34,10 @@
 #define HACK_LED_YELLOW   0x808000
 #define HACK_LED_WHITE    0xFFFFFF
 
-static void aahbt_input_apply_ab_filter(unsigned which,
-					uint16_t* x,
-					uint16_t* y);
-static void aahbt_input_apply_distance_filter(unsigned which,
-					      uint16_t* x,
-					      uint16_t* y);
+/* we either show every event or just disconnect state */
+#define SHOW_DISCONNECT_ONLY 1
 
-int aah_io_led_hack( uint rgb_color );
-
+#if (SHOW_DISCONNECT_ONLY == 0)
 /* Map event types to colors. */
 static int event_colors[HACK_LED_EVENT_COUNT] = {
 	[HACK_LED_EVENT_CONNECT] = HACK_LED_YELLOW,
@@ -55,8 +54,25 @@ void aahbt_input_led_show_event(int event_type)
 	BUG_ON(event_type >= ARRAY_SIZE(event_colors));
 	aah_io_led_hack(event_colors[event_type]);
 }
+#else /* SHOW_DISCONNECT_ONLY */
+void aahbt_input_led_show_event(int event_type)
+{
+	if (event_type == HACK_LED_EVENT_DISCONNECT) {
+		aah_io_led_hack_enable(true);
+	} else if (event_type == HACK_LED_EVENT_CONNECT) {
+		aah_io_led_hack_enable(false);
+	}
+}
+#endif /* SHOW_DISCONNECT_ONLY */
+
 #endif /* HACK_DEBUG_USING_LED */
 
+static void aahbt_input_apply_ab_filter(unsigned which,
+					uint16_t* x,
+					uint16_t* y);
+static void aahbt_input_apply_distance_filter(unsigned which,
+					      uint16_t* x,
+					      uint16_t* y);
 
 struct athome_input_state {
 	/* Values which stay as they are for as long as the module is loaded.
@@ -173,6 +189,15 @@ static int aahbt_input_init_device(struct input_dev **idevP)
 	}
 
 	*idevP = idev;
+
+#if HACK_DEBUG_USING_LED
+#if SHOW_DISCONNECT_ONLY
+	aah_io_led_hack(HACK_LED_WHITE);
+	aah_io_led_hack_enable(false);
+#else
+	aah_io_led_hack_enable(true);
+#endif
+#endif
 	return 0;
 }
 
