@@ -2319,6 +2319,7 @@ bt_add_card(void *card)
 	PRINTM(INFO, "Starting kthread...\n");
 	priv->MainThread.priv = priv;
 	spin_lock_init(&priv->driver_lock);
+	wake_lock_init(&priv->wake_lock, WAKE_LOCK_SUSPEND, "mbt");
 
 	bt_create_thread(bt_service_main_thread, &priv->MainThread,
 			 "bt_main_service");
@@ -2352,6 +2353,7 @@ err_init_fw:
 	PRINTM(INFO, "Unregister device\n");
 	sbi_unregister_dev(priv);
 err_registerdev:
+	wake_lock_destroy(&priv->wake_lock);
 	((struct sdio_mmc_card *)card)->priv = NULL;
 	/* Stop the thread servicing the interrupts */
 	priv->adapter->SurpriseRemoved = TRUE;
@@ -2384,6 +2386,7 @@ bt_remove_card(void *card)
 		LEAVE();
 		return BT_STATUS_SUCCESS;
 	}
+	wake_lock_destroy(&priv->wake_lock);
 	if (!priv->adapter->SurpriseRemoved) {
 		bt_send_reset_command(priv);
 		bt_send_module_cfg_cmd(priv, MODULE_SHUTDOWN_REQ);

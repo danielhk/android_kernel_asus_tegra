@@ -199,13 +199,19 @@ chardev_write(struct file * filp, const char *buf, size_t count, loff_t * f_pos)
 	int nwrite = 0;
 	struct sk_buff *skb;
 	struct char_dev *dev = (struct char_dev *)filp->private_data;
-	struct m_dev *m_dev = dev->m_dev;
+	struct m_dev *m_dev = NULL;
+	bt_private *priv = NULL;
+
 	ENTER();
 
 	if (!dev || !dev->m_dev) {
 		LEAVE();
 		return -ENXIO;
 	}
+
+	m_dev = dev->m_dev;
+	priv = (bt_private *)m_dev->driver_data;
+
 	if (!test_bit(HCI_UP, &m_dev->flags)) {
 		LEAVE();
 		return -EBUSY;
@@ -233,6 +239,8 @@ chardev_write(struct file * filp, const char *buf, size_t count, loff_t * f_pos)
 	       bt_cb(skb)->pkt_type, skb->len, jiffies);
 	DBG_HEXDUMP(DAT_D, "chardev_write", skb->data, skb->len);
 
+	wake_lock_timeout(&priv->wake_lock, WAKE_LOCK_TIMEOUT);
+
 	/* Send skb to the hci wrapper layer */
 	if (m_dev->send(m_dev, skb)) {
 		PRINTM(ERROR, "Write: Fail\n");
@@ -258,16 +266,21 @@ ssize_t
 chardev_read(struct file * filp, char *buf, size_t count, loff_t * f_pos)
 {
 	struct char_dev *dev = (struct char_dev *)filp->private_data;
-	struct m_dev *m_dev = dev->m_dev;
+	struct m_dev *m_dev = NULL;
 	DECLARE_WAITQUEUE(wait, current);
 	ssize_t ret = 0;
 	struct sk_buff *skb = NULL;
+	bt_private *priv = NULL;
 
 	ENTER();
 	if (!dev || !dev->m_dev) {
 		LEAVE();
 		return -ENXIO;
 	}
+
+	m_dev = dev->m_dev;
+	priv = (bt_private *)m_dev->driver_data;
+
 	/* Wait for rx data */
 	add_wait_queue(&m_dev->req_wait_q, &wait);
 	while (1) {
@@ -303,6 +316,9 @@ chardev_read(struct file * filp, char *buf, size_t count, loff_t * f_pos)
 		       bt_cb(skb)->pkt_type, skb->len, jiffies);
 	}
 	DBG_HEXDUMP(DAT_D, "chardev_read", skb->data, skb->len);
+
+	wake_lock_timeout(&priv->wake_lock, WAKE_LOCK_TIMEOUT);
+
 	if (skb->len > count) {
 		/* user data length is smaller than the skb length */
 		if (copy_to_user(buf, skb->data, count)) {

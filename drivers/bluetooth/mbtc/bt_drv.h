@@ -25,6 +25,7 @@
 #include <linux/version.h>
 #include <linux/kthread.h>
 #include <linux/skbuff.h>
+#include <linux/wakelock.h>
 
 #include "hci_wrapper.h"
 
@@ -463,6 +464,7 @@ typedef struct _bt_private {
 	struct kobject kobj;
 	int debug_device_pending;
 	int debug_ocf_ogf[2];
+	struct wake_lock wake_lock;
 
 } bt_private, *pbt_private;
 
@@ -472,6 +474,9 @@ typedef struct _bt_private {
 /** Enable interrupt */
 #define OS_INT_RESTORE	spin_unlock_irqrestore(&priv->driver_lock, \
 					    priv->driver_flags)
+
+/** Wake lock timeout in tick */
+#define WAKE_LOCK_TIMEOUT	(5 * HZ)
 
 #ifndef HCI_BT_AMP
 /** BT_AMP flag for device type */
