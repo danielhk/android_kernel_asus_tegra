@@ -16,6 +16,7 @@
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci.h>
 #include <linux/kthread.h>
+#include <linux/wakelock.h>
 #include "bt_athome_hci_extra.h"
 #include "bt_athome_le_stack.h"
 #include "bt_athome_splitter.h"
@@ -188,6 +189,8 @@ static bool is_listening = false;
 static bool should_be_listening = false;
 static bool connection_in_progress = false;
 static u64 next_listen_attempt_time;
+
+static struct wake_lock wl_suspend; /* used in aahbt_thread only */
 
 /* Utility function used to get a simple, hi-res, monotonic, 64-bit timestamp */
 uint64_t aahbt_get_time(void)
@@ -1016,6 +1019,7 @@ static uint32_t aahbt_connect_if_needed_l(uint64_t now,
 	uint8_t resp_buf[EVT_PACKET_LEN];
 	struct hci_ev_cmd_status *status;
 	int res;
+	uint32_t timeout_msec;
 
 	BUG_ON(!c);
 	BUG_ON(connection_in_progress);
@@ -1067,7 +1071,12 @@ static uint32_t aahbt_connect_if_needed_l(uint64_t now,
 	c->state = CONN_STATE_CONNECTING;
 	connection_in_progress = true;
 
-	return compute_msec_timeout(now, c->conn_timeout);
+	timeout_msec = compute_msec_timeout(now, c->conn_timeout);
+
+	/* Stay awake while the connection is being attempted */
+	wake_lock_timeout(&wl_suspend, msecs_to_jiffies(timeout_msec));
+
+	return timeout_msec;
 
 failure:
 	aahbt_reset_conn_state_l(c, false);
@@ -1891,6 +1900,9 @@ static bool aahbt_process_tx_msgs_l(void)
 		BUG_ON(NULL == skb);
 		aahbt_splitter_send_data(c->handle, skb);
 
+		/* Stay awake for 10 seconds */
+		wake_lock_timeout(&wl_suspend, 10 * HZ);
+
 		/* update bookkeeping and go around again. */
 		cur_total_tx_pending--;
 		did_work = true;
@@ -1907,6 +1919,7 @@ static bool aahbt_process_tx_msgs_l(void)
 
 static int aahbt_thread(void *unusedData)
 {
+	wake_lock_init(&wl_suspend, WAKE_LOCK_SUSPEND, "aahbt");
 	mutex_lock(&state_lock);
 
 	if (aahbt_host_setup()) {
@@ -2017,6 +2030,7 @@ static int aahbt_thread(void *unusedData)
 
 shutdown:
 	mutex_unlock(&state_lock);
+	wake_lock_destroy(&wl_suspend);
 	return 0;
 }
 
