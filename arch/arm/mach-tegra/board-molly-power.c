@@ -376,7 +376,12 @@ static struct palmas_platform_data __initdata palmas_pdata = {
 	.pmic_pdata = &pmic_platform,
 	.clk32k_init_data = palmas_clk32k_pdata,
 	.clk32k_init_data_size = ARRAY_SIZE(palmas_clk32k_pdata),
-	.use_power_off = true,
+	/* On Molly we don't use the PMIC's power off function.  Instead
+	 * we use a Molly specific power off function that reboots into
+	 * the bootloader for shutdown.  This allows the bootloader to
+	 * clear the recovery retry bit if it is set.
+	 */
+	.use_power_off = false,
 	.pinctrl_pdata = &palmas_pinctrl_pdata,
 };
 

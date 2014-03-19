@@ -90,12 +90,14 @@
  *  and we can't use it to pass information
  * bits 4-7 and 12-15 appear available so we use bit 15 to
  *  indicate to next boot that the reset is due to a kernel panic.
+ * bit 14 is used to indicate a requested shutdown.
  */
 #define   RECOVERY_MODE			BIT(31)
 #define   BOOTLOADER_MODE		BIT(30)
 #define   RECOVERY_FACTORY_RESET_MODE	BIT(29)
 #define   NORMAL_REBOOT_MODE		BIT(28)
 #define   KERNEL_PANIC_OCCURRED		BIT(15)
+#define   SHUTDOWN_MODE			BIT(14)
 #define   FORCED_RECOVERY_MODE		BIT(1)
 
 #define AHB_GIZMO_USB		0x1c
@@ -214,6 +216,8 @@ void tegra_assert_system_reset(char mode, const char *cmd)
 			reg |= BOOTLOADER_MODE;
 		else if (!strcmp(cmd, "forced-recovery"))
 			reg |= FORCED_RECOVERY_MODE;
+		else if (!strcmp(cmd ,"shutdown"))
+			reg |= SHUTDOWN_MODE;
 		else
 			reg |= NORMAL_REBOOT_MODE;
 	} else {

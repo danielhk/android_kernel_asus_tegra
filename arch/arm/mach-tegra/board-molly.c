@@ -37,6 +37,7 @@
 #include <linux/tegra_uart.h>
 #include <linux/memblock.h>
 #include <linux/moduleparam.h>
+#include <linux/reboot.h>
 #include <linux/spi-tegra.h>
 #include <linux/rfkill-gpio.h>
 #include <linux/skbuff.h>
@@ -802,6 +803,13 @@ static void __init molly_boost_emc_clk_for_boot(bool if_boost)
 	}
 }
 
+static void molly_power_off(void)
+{
+	pr_emerg("power off requested, rebooting into bootloader to "
+			"complete shutdown\n");
+	machine_restart("shutdown");
+}
+
 static void __init tegra_molly_init(void)
 {
 	molly_init_hw_rev();
@@ -835,6 +843,8 @@ static void __init tegra_molly_init(void)
 	tegra_serial_debug_init(TEGRA_UARTD_BASE, INT_UARTD, NULL, -1, -1);
 	molly_soctherm_init();
 	tegra_register_fuse();
+
+	pm_power_off = molly_power_off;
 }
 
 static int __init tegra_molly_late_init(void)
