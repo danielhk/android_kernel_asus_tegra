@@ -235,6 +235,8 @@ static struct tegra_dc_mode hdmi_panel_modes[] = {
 		.v_active = 480,      /* yres */
 		.h_front_porch = 16,  /* right_margin */
 		.v_front_porch = 9,   /* lower_margin */
+		.flags = (TEGRA_DC_MODE_FLAG_NEG_H_SYNC |
+			  TEGRA_DC_MODE_FLAG_NEG_V_SYNC),
 		.avi_m = TEGRA_DC_MODE_AVI_M_16_9,
 		.avi_q = TEGRA_DC_MODE_AVI_Q_LIMITED,
 	},
