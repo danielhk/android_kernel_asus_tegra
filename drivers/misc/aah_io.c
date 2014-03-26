@@ -151,6 +151,9 @@ struct aah_io_driver_state {
 	/* animation mode */
 	u8 led_mode;
 
+	/* saved enable reg state at suspend, restored on resume */
+	u8 saved_enable_reg;
+
 #ifdef HACK_DEBUG_USING_LED
 	struct led_rgb_vals user_requested_val;
 	struct led_rgb_vals debug_override_val;
@@ -197,7 +200,6 @@ static int aah_io_led_set_rgb(struct aah_io_driver_state *state,
 {
 	if (state->led_mode != AAH_LED_MODE_DIRECT)
 		return -EFAULT;
-
 	return i2c_smbus_write_i2c_block_data(state->i2c_client,
 					      LP5521_REG_LED_PWM_BASE,
 					      3, &rgb_val->rgb[0]);
@@ -784,6 +786,32 @@ static void aah_io_shutdown(struct i2c_client *client)
 	aah_io_led_set_mode(state, AAH_LED_MODE_POWER_UP_ANIMATION);
 }
 
+static int aah_io_suspend(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct aah_io_driver_state *state = i2c_get_clientdata(client);
+
+	pr_debug("%s\n", __func__);
+
+	lp5521_read(client, LP5521_REG_ENABLE, &state->saved_enable_reg);
+	lp5521_write(client, LP5521_REG_ENABLE,
+		     state->saved_enable_reg & ~LP5521_MASTER_ENABLE);
+	return 0;
+}
+
+static int aah_io_resume(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct aah_io_driver_state *state = i2c_get_clientdata(client);
+
+	pr_debug("%s\n", __func__);
+
+	lp5521_write(client, LP5521_REG_ENABLE, state->saved_enable_reg);
+	/* delay for settling time */
+	udelay(500);
+	return 0;
+}
+
 static struct i2c_device_id aah_io_idtable[] = {
 	{ "aah-io", 0 },
 	{ }
@@ -791,19 +819,29 @@ static struct i2c_device_id aah_io_idtable[] = {
 
 MODULE_DEVICE_TABLE(i2c, aah_io_idtable);
 
+#ifdef CONFIG_PM
+
+static const struct dev_pm_ops aah_io_pm_ops = {
+	.suspend = aah_io_suspend,
+	.resume = aah_io_resume,
+};
+
+#define AAH_IO_PM_OPS (&aah_io_pm_ops)
+#else
+#define AAH_IO_PM_OPS NULL
+#endif
+
 static struct i2c_driver aah_io_driver = {
 	.driver = {
 		.name = "aah-io",
+		.pm = AAH_IO_PM_OPS,
 	},
 
 	.id_table = aah_io_idtable,
 	.probe = aah_io_probe,
 	.remove = __devexit_p(aah_io_remove),
 
-	/* TODO(johngro) implement these optional power management routines. */
 	.shutdown = aah_io_shutdown,
-	.suspend = NULL,
-	.resume = NULL,
 };
 
 static int aah_io_init(void)
