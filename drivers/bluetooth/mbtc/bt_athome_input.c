@@ -153,7 +153,6 @@ static int aahbt_input_init_device(struct input_dev **idevP)
 	set_bit(EV_SYN, idev->evbit);
 	set_bit(EV_ABS, idev->evbit);
 	set_bit(EV_MSC, idev->evbit);
-	set_bit(EV_REP, idev->evbit);
 
 	/* we support the following buttons */
 	set_bit(EV_KEY, idev->evbit);
