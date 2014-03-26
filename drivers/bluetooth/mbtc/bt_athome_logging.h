@@ -23,7 +23,7 @@
 #define LOG_BT_CMDS			0
 #define LOG_BT_EVTS			0
 #define LOG_BT_ACL			0
-#define LOG_INPUT_EVENTS		1
+#define LOG_INPUT_EVENTS		0
 #define LOG_INPUT_SPEW  		0
 #define LOG_BT_CREDIT			0
 #define LOG_DISCOVERY			0
