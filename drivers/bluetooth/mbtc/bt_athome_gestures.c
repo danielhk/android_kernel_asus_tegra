@@ -24,20 +24,25 @@ static uint8_t curr_key;
 static uint16_t x_0, y_0;
 static uint16_t analog_dist;
 static bool is_analog;
+static bool in_deadzone;
 static bool sent_swipe;
 struct timer_list analog_timer;
 struct input_dev *gdev;
 
+static uint32_t analog_debug = false;
+static uint16_t last_tick_rate_ms;
 /* The minimum width to register a swipe */
-static uint16_t swipe_width = 16000;
+static uint16_t swipe_width = 16384;
+/* The maximum width for analog gestures */
+static uint16_t analog_width = 24576;
+/* The radius of the center deadzone when analog motion is in play */
+static uint16_t analog_deadzone_radius = 8192;
 /* the longest time allowed between repeat ticks */
-static uint16_t max_analog_rate_ms = 800;
+static uint16_t max_analog_rate_ms = 700;
 /* the shortest time allowed between repeat ticks */
-static uint16_t min_analog_rate_ms = 200;
+static uint16_t min_analog_rate_ms = 150;
 /* Delay between a swipe occurring and switching to analog mode */
-static uint16_t analog_switch_delay_ms = 500;
-
-#define DPAD_CENTER 32000
+static uint16_t analog_switch_delay_ms = 300;
 
 static void send_gesture_key(int code, int value)
 {
@@ -60,27 +65,28 @@ static void recenter_origin(int32_t *_x_dist, int32_t *_y_dist) {
 
 	x_dist = *_x_dist;
 	y_dist = *_y_dist;
+	in_deadzone = false;
 
-	/* If the distance between our center point is more than half the width of
-	 * the panel then we shift the center to facilitate changing direction
+	/* If the distance between our gesture's center point is more than the
+	 * analog width then we shift the center to facilitate changing direction
 	 * after starting from a swipe somewhere off-center
 	 */
-	if (x_dist > DPAD_CENTER) {
-		diff = x_dist - DPAD_CENTER;
+	if (x_dist > analog_width) {
+		diff = x_dist - analog_width;
 		x_dist -= diff;
 		x_0 += diff;
-	} else if (x_dist < -DPAD_CENTER) {
-		diff = x_dist + DPAD_CENTER;
+	} else if (x_dist < -analog_width) {
+		diff = x_dist + analog_width;
 		x_dist -= diff;
 		x_0 += diff;
 	}
 
-	if (y_dist > DPAD_CENTER) {
-		diff = y_dist - DPAD_CENTER;
+	if (y_dist > analog_width) {
+		diff = y_dist - analog_width;
 		y_dist -= diff;
 		y_0 += diff;
-	} else if (y_dist < -DPAD_CENTER) {
-		diff = y_dist + DPAD_CENTER;
+	} else if (y_dist < -analog_width) {
+		diff = y_dist + analog_width;
 		y_dist -= diff;
 		y_0 += diff;
 	}
@@ -90,6 +96,13 @@ static void recenter_origin(int32_t *_x_dist, int32_t *_y_dist) {
 	} else {
 		analog_dist = abs(x_dist);
 	}
+
+	/* Now that we've recentered and calculated the absolute distance we
+	 * need to check to see if we're within the deadzone. The main input
+	 * handling code will react based on this.
+	 */
+	if (analog_dist < analog_deadzone_radius)
+		in_deadzone = true;
 
 	*_x_dist = x_dist;
 	*_y_dist = y_dist;
@@ -102,7 +115,8 @@ static uint8_t determine_gesture_direction(int32_t x_dist, int32_t y_dist)
 	uint8_t old_key = curr_key;
 	bool is_vert = false;
 
-	if (abs(y_dist) > swipe_width || abs(x_dist) > swipe_width) {
+	if (is_analog ||
+		(abs(y_dist) > swipe_width) || (abs(x_dist) > swipe_width)) {
 		if (abs(y_dist) > abs(x_dist))
 			is_vert = true;
 
@@ -156,14 +170,17 @@ static uint16_t calc_tick_rate(void)
 	 * settle on an appropriate linear value. Due to the size of the touchpad
 	 * and a finger we can't do an exponential curve in a manner that feels
 	 * good to a user */
-	tick_tm_ms -= (tick_delta_ms / 100) * ((analog_dist * 100) / DPAD_CENTER);
+	tick_tm_ms -= (tick_delta_ms *
+		(((uint32_t)(analog_dist - analog_deadzone_radius)* 100) /
+		(analog_width - analog_deadzone_radius))) / 100;
 
 	if (tick_tm_ms < min_analog_rate_ms)
 		tick_tm_ms = min_analog_rate_ms;
 	else if (tick_tm_ms > max_analog_rate_ms)
 		tick_tm_ms = max_analog_rate_ms;
 
-	return (uint16_t)tick_tm_ms;
+	last_tick_rate_ms = (uint16_t)tick_tm_ms;
+	return last_tick_rate_ms;
 }
 
 static void set_repeat_timer(uint16_t delay_ms)
@@ -187,6 +204,20 @@ int aahbt_input_dpad_init(struct dentry *debugfs_dir) {
 		return -ENODEV;
 	}
 
+	entry = debugfs_create_u16("analog_width", 0600, debugfs_dir,
+			&analog_width);
+	if (!entry) {
+		aahlog("Failed to create debugfs file for analog width.\n");
+		return -ENODEV;
+	}
+
+	entry = debugfs_create_u16("analog_deadzone_radius", 0600, debugfs_dir,
+			&analog_deadzone_radius);
+	if (!entry) {
+		aahlog("Failed to create debugfs file for analog deadzone radius.\n");
+		return -ENODEV;
+	}
+
 	entry = debugfs_create_u16("max_analog_rate_ms", 0600, debugfs_dir,
 			&max_analog_rate_ms);
 	if (!entry) {
@@ -205,6 +236,13 @@ int aahbt_input_dpad_init(struct dentry *debugfs_dir) {
 			&analog_switch_delay_ms);
 	if (!entry) {
 		aahlog("Failed to create debugfs file for analog switch delay.\n");
+		return -ENODEV;
+	}
+
+	entry = debugfs_create_bool("analog_debug", 0600, debugfs_dir,
+			&analog_debug);
+	if (!entry) {
+		aahlog("Failed to create debugfs file for analog debug.\n");
 		return -ENODEV;
 	}
 
@@ -264,11 +302,19 @@ void aahbt_input_handle_dpad_down(struct input_dev *idev, unsigned int which,
 		 */
 		recenter_origin(&x_dist, &y_dist);
 		old_key = determine_gesture_direction(x_dist, y_dist);
-		if (old_key && old_key != curr_key) {
+		if (analog_debug) {
+			aahlog("dist: %u, old_key: %u, curr_key: %u, x_dist: %d, y_dist: "
+					"%d, x0: %u, y0: %u, tick: %u\n", analog_dist, old_key,
+					curr_key, x_dist, y_dist, x_0, y_0, last_tick_rate_ms);
+		}
+
+		if (in_deadzone && timer_pending(&analog_timer)) {
+			del_timer(&analog_timer);
+		} else if (old_key && old_key != curr_key) {
 			send_gesture_key(old_key, AAH_KEY_UP);
 			send_gesture_key(curr_key, AAH_KEY_DOWN);
-			set_repeat_timer(calc_tick_rate());
-		} else if (!timer_pending(&analog_timer)) {
+			set_repeat_timer(min_analog_rate_ms);
+		} else if (!in_deadzone && !timer_pending(&analog_timer)) {
 			set_repeat_timer(calc_tick_rate());
 		}
 	}
