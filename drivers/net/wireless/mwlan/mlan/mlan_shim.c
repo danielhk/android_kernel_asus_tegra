@@ -1121,3 +1121,17 @@ mlan_interrupt(IN t_void * adapter)
 	wlan_interrupt(pmadapter);
 	LEAVE();
 }
+
+/**
+ *  @brief This function wake up card
+ *
+ *  @param adapter  A pointer to mlan_adapter structure
+ *  @return         N/A
+ */
+t_void mlan_pm_wakeup_card(IN t_void *pmlan_adapter)
+{
+	mlan_adapter *pmadapter = (mlan_adapter *)pmlan_adapter;
+	ENTER();
+	wlan_pm_wakeup_card(pmadapter);
+	LEAVE();
+}

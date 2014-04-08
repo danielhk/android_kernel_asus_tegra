@@ -40,6 +40,7 @@ EXPORT_SYMBOL(mlan_main_process);
 EXPORT_SYMBOL(mlan_rx_process);
 EXPORT_SYMBOL(mlan_select_wmm_queue);
 EXPORT_SYMBOL(mlan_interrupt);
+EXPORT_SYMBOL(mlan_pm_wakeup_card);
 #ifdef HISTOGRAM_SUPPORT
 EXPORT_SYMBOL(mlan_hist_data_get);
 EXPORT_SYMBOL(mlan_hist_data_clear);

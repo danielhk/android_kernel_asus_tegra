@@ -4928,6 +4928,8 @@ woal_dump_firmware_info(moal_handle * phandle)
 		return;
 	}
 
+	mlan_pm_wakeup_card(phandle->pmlan_adapter);
+
 	woal_dump_drv_info(phandle);
 
 	sdio_claim_host(((struct sdio_mmc_card *)phandle->card)->func);

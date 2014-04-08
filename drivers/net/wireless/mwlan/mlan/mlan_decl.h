@@ -1159,6 +1159,9 @@ MLAN_API mlan_status mlan_ioctl(IN t_void * pmlan_adapter,
 MLAN_API t_u8 mlan_select_wmm_queue(IN t_void * pmlan_adapter,
 				    IN t_u8 bss_num, IN t_u8 tid);
 
+/** mlan power management:wake up card */
+MLAN_API t_void mlan_pm_wakeup_card(IN t_void *pmlan_adapter);
+
 #ifdef HISTOGRAM_SUPPORT
 /** api to get the histogram data */
 MLAN_API int mlan_hist_data_get(
