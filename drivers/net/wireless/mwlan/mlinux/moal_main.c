@@ -3,7 +3,7 @@
   * @brief This file contains the major functions in WLAN
   * driver.
   *
-  * Copyright (C) 2008-2013, Marvell International Ltd.
+  * Copyright (C) 2008-2014, Marvell International Ltd.
   *
   * This software file (the "File") is distributed by Marvell International
   * Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -26,7 +26,7 @@ Change log:
 ********************************************************/
 
 #include	"moal_main.h"
-#include 	"moal_sdio.h"
+#include    "moal_sdio.h"
 #ifdef UAP_SUPPORT
 #include    "moal_uap.h"
 #endif
@@ -52,6 +52,10 @@ Change log:
 #include <linux/tcp.h>
 #include <net/tcp.h>
 #include <net/dsfield.h>
+
+#ifdef CONFIG_OF
+#include <linux/of.h>
+#endif
 
 /********************************************************
 		Local Variables
@@ -84,6 +88,13 @@ int mfg_mode;
 int intmode = INT_MODE_SDIO;
 /** GPIO interrupt pin number */
 int gpiopin;
+
+#ifdef CONFIG_OF
+#if defined(STA_CFG80211) || defined(UAP_CFG80211)
+/** Region alpha2 string */
+extern char *reg_alpha2;
+#endif
+#endif
 
 /** Auto deep sleep */
 int auto_ds;
@@ -176,7 +187,7 @@ int hw_test;
 #if defined(WIFI_DIRECT_SUPPORT)
 #if defined(STA_CFG80211) && defined(UAP_CFG80211)
 #if LINUX_VERSION_CODE >= WIFI_DIRECT_KERNEL_VERSION
-int p2p_enh = 1;
+int p2p_enh;
 #endif
 #endif
 #endif
@@ -235,6 +246,9 @@ int drv_mode = DRV_MODE_UAP;
 #endif /* STA_SUPPORT */
 #endif /* STA_SUPPORT & UAP_SUPPORT */
 
+/** all the feature are enabled */
+#define DEFAULT_DEV_CAP_MASK 0xffffffff
+t_u32 dev_cap_mask = DEFAULT_DEV_CAP_MASK;
 /********************************************************
 		Global Variables
 ********************************************************/
@@ -263,7 +277,12 @@ int woal_set_mac_address(struct net_device *dev, void *addr);
 void woal_tx_timeout(struct net_device *dev);
 struct net_device_stats *woal_get_stats(struct net_device *dev);
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 29)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0)
+u16 woal_select_queue(struct net_device *dev, struct sk_buff *skb,
+		      void *accel_priv);
+#else
 u16 woal_select_queue(struct net_device *dev, struct sk_buff *skb);
+#endif
 #endif
 
 mlan_debug_info info;
@@ -659,9 +678,7 @@ woal_update_drv_tbl(moal_handle * handle, int drv_mode_local)
 		goto done;
 	} else {
 		/* Create new table */
-		bss_tbl =
-			(mlan_bss_attr *) kmalloc(sizeof(mlan_bss_attr) *
-						  intf_num, GFP_KERNEL);
+		bss_tbl = kmalloc(sizeof(mlan_bss_attr) * intf_num, GFP_KERNEL);
 		if (!bss_tbl) {
 			PRINTM(MERROR,
 			       "Could not create BSS attribute table\n");
@@ -765,6 +782,158 @@ done:
 	return ret;
 }
 
+#ifdef CONFIG_OF
+/**
+ *  @brief This function read the initial parameter from device tress
+ *
+ *  @param handle   A pointer to moal_handle structure
+ *
+ *  @return         N/A
+ */
+static void
+woal_init_from_dev_tree(void)
+{
+	struct device_node *dt_node = NULL;
+	struct property *prop;
+	t_u32 data;
+	const char *string_data;
+
+	ENTER();
+	dt_node = of_find_node_by_name(NULL, "sd8xxx-wlan");
+	if (!dt_node) {
+		LEAVE();
+		return;
+	}
+	for_each_property_of_node(dt_node, prop) {
+		if (!strncmp(prop->name, "drv_mode", strlen("drv_mode"))) {
+			if (!of_property_read_u32(dt_node, prop->name, &data)) {
+				PRINTM(MIOCTL, "drv_mode=0x%x\n", data);
+				drv_mode = data;
+			}
+		} else if (!strncmp(prop->name, "drvdbg", strlen("drvdbg"))) {
+			if (!of_property_read_u32(dt_node, prop->name, &data)) {
+				PRINTM(MIOCTL, "drvdbg=0x%x\n", data);
+				drvdbg = data;
+			}
+		} else if (!strncmp
+			   (prop->name, "dev_cap_mask",
+			    strlen("dev_cap_mask"))) {
+			if (!of_property_read_u32(dt_node, prop->name, &data)) {
+				PRINTM(MIOCTL, "dev_cap_mask=0x%x\n", data);
+				dev_cap_mask = data;
+			}
+		} else if (!strncmp(prop->name, "hw_test", strlen("hw_test"))) {
+			if (!of_property_read_u32(dt_node, prop->name, &data)) {
+				PRINTM(MIOCTL, "hw_test=0x%x\n", data);
+				hw_test = data;
+			}
+		}
+#ifdef MFG_CMD_SUPPORT
+		else if (!strncmp(prop->name, "mfg_mode", strlen("mfg_mode"))) {
+			if (!of_property_read_u32(dt_node, prop->name, &data)) {
+				PRINTM(MIOCTL, "mfg_mode=0x%x\n", data);
+				mfg_mode = data;
+			}
+		}
+#endif
+		else if (!strncmp(prop->name, "mac_addr", strlen("mac_addr"))) {
+			if (!of_property_read_string
+			    (dt_node, prop->name, &string_data)) {
+				mac_addr = (char *)string_data;
+				PRINTM(MIOCTL, "mac_addr=%s\n", mac_addr);
+			}
+		} else if (!strncmp(prop->name, "fw_name", strlen("fw_name"))) {
+			if (!of_property_read_string
+			    (dt_node, prop->name, &string_data)) {
+				fw_name = (char *)string_data;
+				PRINTM(MIOCTL, "fw_name=%s\n", fw_name);
+			}
+		}
+#if defined(STA_WEXT) || defined(UAP_WEXT)
+		else if (!strncmp
+			 (prop->name, "cfg80211_wext",
+			  strlen("cfg80211_wext"))) {
+			if (!of_property_read_u32(dt_node, prop->name, &data)) {
+				PRINTM(MIOCTL, "cfg80211_wext=0x%x\n", data);
+				cfg80211_wext = data;
+			}
+		}
+#endif
+#ifdef STA_SUPPORT
+		else if (!strncmp(prop->name, "sta_name", strlen("sta_name"))) {
+			if (!of_property_read_string
+			    (dt_node, prop->name, &string_data)) {
+				sta_name = (char *)string_data;
+				PRINTM(MIOCTL, "sta_name=%s\n", sta_name);
+			}
+		}
+#endif
+#if defined(WIFI_DIRECT_SUPPORT)
+		else if (!strncmp(prop->name, "wfd_name", strlen("wfd_name"))) {
+			if (!of_property_read_string
+			    (dt_node, prop->name, &string_data)) {
+				wfd_name = (char *)string_data;
+				PRINTM(MIOCTL, "wfd_name=%s\n", wfd_name);
+			}
+		}
+#endif
+#if defined(STA_CFG80211) || defined(UAP_CFG80211)
+		else if (!strncmp
+			 (prop->name, "reg_alpha2", strlen("reg_alpha2"))) {
+			if (!of_property_read_string
+			    (dt_node, prop->name, &string_data)) {
+				reg_alpha2 = (char *)string_data;
+				PRINTM(MIOCTL, "reg_alpha2=%s\n", reg_alpha2);
+			}
+		}
+#endif
+#if defined(WIFI_DIRECT_SUPPORT)
+#if defined(STA_CFG80211) && defined(UAP_CFG80211)
+		else if (!strncmp
+			 (prop->name, "max_vir_bss", strlen("max_vir_bss"))) {
+			if (!of_property_read_u32(dt_node, prop->name, &data)) {
+				PRINTM(MIOCTL, "max_vir_bss=0x%x\n", data);
+				max_vir_bss = data;
+			}
+		} else if (!strncmp(prop->name, "p2p_enh", strlen("p2p_enh"))) {
+			if (!of_property_read_u32(dt_node, prop->name, &data)) {
+				PRINTM(MIOCTL, "p2p_enh=0x%x\n", data);
+				p2p_enh = data;
+			}
+		}
+#endif
+#endif
+		else if (!strncmp(prop->name, "init_cfg", strlen("init_cfg"))) {
+			if (!of_property_read_string
+			    (dt_node, prop->name, &string_data)) {
+				init_cfg = (char *)string_data;
+				PRINTM(MIOCTL, "init_cfg=%s\n", init_cfg);
+			}
+		} else if (!strncmp
+			   (prop->name, "cal_data_cfg",
+			    strlen("cal_data_cfg"))) {
+			if (!of_property_read_string
+			    (dt_node, prop->name, &string_data)) {
+				cal_data_cfg = (char *)string_data;
+				PRINTM(MIOCTL, "cal_data_cfg=%s\n",
+				       cal_data_cfg);
+			}
+		} else if (!strncmp
+			   (prop->name, "txpwrlimit_cfg",
+			    strlen("txpwrlimit_cfg"))) {
+			if (!of_property_read_string
+			    (dt_node, prop->name, &string_data)) {
+				txpwrlimit_cfg = (char *)string_data;
+				PRINTM(MIOCTL, "txpwrlimit_cfg=%s\n",
+				       txpwrlimit_cfg);
+			}
+		}
+	}
+	LEAVE();
+	return;
+}
+#endif
+
 /**
  *  @brief This function initializes software
  *
@@ -785,6 +954,10 @@ woal_init_sw(moal_handle * handle)
 	/* Initialize moal_handle structure */
 	handle->hardware_status = HardwareStatusInitializing;
 	handle->main_state = MOAL_STATE_IDLE;
+
+#ifdef CONFIG_OF
+	woal_init_from_dev_tree();
+#endif
 
 #ifdef STA_SUPPORT
 	if ((drv_mode & DRV_MODE_STA)
@@ -827,6 +1000,7 @@ woal_init_sw(moal_handle * handle)
 	spin_lock_init(&handle->queue_lock);
 #endif
 	spin_lock_init(&handle->driver_lock);
+	spin_lock_init(&handle->ioctl_lock);
 
 #if defined(SDIO_SUSPEND_RESUME)
 	handle->is_suspended = MFALSE;
@@ -926,6 +1100,9 @@ woal_init_sw(moal_handle * handle)
 	}
 	PRINTM(MMSG, "rx_work=%d cpu_num=%d\n", device.rx_work,
 	       num_possible_cpus());
+
+	device.dev_cap_mask = dev_cap_mask;
+
 	for (i = 0; i < handle->drv_mode.intf_num; i++) {
 		device.bss_attr[i].bss_type =
 			handle->drv_mode.bss_attr[i].bss_type;
@@ -1303,13 +1480,14 @@ woal_process_hostcmd_cfg(moal_handle * handle, t_u8 * data, t_size size)
 	t_u8 *ptr = NULL;
 	t_u32 cmd_len = 0;
 	t_u8 start_raw = MFALSE;
+	gfp_t flag;
 
 #define CMD_STR     "MRVL_CMDhostcmd"
 #define CMD_BUF_LEN 2048
 
 	ENTER();
-
-	buf = (t_u8 *) kzalloc(CMD_BUF_LEN, GFP_ATOMIC | GFP_KERNEL);
+	flag = (in_atomic() || irqs_disabled())? GFP_ATOMIC : GFP_KERNEL;
+	buf = kzalloc(CMD_BUF_LEN, flag);
 	if (!buf) {
 		PRINTM(MERROR, "Could not allocate buffer space!\n");
 		goto done;
@@ -1600,9 +1778,6 @@ woal_init_fw_dpc(moal_handle * handle)
 	if (handle->user_data) {
 		param.pcal_data_buf = (t_u8 *) handle->user_data->data;
 		param.cal_data_len = handle->user_data->size;
-
-		release_firmware(handle->user_data);
-		handle->user_data = NULL;
 	}
 
 #ifdef MFG_CMD_SUPPORT
@@ -1640,7 +1815,6 @@ woal_init_fw_dpc(moal_handle * handle)
 	handle->hardware_status = HardwareStatusFwReady;
 	if (ret != MLAN_STATUS_SUCCESS)
 		goto done;
-
 	handle->init_wait_q_woken = MFALSE;
 
 	ret = mlan_set_init_param(handle->pmlan_adapter, &param);
@@ -1858,31 +2032,36 @@ woal_fill_mlan_buffer(moal_private * priv,
 	t_u8 tid;
 
 	ENTER();
+	/* skb->priority values from 256->263 are magic values to directly
+	   indicate a specific 802.1d priority.  This is used to allow 802.1d
+	   priority to be passed directly in from VLAN * tags, etc. */
+	if (IS_SKB_MAGIC_VLAN(skb)) {
+		tid = GET_VLAN_PRIO(skb);
+	} else {
+		eth = (struct ethhdr *)skb->data;
 
-	eth = (struct ethhdr *)skb->data;
-
-	switch (eth->h_proto) {
-
-	case __constant_htons(ETH_P_IP):
-		tid = (IPTOS_PREC(SKB_TOS(skb)) >> IPTOS_OFFSET);
-		PRINTM(MDAT_D, "packet type ETH_P_IP: %04x, tid=%#x prio=%#x\n",
-		       eth->h_proto, tid, skb->priority);
-		break;
-	case __constant_htons(ETH_P_IPV6):
-		tid = SKB_TIDV6(skb);
-		PRINTM(MDAT_D,
-		       "packet type ETH_P_IPV6: %04x, tid=%#x prio=%#x\n",
-		       eth->h_proto, tid, skb->priority);
-		break;
-	case __constant_htons(ETH_P_ARP):
-		PRINTM(MDATA, "ARP packet %04x\n", eth->h_proto);
-		tid = 0;
-		break;
-	default:
-		tid = 0;
-		break;
+		switch (eth->h_proto) {
+		case __constant_htons(ETH_P_IP):
+			tid = (IPTOS_PREC(SKB_TOS(skb)) >> IPTOS_OFFSET);
+			PRINTM(MDAT_D,
+			       "packet type ETH_P_IP: %04x, tid=%#x prio=%#x\n",
+			       eth->h_proto, tid, skb->priority);
+			break;
+		case __constant_htons(ETH_P_IPV6):
+			tid = SKB_TIDV6(skb);
+			PRINTM(MDAT_D,
+			       "packet type ETH_P_IPV6: %04x, tid=%#x prio=%#x\n",
+			       eth->h_proto, tid, skb->priority);
+			break;
+		case __constant_htons(ETH_P_ARP):
+			PRINTM(MDATA, "ARP packet %04x\n", eth->h_proto);
+			tid = 0;
+			break;
+		default:
+			tid = 0;
+			break;
+		}
 	}
-
 	skb->priority = tid;
 
 	/* Record the current time the packet was queued; used to determine the
@@ -1987,7 +2166,6 @@ woal_init_sta_dev(struct net_device *dev, moal_private * priv)
 	if (IS_STA_WEXT(cfg80211_wext))
 		init_waitqueue_head(&priv->w_stats_wait_q);
 #endif
-
 	LEAVE();
 	return MLAN_STATUS_SUCCESS;
 }
@@ -2204,6 +2382,7 @@ woal_add_interface(moal_handle * handle, t_u8 bss_index, t_u8 bss_type)
 				goto error;
 			}
 		spin_lock_init(&priv->scan_req_lock);
+		spin_lock_init(&priv->connect_lock);
 	}
 #endif /* STA_SUPPORT */
 #endif /* STA_CFG80211 */
@@ -2653,6 +2832,12 @@ woal_open(struct net_device *dev)
 	t_u8 carrier_on = MFALSE;
 
 	ENTER();
+	if (priv->phandle->surprise_removed == MTRUE) {
+		PRINTM(MERROR,
+		       "open is not allowed in surprise remove state.\n");
+		LEAVE();
+		return -EFAULT;
+	}
 
 	if (!MODULE_GET) {
 		LEAVE();
@@ -2706,19 +2891,24 @@ int
 woal_close(struct net_device *dev)
 {
 	moal_private *priv = (moal_private *) netdev_priv(dev);
+#if defined(STA_SUPPORT) && defined(STA_CFG80211)
+	unsigned long flags;
+#endif
 
 	ENTER();
+
 #ifdef STA_SUPPORT
 #ifdef STA_CFG80211
 	if (IS_STA_CFG80211(cfg80211_wext) &&
 	    (priv->bss_type == MLAN_BSS_TYPE_STA))
 		woal_clear_conn_params(priv);
-	spin_lock(&priv->scan_req_lock);
+	spin_lock_irqsave(&priv->scan_req_lock, flags);
 	if (IS_STA_CFG80211(cfg80211_wext) && priv->scan_request) {
 		cfg80211_scan_done(priv->scan_request, MTRUE);
 		priv->scan_request = NULL;
 	}
-	spin_unlock(&priv->scan_req_lock);
+	spin_unlock_irqrestore(&priv->scan_req_lock, flags);
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0) || defined(COMPAT_WIRELESS)
 	if (IS_STA_CFG80211(cfg80211_wext) && priv->sched_scanning) {
 		woal_stop_bg_scan(priv, MOAL_IOCTL_WAIT);
@@ -2771,6 +2961,13 @@ woal_set_mac_address(struct net_device *dev, void *addr)
 	t_u8 prev_addr[ETH_ALEN];
 
 	ENTER();
+
+	if (priv->phandle->surprise_removed == MTRUE) {
+		PRINTM(MERROR,
+		       "Set mac address is not allowed in surprise remove state.\n");
+		LEAVE();
+		return -EFAULT;
+	}
 
 	memcpy(prev_addr, priv->current_addr, ETH_ALEN);
 	memset(priv->current_addr, 0, ETH_ALEN);
@@ -2905,7 +3102,7 @@ woal_mlan_debug_info(moal_private * priv)
 	PRINTM(MERROR, "rx_pkts_queued=%d\n", info.rx_pkts_queued);
 
 	PRINTM(MERROR, "num_cmd_timeout = %d\n", info.num_cmd_timeout);
-	PRINTM(MERROR, "Timeout cmd id = 0x%x, act = 0x%x \n",
+	PRINTM(MERROR, "Timeout cmd id = 0x%x, act = 0x%x\n",
 	       info.timeout_cmd_id, info.timeout_cmd_act);
 
 	PRINTM(MERROR, "last_cmd_index = %d\n", info.last_cmd_index);
@@ -3041,7 +3238,11 @@ woal_get_stats(struct net_device *dev)
  *  @return        tx_queue index (0-3)
  */
 u16
-woal_select_queue(struct net_device * dev, struct sk_buff * skb)
+woal_select_queue(struct net_device * dev, struct sk_buff * skb
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0)
+		  , void *accel_priv
+#endif
+	)
 {
 	moal_private *priv = (moal_private *) netdev_priv(dev);
 	struct ethhdr *eth = NULL;
@@ -3050,18 +3251,26 @@ woal_select_queue(struct net_device * dev, struct sk_buff * skb)
 
 	ENTER();
 
-	eth = (struct ethhdr *)skb->data;
-	switch (eth->h_proto) {
-	case __constant_htons(ETH_P_IP):
-		tid = (IPTOS_PREC(SKB_TOS(skb)) >> IPTOS_OFFSET);
-		break;
-	case __constant_htons(ETH_P_IPV6):
-		tid = SKB_TIDV6(skb);
-		break;
-	case __constant_htons(ETH_P_ARP):
-	default:
-		break;
+	/* skb->priority values from 256->263 are magic values to directly
+	   indicate a specific 802.1d priority.  This is used to allow 802.1d
+	   priority to be passed directly in from VLAN * tags, etc. */
+	if (IS_SKB_MAGIC_VLAN(skb)) {
+		tid = GET_VLAN_PRIO(skb);
+	} else {
+		eth = (struct ethhdr *)skb->data;
+		switch (eth->h_proto) {
+		case __constant_htons(ETH_P_IP):
+			tid = (IPTOS_PREC(SKB_TOS(skb)) >> IPTOS_OFFSET);
+			break;
+		case __constant_htons(ETH_P_IPV6):
+			tid = SKB_TIDV6(skb);
+			break;
+		case __constant_htons(ETH_P_ARP):
+		default:
+			break;
+		}
 	}
+
 	index = mlan_select_wmm_queue(priv->phandle->pmlan_adapter,
 				      priv->bss_index, tid);
 	PRINTM(MDATA, "select queue: tid=%d, index=%d\n", tid, index);
@@ -3406,12 +3615,14 @@ woal_atoi(int *data, char *a)
 	ENTER();
 
 	len = strlen(a);
-	if (!strncmp(a, "0x", 2)) {
-		a = a + 2;
-		len -= 2;
-		*data = woal_atox(a);
-		LEAVE();
-		return MLAN_STATUS_SUCCESS;
+	if (len > 2) {
+		if (!strncmp(a, "0x", 2)) {
+			a = a + 2;
+			len -= 2;
+			*data = woal_atox(a);
+			LEAVE();
+			return MLAN_STATUS_SUCCESS;
+		}
 	}
 	for (i = 0; i < len; i++) {
 		if (isdigit(a[i])) {
@@ -3799,20 +4010,19 @@ woal_alloc_mlan_buffer(moal_handle * handle, int size)
 
 	ENTER();
 
-	flag = in_atomic()? GFP_ATOMIC : GFP_KERNEL;
+	flag = (in_atomic() || irqs_disabled())? GFP_ATOMIC : GFP_KERNEL;
 	if (size <= 0) {
 		PRINTM(MERROR, "Buffer size must be positive\n");
 		LEAVE();
 		return NULL;
 	}
 
-	pmbuf = kmalloc(sizeof(mlan_buffer), flag);
+	pmbuf = kzalloc(sizeof(mlan_buffer), flag);
 	if (!pmbuf) {
 		PRINTM(MERROR, "%s: Fail to alloc mlan buffer\n", __func__);
 		LEAVE();
 		return NULL;
 	}
-	memset((t_u8 *) pmbuf, 0, sizeof(mlan_buffer));
 	skb = __dev_alloc_skb(size, flag);
 	if (!skb) {
 		PRINTM(MERROR, "%s: No free skb\n", __func__);
@@ -3842,17 +4052,14 @@ woal_alloc_mlan_ioctl_req(int size)
 
 	ENTER();
 
-	flag = in_atomic()? GFP_ATOMIC : GFP_KERNEL;
-	req = (mlan_ioctl_req *)
-		kmalloc((sizeof(mlan_ioctl_req) + size + sizeof(int) +
-			 sizeof(wait_queue)), flag);
+	flag = (in_atomic() || irqs_disabled())? GFP_ATOMIC : GFP_KERNEL;
+	req = kzalloc((sizeof(mlan_ioctl_req) + size + sizeof(int) +
+		       sizeof(wait_queue)), flag);
 	if (!req) {
 		PRINTM(MERROR, "%s: Fail to alloc ioctl buffer\n", __func__);
 		LEAVE();
 		return NULL;
 	}
-	memset((t_u8 *) req, 0, (sizeof(mlan_ioctl_req) + size +
-				 sizeof(int) + sizeof(wait_queue)));
 	req->pbuf = (t_u8 *) req + sizeof(mlan_ioctl_req) + sizeof(wait_queue);
 	req->buf_len = (t_u32) size;
 	req->reserved_1 = (t_ptr) ((t_u8 *) req + sizeof(mlan_ioctl_req));
@@ -4054,8 +4261,9 @@ woal_reassociation_thread(void *data)
 		PRINTM(MEVENT, "Reassoc: Thread waking up...\n");
 		reassoc_timer_req = MFALSE;
 #ifdef STA_CFG80211
-		for (i = 0; i < handle->priv_num && (priv = handle->priv[i]);
-		     i++) {
+		for (i = 0;
+		     i < MIN(handle->priv_num, MLAN_MAX_BSS_NUM) &&
+		     (priv = handle->priv[i]); i++) {
 			if (priv->roaming_required) {
 				priv->roaming_required = MFALSE;
 				PRINTM(MEVENT, "Try to roaming......\n");
@@ -4065,8 +4273,9 @@ woal_reassociation_thread(void *data)
 		}
 #endif
 
-		for (i = 0; i < handle->priv_num && (priv = handle->priv[i]);
-		     i++) {
+		for (i = 0;
+		     i < MIN(handle->priv_num, MLAN_MAX_BSS_NUM) &&
+		     (priv = handle->priv[i]); i++) {
 
 			if (priv->reassoc_required == MFALSE) {
 				priv->set_asynced_essid_flag = MFALSE;
@@ -4318,6 +4527,9 @@ woal_send_disconnect_to_system(moal_private * priv)
 #ifdef STA_WEXT
 	union iwreq_data wrqu;
 #endif
+#ifdef STA_CFG80211
+	unsigned long flags;
+#endif
 
 	ENTER();
 	priv->media_connected = MFALSE;
@@ -4334,18 +4546,22 @@ woal_send_disconnect_to_system(moal_private * priv)
 #endif
 #ifdef STA_CFG80211
 	if (IS_STA_CFG80211(cfg80211_wext)) {
+		spin_lock_irqsave(&priv->connect_lock, flags);
 		if (!priv->cfg_disconnect && !priv->cfg_connect &&
 		    priv->wdev && priv->wdev->iftype != NL80211_IFTYPE_ADHOC) {
 			PRINTM(MMSG,
 			       "wlan: Disconnected from " MACSTR
 			       ": Reason code %d\n", MAC2STR(priv->cfg_bssid),
 			       WLAN_REASON_DEAUTH_LEAVING);
+			spin_unlock_irqrestore(&priv->connect_lock, flags);
 			/* This function must be called only when disconnect
 			   issued by the FW, i.e. disconnected by AP. For IBSS
 			   mode this call is not valid */
 			cfg80211_disconnected(priv->netdev,
 					      WLAN_REASON_DEAUTH_LEAVING, NULL,
 					      0, GFP_KERNEL);
+		} else {
+			spin_unlock_irqrestore(&priv->connect_lock, flags);
 		}
 		if (!woal_is_any_interface_active(priv->phandle))
 			woal_set_scan_time(priv, ACTIVE_SCAN_CHAN_TIME,
@@ -4453,7 +4669,7 @@ woal_dump_sdio_reg_info(moal_handle * phandle, t_u8 * drv_buf)
 	t_u8 loop, index = 0, func, data;
 	unsigned int reg, reg_start, reg_end;
 	unsigned int reg_table[] = { 0x28, 0x30, 0x34, 0x38, 0x3c };
-	char buf[128], *ptr;
+	char buf[256], *ptr;
 
 	ENTER();
 
@@ -4468,8 +4684,14 @@ woal_dump_sdio_reg_info(moal_handle * phandle, t_u8 * drv_buf)
 	for (loop = 0; loop < 5; loop++) {
 		memset(buf, 0, sizeof(buf));
 		ptr = buf;
-		if (loop < 2) {
-			/* Read the registers of SDIO function0 and function1 */
+		if (loop == 0) {
+			/* Read the registers of SDIO function0 */
+			func = loop;
+			reg_start = 0;
+			reg_end = 9;
+
+		} else if (loop == 1) {
+			/* Read the registers of SDIO function1 */
 			func = loop;
 			reg_start = 0;
 			reg_end = 9;
@@ -4610,23 +4832,27 @@ woal_dump_mlan_drv_info(moal_private * priv, t_u8 * buf)
 		       info.mlan_rx_processing);
 	ptr += sprintf(ptr, "rx_pkts_queued =%d\n", info.rx_pkts_queued);
 	ptr += sprintf(ptr, "num_cmd_timeout = %d\n", info.num_cmd_timeout);
-	ptr += sprintf(ptr, "Timeout cmd id = 0x%x, act = 0x%x \n",
+	ptr += sprintf(ptr, "Timeout cmd id = 0x%x, act = 0x%x\n",
 		       info.timeout_cmd_id, info.timeout_cmd_act);
 	ptr += sprintf(ptr, "last_cmd_index = %d\n", info.last_cmd_index);
-	for (s = str, i = 0; i < DBG_CMD_NUM; i++) {
+	for (s = str, i = 0; i < DBG_CMD_NUM; i++)
+		s += sprintf(s, "0x%x ", info.last_cmd_id[i]);
+	ptr += sprintf(ptr, "last_cmd_id = %s\n", str);
+
+	for (s = str, i = 0; i < DBG_CMD_NUM; i++)
 		s += sprintf(s, "0x%x ", info.last_cmd_act[i]);
-	}
+
 	ptr += sprintf(ptr, "last_cmd_act = %s\n", str);
 	ptr += sprintf(ptr, "last_cmd_resp_index = %d\n",
 		       info.last_cmd_resp_index);
-	for (s = str, i = 0; i < DBG_CMD_NUM; i++) {
+	for (s = str, i = 0; i < DBG_CMD_NUM; i++)
 		s += sprintf(s, "0x%x ", info.last_cmd_resp_id[i]);
-	}
+
 	ptr += sprintf(ptr, "last_cmd_resp_id = %s\n", str);
 	ptr += sprintf(ptr, "last_event_index = %d\n", info.last_event_index);
-	for (s = str, i = 0; i < DBG_CMD_NUM; i++) {
+	for (s = str, i = 0; i < DBG_CMD_NUM; i++)
 		s += sprintf(s, "0x%x ", info.last_event[i]);
-	}
+
 	ptr += sprintf(ptr, "last_event = %s\n", str);
 	ptr += sprintf(ptr, "num_data_h2c_failure = %d\n",
 		       info.num_tx_host_to_card_failure);
@@ -4677,12 +4903,12 @@ woal_dump_mlan_drv_info(moal_private * priv, t_u8 * buf)
 	ptr += sprintf(ptr, "last_recv_wr_bitmap=0x%x last_mp_index = %d\n",
 		       info.last_recv_wr_bitmap, info.last_mp_index);
 	for (i = 0; i < SDIO_MP_DBG_NUM; i++) {
-		for (s = str, j = 0; j < SDIO_MP_AGGR_DEF_PKT_LIMIT; j++) {
+		for (s = str, j = 0; j < SDIO_MP_AGGR_DEF_PKT_LIMIT; j++)
 			s += sprintf(s, "0x%02x ",
 				     info.last_mp_wr_info[i *
 							  SDIO_MP_AGGR_DEF_PKT_LIMIT
 							  + j]);
-		}
+
 		ptr += sprintf(ptr,
 			       "mp_wr_bitmap: 0x%x mp_wr_ports=0x%x len=%d curr_wr_port=0x%x\n%s\n",
 			       info.last_mp_wr_bitmap[i],
@@ -4819,15 +5045,140 @@ woal_dump_mlan_hex(moal_private * priv, t_u8 * buf)
 	return ptr - (char *)buf;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
 /**
- *  @brief This function dump drv info to file
+ *  @brief This function create dump directory
  *
  *  @param phandle   A pointer to moal_handle
+ *  @param dir_buf   A pointer to dir_buf buffer
+ *  @param buf_size  Size of dir_buf buffer
  *
  *  @return         N/A
  */
 void
-woal_dump_drv_info(moal_handle * phandle)
+woal_create_dump_dir(moal_handle * phandle, char *dir_buf, int buf_size)
+{
+	struct dentry *dentry;
+	struct path path;
+	t_u32 sec, usec;
+	int ret;
+
+	ENTER();
+
+	if (!phandle || !dir_buf) {
+		PRINTM(MERROR, "Can't create directory\n");
+		ret = MLAN_STATUS_FAILURE;
+		goto done;
+	}
+
+	moal_get_system_time(phandle, &sec, &usec);
+	memset(dir_buf, 0, buf_size);
+	sprintf(dir_buf, "%s%u", "/data/dump_", sec);
+
+	dentry = kern_path_create(AT_FDCWD, dir_buf, &path, 1);
+	if (IS_ERR(dentry)) {
+		PRINTM(MMSG,
+		       "Create directory %s error, try create dir in /var",
+		       dir_buf);
+		memset(dir_buf, 0, buf_size);
+		sprintf(dir_buf, "%s%u", "/var/dump_", sec);
+		dentry = kern_path_create(AT_FDCWD, dir_buf, &path, 1);
+	}
+	if (IS_ERR(dentry)) {
+		PRINTM(MMSG, "Create directory %s error, use default folder",
+		       dir_buf);
+		goto default_dir;
+	}
+	ret = vfs_mkdir(path.dentry->d_inode, dentry, 0777);
+	mutex_unlock(&path.dentry->d_inode->i_mutex);
+	if (ret < 0) {
+		PRINTM(MMSG, "Create directory failure, use default folder\n");
+		goto default_dir;
+	} else {
+		PRINTM(MMSG, "Create directory %s successfully\n", dir_buf);
+		goto done;
+	}
+
+default_dir:
+	memset(dir_buf, 0, buf_size);
+	sprintf(dir_buf, "%s", "/data");
+done:
+	LEAVE();
+}
+#endif
+
+/**
+ *  @brief This function save dump buf to file
+ *
+ *  @param dir_name  A pointer to directory name
+ *  @param file_name A pointer to file name
+ *  @param buf       A pointer to dump data
+ *  @param buf_len   The length of dump buf
+ *
+ *  @return         SUCCESS OR FAILURE
+ */
+mlan_status
+woal_save_dump_info_to_file(char *dir_name, char *file_name, t_u8 * buf,
+			    t_u32 buf_len)
+{
+	mlan_status ret = MLAN_STATUS_SUCCESS;
+	struct file *pfile = NULL;
+	t_u8 name[64];
+	mm_segment_t fs;
+	loff_t pos;
+
+	ENTER();
+
+	if (!dir_name || !file_name || !buf) {
+		PRINTM(MERROR, "Can't save dump info to file\n");
+		ret = MLAN_STATUS_FAILURE;
+		goto done;
+	}
+
+	memset(name, 0, sizeof(name));
+	sprintf(name, "%s/%s", dir_name, file_name);
+	pfile = filp_open(name, O_CREAT | O_RDWR, 0644);
+	if (IS_ERR(pfile)) {
+		PRINTM(MMSG,
+		       "Create file %s error, try to save dump file in /var\n",
+		       name);
+		memset(name, 0, sizeof(name));
+		sprintf(name, "%s/%s", "/var", file_name);
+		pfile = filp_open(name, O_CREAT | O_RDWR, 0644);
+	}
+	if (IS_ERR(pfile)) {
+		PRINTM(MERROR, "Create Dump file for %s error\n", name);
+		ret = MLAN_STATUS_FAILURE;
+		goto done;
+	}
+
+	PRINTM(MMSG, "Dump data %s saved in %s\n", file_name, name);
+
+	fs = get_fs();
+	set_fs(KERNEL_DS);
+	pos = 0;
+	vfs_write(pfile, buf, buf_len, &pos);
+	filp_close(pfile, NULL);
+	set_fs(fs);
+
+	PRINTM(MMSG, "Dump data %s saved in %s successfully\n", file_name,
+	       name);
+
+done:
+	LEAVE();
+	return ret;
+}
+
+/**
+ *  @brief This function dump drv info to file
+ *
+ *  @param phandle   A pointer to moal_handle
+ *  @param dir_name   A pointer to directory name
+ *
+ *  @return         N/A
+ */
+void
+woal_dump_drv_info(moal_handle * phandle, t_u8 * dir_name)
 {
 	int ret = 0;
 	struct file *pfile = NULL;
@@ -4835,6 +5186,7 @@ woal_dump_drv_info(moal_handle * phandle)
 	t_u8 *drv_buf;
 	t_u8 *pos;
 	loff_t start;
+	t_u8 file_name[64];
 
 	ENTER();
 
@@ -4857,10 +5209,12 @@ woal_dump_drv_info(moal_handle * phandle)
 	PRINTM(MMSG, "Drv info total bytes = %ld (0x%lx)\n",
 	       (long int)(pos - drv_buf), (long unsigned int)(pos - drv_buf));
 
-	pfile = filp_open("/data/file_drv_info", O_CREAT | O_RDWR, 0644);
-	if (IS_ERR(pfile)) {
+	memset(file_name, 0, sizeof(file_name));
+	sprintf(file_name, "%s/%s", dir_name, "file_drv_info");
+	PRINTM(MMSG, "DRV dump data in %s\n", file_name);
+	pfile = filp_open(file_name, O_CREAT | O_RDWR, 0644);
+	if (IS_ERR(pfile))
 		pfile = filp_open("/var/file_drv_info", O_CREAT | O_RDWR, 0644);
-	}
 	if (IS_ERR(pfile)) {
 		PRINTM(MMSG, "Create file_drv_info file failed\n");
 		goto done;
@@ -4880,12 +5234,12 @@ done:
 	LEAVE();
 }
 
-#define DEBUG_HOST_READY		0xee
-#define DEBUG_FW_DONE			0xff
+#define DEBUG_HOST_READY		0xEE
+#define DEBUG_FW_DONE			0xFF
+#define MAX_POLL_TRIES			100
 #define DEBUG_ITCM_DONE			0xaa
 #define DEBUG_DTCM_DONE			0xbb
 #define DEBUG_SQRAM_DONE		0xcc
-#define MAX_POLL_TRIES			100
 
 #define DEBUG_DUMP_CTRL_REG               0x63
 #define DEBUG_DUMP_FIRST_REG              0x62
@@ -4893,7 +5247,7 @@ done:
 #define DEBUG_DUMP_END_REG                0x6a
 #define ITCM_SIZE                         0x60000
 #define SQRAM_SIZE                        0x7c000
-#define DTCM_SIZE                         0x14000
+#define DTCM_SIZE                         0x10000
 
 /**
  *  @brief This function dump firmware memory to file
@@ -4908,6 +5262,7 @@ woal_dump_firmware_info(moal_handle * phandle)
 
 	int ret = 0;
 	unsigned int reg, reg_start, reg_end;
+	t_u8 path_name[64], file_name[32];
 	t_u8 *ITCM_Ptr = NULL;
 	t_u8 *DTCM_Ptr = NULL;
 	t_u8 *SQRAM_Ptr = NULL;
@@ -4915,11 +5270,6 @@ woal_dump_firmware_info(moal_handle * phandle)
 	t_u32 sec, usec;
 	t_u8 ctrl_data = 0;
 	t_u32 dtcm_size = 0;
-	struct file *pfileITCM = NULL;
-	struct file *pfileDTCM = NULL;
-	struct file *pfileSQRAM = NULL;
-	mm_segment_t fs;
-	loff_t pos;
 	t_u8 *end_ptr = NULL;
 	int tries;
 
@@ -4927,11 +5277,17 @@ woal_dump_firmware_info(moal_handle * phandle)
 		PRINTM(MERROR, "Could not dump firmwware info\n");
 		return;
 	}
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
+    /** Create dump directort*/
+	woal_create_dump_dir(phandle, path_name, sizeof(path_name));
+#else
+	memset(path_name, 0, sizeof(path_name));
+	strcpy(path_name, "/data");
+#endif
+	PRINTM(MMSG, "Directory name is %s\n", path_name);
+	woal_dump_drv_info(phandle, path_name);
 
 	mlan_pm_wakeup_card(phandle->pmlan_adapter);
-
-	woal_dump_drv_info(phandle);
-
 	sdio_claim_host(((struct sdio_mmc_card *)phandle->card)->func);
 	/* start dump fw memory */
 	moal_get_system_time(phandle, &sec, &usec);
@@ -5025,8 +5381,20 @@ woal_dump_firmware_info(moal_handle * phandle)
 		}
 		switch (ctrl_data) {
 		case DEBUG_ITCM_DONE:
+#ifdef MLAN_64BIT
+			PRINTM(MMSG, "ITCM done: size=0x%lx\n",
+			       dbg_ptr - ITCM_Ptr);
+#else
 			PRINTM(MMSG, "ITCM done: size=0x%x\n",
 			       dbg_ptr - ITCM_Ptr);
+#endif
+			memset(file_name, 0, sizeof(file_name));
+			sprintf(file_name, "%s", "file_sdio_ITCM");
+			if (MLAN_STATUS_SUCCESS !=
+			    woal_save_dump_info_to_file(path_name, file_name,
+							ITCM_Ptr, ITCM_SIZE))
+				PRINTM(MMSG, "Can't save dump file %s in %s\n",
+				       file_name, path_name);
 			dbg_ptr = DTCM_Ptr;
 			end_ptr = DTCM_Ptr + DTCM_SIZE;
 			moal_get_system_time(phandle, &sec, &usec);
@@ -5035,8 +5403,20 @@ woal_dump_firmware_info(moal_handle * phandle)
 			       sec, usec);
 			break;
 		case DEBUG_DTCM_DONE:
+#ifdef MLAN_64BIT
+			PRINTM(MMSG, "DTCM done: size=0x%lx\n",
+			       dbg_ptr - DTCM_Ptr);
+#else
 			PRINTM(MMSG, "DTCM done: size=0x%x\n",
 			       dbg_ptr - DTCM_Ptr);
+#endif
+			memset(file_name, 0, sizeof(file_name));
+			sprintf(file_name, "%s", "file_sdio_DTCM");
+			if (MLAN_STATUS_SUCCESS !=
+			    woal_save_dump_info_to_file(path_name, file_name,
+							DTCM_Ptr, dtcm_size))
+				PRINTM(MMSG, "Can't save dump file %s in %s\n",
+				       file_name, path_name);
 			dbg_ptr = SQRAM_Ptr;
 			end_ptr = SQRAM_Ptr + SQRAM_SIZE;
 			moal_get_system_time(phandle, &sec, &usec);
@@ -5045,8 +5425,20 @@ woal_dump_firmware_info(moal_handle * phandle)
 			       sec, usec);
 			break;
 		case DEBUG_SQRAM_DONE:
+#ifdef MLAN_64BIT
+			PRINTM(MMSG, "SQRAM done: size=0x%lx\n",
+			       dbg_ptr - SQRAM_Ptr);
+#else
 			PRINTM(MMSG, "SQRAM done: size=0x%x\n",
 			       dbg_ptr - SQRAM_Ptr);
+#endif
+			memset(file_name, 0, sizeof(file_name));
+			sprintf(file_name, "%s", "file_sdio_SQRAM");
+			if (MLAN_STATUS_SUCCESS !=
+			    woal_save_dump_info_to_file(path_name, file_name,
+							SQRAM_Ptr, SQRAM_SIZE))
+				PRINTM(MMSG, "Can't save dump file %s in %s\n",
+				       file_name, path_name);
 			PRINTM(MMSG, "End output!\n");
 			break;
 		default:
@@ -5054,54 +5446,6 @@ woal_dump_firmware_info(moal_handle * phandle)
 		}
 	} while (ctrl_data != DEBUG_SQRAM_DONE);
 
-	moal_get_system_time(phandle, &sec, &usec);
-	/* TODO file path should be config */
-	pfileITCM = filp_open("/data/file_ITCM", O_CREAT | O_RDWR, 0644);
-	if (IS_ERR(pfileITCM)) {
-		PRINTM(MMSG,
-		       "Now Start to save all the outputs to the /var directory: %u.%06u, please wait...\n",
-		       sec, usec);
-		pfileITCM = filp_open("/var/file_ITCM", O_CREAT | O_RDWR, 0644);
-		pfileDTCM = filp_open("/var/file_DTCM", O_CREAT | O_RDWR, 0644);
-		pfileSQRAM =
-			filp_open("/var/file_SQRAM", O_CREAT | O_RDWR, 0644);
-	} else {
-		PRINTM(MMSG,
-		       "Now Start to save all the outputs to the /data directory: %u.%06u, please wait...\n",
-		       sec, usec);
-		pfileDTCM =
-			filp_open("/data/file_DTCM", O_CREAT | O_RDWR, 0644);
-		pfileSQRAM =
-			filp_open("/data/file_SQRAM", O_CREAT | O_RDWR, 0644);
-	}
-	if (IS_ERR(pfileITCM)) {
-		PRINTM(MMSG, "Create ITCM file failed\n");
-		goto done;
-	}
-	if (IS_ERR(pfileDTCM)) {
-		PRINTM(MMSG, "Create DTCM file failed\n");
-		filp_close(pfileITCM, NULL);
-		goto done;
-	}
-	if (IS_ERR(pfileSQRAM)) {
-		PRINTM(MMSG, "Create SQRAM file failed\n");
-		filp_close(pfileITCM, NULL);
-		filp_close(pfileDTCM, NULL);
-		goto done;
-	}
-	PRINTM(MMSG, "Create ITCM/DTCM/SQRAM files OK\n");
-	fs = get_fs();
-	set_fs(KERNEL_DS);
-	pos = 0;
-	vfs_write(pfileITCM, ITCM_Ptr, ITCM_SIZE, &pos);
-	pos = 0;
-	vfs_write(pfileDTCM, DTCM_Ptr, dtcm_size, &pos);
-	pos = 0;
-	vfs_write(pfileSQRAM, SQRAM_Ptr, SQRAM_SIZE, &pos);
-	filp_close(pfileITCM, NULL);
-	filp_close(pfileDTCM, NULL);
-	filp_close(pfileSQRAM, NULL);
-	set_fs(fs);
 	PRINTM(MMSG,
 	       "The output ITCM/DTCM/SQRAM have been saved to files successfully!\n");
 	moal_get_system_time(phandle, &sec, &usec);
@@ -5132,19 +5476,22 @@ woal_sdio_reg_dbg(moal_handle * phandle)
 	t_u8 loop, index = 0, func, data;
 	unsigned int reg, reg_start, reg_end;
 	unsigned int reg_table[] = { 0x28, 0x30, 0x34, 0x38, 0x3c };
-	char buf[128], *ptr;
+	char buf[256], *ptr;
 
 	sdio_claim_host(((struct sdio_mmc_card *)phandle->card)->func);
 	for (loop = 0; loop < 5; loop++) {
 		memset(buf, 0, sizeof(buf));
 		ptr = buf;
-		if (loop < 2) {
-			/* Read the registers of SDIO function0 and function1 */
+		if (loop == 0) {
+			/* Read the registers of SDIO function0 */
 			func = loop;
-			if (loop == 1)
-				reg_start = 4;
-			else
-				reg_start = 0;
+			reg_start = 0;
+			reg_end = 9;
+
+		} else if (loop == 1) {
+			/* Read the registers of SDIO function1 */
+			func = loop;
+			reg_start = 0;
 			reg_end = 9;
 		} else if (loop == 2) {
 			/* Read specific registers of SDIO function1 */
@@ -5498,14 +5845,13 @@ woal_add_card(void *card)
 		goto exit_sem_err;
 
 	/* Allocate buffer for moal_handle */
-	handle = kmalloc(sizeof(moal_handle), GFP_KERNEL);
+	handle = kzalloc(sizeof(moal_handle), GFP_KERNEL);
 	if (!handle) {
 		PRINTM(MERROR, "Allocate buffer for moal_handle failed!\n");
 		goto err_handle;
 	}
 
 	/* Init moal_handle */
-	memset(handle, 0, sizeof(moal_handle));
 	handle->card = card;
 	/* Save the handle */
 	for (index = 0; index < MAX_MLAN_ADAPTER; index++) {
@@ -5954,6 +6300,9 @@ woal_cleanup_module(void)
 	moal_handle *handle = NULL;
 	int index = 0;
 	int i;
+#if defined(STA_SUPPORT) && defined(STA_CFG80211)
+	unsigned long flags;
+#endif
 
 	ENTER();
 
@@ -5989,14 +6338,16 @@ woal_cleanup_module(void)
 				    (handle->priv[i]->bss_type ==
 				     MLAN_BSS_TYPE_STA))
 					woal_clear_conn_params(handle->priv[i]);
-				spin_lock(&handle->priv[i]->scan_req_lock);
+				spin_lock_irqsave(&handle->priv[i]->
+						  scan_req_lock, flags);
 				if (IS_STA_CFG80211(cfg80211_wext) &&
 				    handle->priv[i]->scan_request) {
 					cfg80211_scan_done(handle->priv[i]->
 							   scan_request, MTRUE);
 					handle->priv[i]->scan_request = NULL;
 				}
-				spin_unlock(&handle->priv[i]->scan_req_lock);
+				spin_unlock_irqrestore(&handle->priv[i]->
+						       scan_req_lock, flags);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0) || defined(COMPAT_WIRELESS)
 				if (IS_STA_CFG80211(cfg80211_wext) &&
 				    handle->priv[i]->sched_scanning) {
@@ -6195,6 +6546,9 @@ MODULE_PARM_DESC(p2p_enh, "1: Enable enhanced P2P; 0: Disable enhanced P2P");
 #endif
 #endif
 #endif
+
+module_param(dev_cap_mask, uint, 0);
+MODULE_PARM_DESC(dev_cap_mask, "Device capability mask");
 
 MODULE_DESCRIPTION("M-WLAN Driver");
 MODULE_AUTHOR("Marvell International Ltd.");

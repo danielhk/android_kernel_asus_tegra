@@ -3,7 +3,7 @@
  *  @brief This file contains the initialization for FW
  *  and HW.
  *
- *  Copyright (C) 2008-2013, Marvell International Ltd.
+ *  Copyright (C) 2008-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -39,7 +39,6 @@ Change log:
 #include "mlan_11h.h"
 #include "mlan_meas.h"
 #include "mlan_sdio.h"
-
 /********************************************************
 			Global Variables
 ********************************************************/
@@ -219,6 +218,7 @@ wlan_allocate_adapter(pmlan_adapter pmadapter)
 		return MLAN_STATUS_FAILURE;
 	}
 	pmadapter->bcn_buf_size = DEFAULT_SCAN_BEACON_BUFFER;
+
 #endif
 
 	/* Allocate command buffer */
@@ -365,8 +365,6 @@ wlan_init_priv(pmlan_private priv)
 	memset(pmadapter, &priv->gen_ie_buf, 0, sizeof(priv->gen_ie_buf));
 	priv->gen_ie_buf_len = 0;
 #endif /* STA_SUPPORT */
-
-	priv->tx_bf_cap = 0;
 	priv->wmm_required = MTRUE;
 	priv->wmm_enabled = MFALSE;
 	priv->wmm_qosinfo = 0;
@@ -475,11 +473,10 @@ wlan_init_adapter(pmlan_adapter pmadapter)
 
 	if (!pmadapter->init_para.ps_mode) {
 		pmadapter->ps_mode = DEFAULT_PS_MODE;
-	} else if (pmadapter->init_para.ps_mode == MLAN_INIT_PARA_DISABLED) {
+	} else if (pmadapter->init_para.ps_mode == MLAN_INIT_PARA_DISABLED)
 		pmadapter->ps_mode = Wlan802_11PowerModeCAM;
-	} else {
+	else
 		pmadapter->ps_mode = Wlan802_11PowerModePSP;
-	}
 	pmadapter->ps_state = PS_STATE_AWAKE;
 	pmadapter->need_to_wakeup = MFALSE;
 
@@ -512,13 +509,12 @@ wlan_init_adapter(pmlan_adapter pmadapter)
 
 	pmadapter->is_deep_sleep = MFALSE;
 	pmadapter->idle_time = DEEP_SLEEP_IDLE_TIME;
-	if (!pmadapter->init_para.auto_ds) {
+	if (!pmadapter->init_para.auto_ds)
 		pmadapter->init_auto_ds = DEFAULT_AUTO_DS_MODE;
-	} else if (pmadapter->init_para.auto_ds == MLAN_INIT_PARA_DISABLED) {
+	else if (pmadapter->init_para.auto_ds == MLAN_INIT_PARA_DISABLED)
 		pmadapter->init_auto_ds = MFALSE;
-	} else {
+	else
 		pmadapter->init_auto_ds = MTRUE;
-	}
 
 	pmadapter->delay_null_pkt = MFALSE;
 	pmadapter->delay_to_ps = DELAY_TO_PS_DEFAULT;
@@ -561,6 +557,7 @@ wlan_init_adapter(pmlan_adapter pmadapter)
 	pmadapter->usr_dot_11n_dev_cap_bg = 0;
 	pmadapter->usr_dot_11n_dev_cap_a = 0;
 	pmadapter->usr_dev_mcs_support = 0;
+	pmadapter->coex_rx_winsize = 1;
 #ifdef STA_SUPPORT
 	pmadapter->chan_bandwidth = 0;
 	pmadapter->adhoc_11n_enabled = MFALSE;
@@ -1047,10 +1044,10 @@ wlan_free_adapter(pmlan_adapter pmadapter)
 #ifdef STA_SUPPORT
 	PRINTM(MINFO, "Free ScanTable\n");
 	if (pmadapter->pscan_table) {
-		if (pcb->moal_vmalloc && pcb->moal_vfree) {
+		if (pcb->moal_vmalloc && pcb->moal_vfree)
 			pcb->moal_vfree(pmadapter->pmoal_handle,
 					(t_u8 *) pmadapter->pscan_table);
-		} else
+		else
 			pcb->moal_mfree(pmadapter->pmoal_handle,
 					(t_u8 *) pmadapter->pscan_table);
 		pmadapter->pscan_table = MNULL;
@@ -1112,7 +1109,7 @@ wlan_free_priv(mlan_private * pmpriv)
  *  @param pmadapter	A pointer to mlan_adapter structure
  *
  *  @return		MLAN_STATUS_SUCCESS
- *                      	The firmware initialization callback succeeded.
+ *              The firmware initialization callback succeeded.
  */
 mlan_status
 wlan_init_fw_complete(IN pmlan_adapter pmadapter)

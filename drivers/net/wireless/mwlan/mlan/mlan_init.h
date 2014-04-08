@@ -3,7 +3,7 @@
  *  @brief This file defines the FW initialization data
  *  structures.
  *
- *  Copyright (C) 2008-2013, Marvell International Ltd.
+ *  Copyright (C) 2008-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -38,7 +38,7 @@ Change log:
 #define FW_HAS_LAST_BLOCK		0x00000004
 
 /** Firmware data transmit size */
-#define FW_DATA_XMIT_SIZE       (sizeof(FWHeader) + DataLength + sizeof(t_u32))
+#define FW_DATA_XMIT_SIZE (sizeof(FWHeader) + DataLength + sizeof(t_u32))
 
 /** FWHeader */
 typedef struct _FWHeader {

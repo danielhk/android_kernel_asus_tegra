@@ -2,7 +2,7 @@
  *
  *  @brief This file declares the generic data structures and APIs.
  *
- *  Copyright (C) 2008-2013, Marvell International Ltd.
+ *  Copyright (C) 2008-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -27,7 +27,7 @@ Change log:
 #define _MLAN_DECL_H_
 
 /** MLAN release version */
-#define MLAN_RELEASE_VERSION		"459"
+#define MLAN_RELEASE_VERSION		"483"
 
 /** Re-define generic data types for MLAN/MOAL */
 /** Signed char (1-byte) */
@@ -281,9 +281,11 @@ typedef t_u8 mlan_802_11_mac_addr[MLAN_MAC_ADDR_LENGTH];
 /** Buffer flag for bridge packet */
 #define MLAN_BUF_FLAG_BRIDGE_BUF        MBIT(3)
 
+/** Buffer flag for TDLS */
 #define MLAN_BUF_FLAG_TDLS	            MBIT(8)
 
-#define MLAN_BUF_FLAG_TCP_ACK		MBIT(9)
+/** Buffer flag for TCP_ACK */
+#define MLAN_BUF_FLAG_TCP_ACK		    MBIT(9)
 
 #ifdef DEBUG_LEVEL1
 /** Debug level bit definition */
@@ -1107,7 +1109,8 @@ typedef struct _mlan_device {
 #endif
     /** enable/disable rx work */
 	t_u8 rx_work;
-
+    /** dev cap mask */
+	t_u32 dev_cap_mask;
 } mlan_device, *pmlan_device;
 
 /** MLAN API function prototype */
@@ -1152,15 +1155,14 @@ MLAN_API mlan_status mlan_recv_packet_complete(IN t_void * pmlan_adapter,
 /** interrupt handler */
 MLAN_API t_void mlan_interrupt(IN t_void * pmlan_adapter);
 
+MLAN_API t_void mlan_pm_wakeup_card(IN t_void * pmlan_adapter);
+
 /** mlan ioctl */
 MLAN_API mlan_status mlan_ioctl(IN t_void * pmlan_adapter,
 				IN pmlan_ioctl_req pioctl_req);
 /** mlan select wmm queue */
 MLAN_API t_u8 mlan_select_wmm_queue(IN t_void * pmlan_adapter,
 				    IN t_u8 bss_num, IN t_u8 tid);
-
-/** mlan power management:wake up card */
-MLAN_API t_void mlan_pm_wakeup_card(IN t_void *pmlan_adapter);
 
 #ifdef HISTOGRAM_SUPPORT
 /** api to get the histogram data */

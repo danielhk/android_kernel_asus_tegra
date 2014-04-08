@@ -2,7 +2,7 @@
  *
  *  @brief This file contains the functions for station ioctl.
  *
- *  Copyright (C) 2008-2013, Marvell International Ltd.
+ *  Copyright (C) 2008-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -282,7 +282,6 @@ wlan_get_info_bss_info(IN pmlan_adapter pmadapter,
 	       pbss_desc->supported_rates,
 	       MIN(sizeof(info->param.bss_info.peer_supp_rates),
 		   sizeof(pbss_desc->supported_rates)));
-
 	pioctl_req->data_read_written =
 		sizeof(mlan_bss_info) + MLAN_SUB_COMMAND_SIZE;
 
@@ -490,8 +489,8 @@ wlan_radio_ioctl_band_cfg(IN pmlan_adapter pmadapter,
 		pmadapter->chan_bandwidth =
 			(t_u8) radio_cfg->param.band_cfg.sec_chan_offset;
 		/*
-		 * If no adhoc_channel is supplied verify if the existing adhoc channel
-		 * compiles with new adhoc_band
+		 * If no adhoc_channel is supplied verify if the existing
+		 * adhoc channel compiles with new adhoc_band
 		 */
 		if (!adhoc_channel) {
 			if (!wlan_find_cfp_by_band_and_channel
@@ -1419,6 +1418,7 @@ wlan_bss_ioctl_find_bss(IN pmlan_adapter pmadapter,
 			return MLAN_STATUS_PENDING;
 		}
 	}
+
 	ret = wlan_find_bss(pmpriv, pioctl_req);
 
 	LEAVE();
@@ -2567,9 +2567,9 @@ wlan_sec_ioctl_auth_mode(IN pmlan_adapter pmadapter,
 	sec = (mlan_ds_sec_cfg *) pioctl_req->pbuf;
 	if (pioctl_req->action == MLAN_ACT_GET)
 		sec->param.auth_mode = pmpriv->sec_info.authentication_mode;
-	else {
+	else
 		pmpriv->sec_info.authentication_mode = sec->param.auth_mode;
-	}
+
 	pioctl_req->data_read_written = sizeof(t_u32) + MLAN_SUB_COMMAND_SIZE;
 	LEAVE();
 	return ret;
@@ -2594,9 +2594,9 @@ wlan_sec_ioctl_encrypt_mode(IN pmlan_adapter pmadapter,
 	sec = (mlan_ds_sec_cfg *) pioctl_req->pbuf;
 	if (pioctl_req->action == MLAN_ACT_GET)
 		sec->param.encrypt_mode = pmpriv->sec_info.encryption_mode;
-	else {
+	else
 		pmpriv->sec_info.encryption_mode = sec->param.encrypt_mode;
-	}
+
 	pioctl_req->data_read_written = sizeof(t_u32) + MLAN_SUB_COMMAND_SIZE;
 	LEAVE();
 	return ret;
@@ -3087,7 +3087,6 @@ wlan_sec_ioctl_passphrase(IN pmlan_adapter pmadapter,
 	t_u16 cmd_action = 0;
 	BSSDescriptor_t *pbss_desc;
 	int i = 0;
-
 	ENTER();
 
 	sec = (mlan_ds_sec_cfg *) pioctl_req->pbuf;
@@ -3372,7 +3371,8 @@ wlan_set_gen_ie_helper(mlan_private * priv, t_u8 * ie_data_ptr, t_u16 ie_len)
 			     sizeof(wps_oui)))) {
 			/*
 			 * Discard first two byte (Element ID and Length)
-			 * because they are not needed in the case of setting WPS_IE
+			 * because they are not needed in the case of setting
+			 * WPS_IE
 			 */
 			if (pvendor_ie->len > 4) {
 				memcpy(priv->adapter,
@@ -3389,8 +3389,8 @@ wlan_set_gen_ie_helper(mlan_private * priv, t_u8 * ie_data_ptr, t_u16 ie_len)
 			}
 		} else {
 			/*
-			 * Verify that the passed length is not larger than the available
-			 * space remaining in the buffer
+			 * Verify that the passed length is not larger than
+			 * the available space remaining in the buffer
 			 */
 			if (ie_len <
 			    (sizeof(priv->gen_ie_buf) - priv->gen_ie_buf_len)) {
@@ -3728,6 +3728,7 @@ wlan_11h_channel_check_req(IN pmlan_adapter pmadapter,
 {
 	pmlan_private pmpriv = MNULL;
 	mlan_status ret = MLAN_STATUS_FAILURE;
+	t_u8 chan_width = CHAN_BW_20MHZ;
 
 	ENTER();
 
@@ -3766,9 +3767,14 @@ wlan_11h_channel_check_req(IN pmlan_adapter pmadapter,
 			ret = wlan_11h_check_update_radar_det_state(pmpriv);
 
 			/* Check for radar on the channel */
+			if ((pmadapter->chan_bandwidth ==
+			     CHANNEL_BW_40MHZ_ABOVE) ||
+			    (pmadapter->chan_bandwidth ==
+			     CHANNEL_BW_40MHZ_BELOW))
+				chan_width = CHAN_BW_40MHZ;
 			ret = wlan_11h_issue_radar_detect(pmpriv, pioctl_req,
-							  pmpriv->
-							  adhoc_channel);
+							  pmpriv->adhoc_channel,
+							  chan_width);
 			if (ret == MLAN_STATUS_SUCCESS)
 				ret = MLAN_STATUS_PENDING;
 		}
@@ -4943,6 +4949,10 @@ wlan_misc_cfg_ioctl(IN pmlan_adapter pmadapter, IN pmlan_ioctl_req pioctl_req)
 	case MLAN_OID_MISC_SOFT_RESET:
 		status = wlan_misc_ioctl_soft_reset(pmadapter, pioctl_req);
 		break;
+	case MLAN_OID_MISC_COALESCING_STATUS:
+		status = wlan_misc_ioctl_coalescing_status(pmadapter,
+							   pioctl_req);
+		break;
 	case MLAN_OID_MISC_CUSTOM_IE:
 		status = wlan_misc_ioctl_custom_ie_list(pmadapter, pioctl_req,
 							MTRUE);
@@ -5323,7 +5333,7 @@ wlan_find_bss(mlan_private * pmpriv, pmlan_ioctl_req pioctl_req)
 /**
  *  @brief MLAN station ioctl handler
  *
- *  @param adapter 	A pointer to mlan_adapter structure
+ *  @param adapter  A pointer to mlan_adapter structure
  *  @param pioctl_req	A pointer to ioctl request buffer
  *
  *  @return		MLAN_STATUS_SUCCESS/MLAN_STATUS_PENDING --success, otherwise fail

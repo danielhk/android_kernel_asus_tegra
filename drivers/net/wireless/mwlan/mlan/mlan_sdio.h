@@ -3,7 +3,7 @@
   * @brief This file contains definitions for SDIO interface.
   * driver.
   *
-  * Copyright (C) 2008-2013, Marvell International Ltd.
+  * Copyright (C) 2008-2014, Marvell International Ltd.
   *
   * This software file (the "File") is distributed by Marvell International
   * Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -217,27 +217,28 @@ Change log:
 			(((a->mpa_tx.buf_len) + len) <= (a->mpa_tx.buf_size))
 
 /** Copy current packet (SDIO Tx aggregation buffer) to SDIO buffer */
-#define MP_TX_AGGR_BUF_PUT(a, mbuf, port) do {                  \
+#define MP_TX_AGGR_BUF_PUT(a, mbuf, port) do {          \
 	pmadapter->callbacks.moal_memmove(a->pmoal_handle, \
 		&a->mpa_tx.buf[a->mpa_tx.buf_len], \
 		mbuf->pbuf+mbuf->data_offset, mbuf->data_len);\
-	a->mpa_tx.buf_len += mbuf->data_len;                        \
-	a->mpa_tx.mp_wr_info[a->mpa_tx.pkt_cnt] = *(t_u16 *)(mbuf->pbuf+mbuf->data_offset); \
-	if (!a->mpa_tx.pkt_cnt) {                                   \
-	    a->mpa_tx.start_port = port;                            \
-	}                                                           \
-	if (a->mpa_tx.start_port <= port) {                         \
-	    a->mpa_tx.ports |= (1 << (a->mpa_tx.pkt_cnt));			\
-	} else {                                                    \
-	      a->mpa_tx.ports |= (1 << (a->mpa_tx.pkt_cnt \
+	a->mpa_tx.buf_len += mbuf->data_len;                \
+	a->mpa_tx.mp_wr_info[a->mpa_tx.pkt_cnt] = \
+		*(t_u16 *)(mbuf->pbuf+mbuf->data_offset); \
+	if (!a->mpa_tx.pkt_cnt) {                           \
+		a->mpa_tx.start_port = port;                    \
+	}                                                   \
+	if (a->mpa_tx.start_port <= port) {                 \
+		a->mpa_tx.ports |= (1 << (a->mpa_tx.pkt_cnt));	\
+	} else {                                            \
+		a->mpa_tx.ports |= (1 << (a->mpa_tx.pkt_cnt \
 			+ 1 + (MAX_PORT - a->mp_end_port)));  \
-	}                                                           \
-	a->mpa_tx.pkt_cnt++;                                       \
+	}                                                   \
+	a->mpa_tx.pkt_cnt++;                                \
 } while (0)
 
 /** SDIO Tx aggregation limit ? */
 #define MP_TX_AGGR_PKT_LIMIT_REACHED(a) ((a->mpa_tx.pkt_cnt) \
-								== (a->mpa_tx.pkt_aggr_limit))
+			== (a->mpa_tx.pkt_aggr_limit))
 
 /** SDIO Tx aggregation port limit ? */
 #define MP_TX_AGGR_PORT_LIMIT_REACHED(a) ((a->curr_wr_port < \
@@ -247,12 +248,12 @@ Change log:
 
 /** Reset SDIO Tx aggregation buffer parameters */
 #define MP_TX_AGGR_BUF_RESET(a) do {         \
-    memset(a, a->mpa_tx.mp_wr_info, 0, sizeof(a->mpa_tx.mp_wr_info)); \
+	memset(a, a->mpa_tx.mp_wr_info, 0, sizeof(a->mpa_tx.mp_wr_info)); \
 	a->mpa_tx.pkt_cnt = 0;                   \
 	a->mpa_tx.buf_len = 0;                   \
 	a->mpa_tx.ports = 0;                     \
 	a->mpa_tx.start_port = 0;                \
-} while (0);
+} while (0)
 
 #endif /* SDIO_MULTI_PORT_TX_AGGR */
 
@@ -260,7 +261,7 @@ Change log:
 
 /** SDIO Rx aggregation limit ? */
 #define MP_RX_AGGR_PKT_LIMIT_REACHED(a) (a->mpa_rx.pkt_cnt \
-								== a->mpa_rx.pkt_aggr_limit)
+		== a->mpa_rx.pkt_aggr_limit)
 
 /** SDIO Rx aggregation port limit ? */
 #define MP_RX_AGGR_PORT_LIMIT_REACHED(a) ((a->curr_rd_port < \
@@ -279,17 +280,17 @@ Change log:
 #define MP_RX_AGGR_SETUP(a, mbuf, port, rx_len) do {   \
 	a->mpa_rx.buf_len += rx_len;                       \
 	if (!a->mpa_rx.pkt_cnt) {                          \
-	    a->mpa_rx.start_port = port;                   \
+		a->mpa_rx.start_port = port;                   \
 	}                                                  \
 	if (a->mpa_rx.start_port <= port) {                  \
-	    a->mpa_rx.ports |= (1 << (a->mpa_rx.pkt_cnt)); \
+		a->mpa_rx.ports |= (1 << (a->mpa_rx.pkt_cnt)); \
 	} else {                                           \
-	    a->mpa_rx.ports |= (1 << (a->mpa_rx.pkt_cnt + 1)); \
+		a->mpa_rx.ports |= (1 << (a->mpa_rx.pkt_cnt + 1)); \
 	}                                                  \
 	a->mpa_rx.mbuf_arr[a->mpa_rx.pkt_cnt] = mbuf;      \
 	a->mpa_rx.len_arr[a->mpa_rx.pkt_cnt] = rx_len;     \
 	a->mpa_rx.pkt_cnt++;                               \
-} while (0);
+} while (0)
 
 /** Reset SDIO Rx aggregation buffer parameters */
 #define MP_RX_AGGR_BUF_RESET(a) do {         \
@@ -297,7 +298,7 @@ Change log:
 	a->mpa_rx.buf_len = 0;                   \
 	a->mpa_rx.ports = 0;                     \
 	a->mpa_rx.start_port = 0;                \
-} while (0);
+} while (0)
 
 #endif /* SDIO_MULTI_PORT_RX_AGGR */
 

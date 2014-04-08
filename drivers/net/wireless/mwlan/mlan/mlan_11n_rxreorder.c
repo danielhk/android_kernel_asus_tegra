@@ -3,7 +3,7 @@
  *  @brief This file contains the handling of RxReordering in wlan
  *  driver.
  *
- *  Copyright (C) 2008-2013, Marvell International Ltd.
+ *  Copyright (C) 2008-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -406,6 +406,36 @@ wlan_11n_find_last_seqnum(RxReorderTbl * rx_reorder_tbl_ptr)
 /**
  *  @brief This function flushes all data
  *
+ *  @param priv          A pointer to  mlan_private structure
+ *  @param rx_reor_tbl_ptr  A pointer to RxReorderTbl
+ *
+ *  @return             N/A
+ */
+static t_void
+wlan_start_flush_data(mlan_private * priv, RxReorderTbl * rx_reor_tbl_ptr)
+{
+
+	int startWin;
+
+	ENTER();
+	wlan_11n_display_tbl_ptr(priv->adapter, rx_reor_tbl_ptr);
+
+	startWin = wlan_11n_find_last_seqnum(rx_reor_tbl_ptr);
+	if (startWin >= 0) {
+		PRINTM(MINFO, "Flush data %d\n", startWin);
+		wlan_11n_dispatch_pkt_until_start_win(priv, rx_reor_tbl_ptr,
+						      ((rx_reor_tbl_ptr->
+							start_win + startWin +
+							1) & (MAX_TID_VALUE -
+							      1)));
+	}
+	wlan_11n_display_tbl_ptr(priv->adapter, rx_reor_tbl_ptr);
+	LEAVE();
+}
+
+/**
+ *  @brief This function set the flag to flushes data
+ *
  *  @param context      Reorder context pointer
  *
  *  @return             N/A
@@ -414,26 +444,10 @@ static t_void
 wlan_flush_data(t_void * context)
 {
 	reorder_tmr_cnxt_t *reorder_cnxt = (reorder_tmr_cnxt_t *) context;
-	int startWin;
-
 	ENTER();
+	/* Set the flag to flush data */
+	reorder_cnxt->ptr->flush_data = MTRUE;
 	reorder_cnxt->timer_is_set = MFALSE;
-	wlan_11n_display_tbl_ptr(reorder_cnxt->priv->adapter,
-				 reorder_cnxt->ptr);
-
-	startWin = wlan_11n_find_last_seqnum(reorder_cnxt->ptr);
-	if (startWin >= 0) {
-		PRINTM(MINFO, "Flush data %d\n", startWin);
-		wlan_11n_dispatch_pkt_until_start_win(reorder_cnxt->priv,
-						      reorder_cnxt->ptr,
-						      ((reorder_cnxt->ptr->
-							start_win + startWin +
-							1) & (MAX_TID_VALUE -
-							      1)));
-	}
-
-	wlan_11n_display_tbl_ptr(reorder_cnxt->priv->adapter,
-				 reorder_cnxt->ptr);
 	LEAVE();
 }
 
@@ -555,7 +569,7 @@ wlan_11n_create_rxreorder_tbl(mlan_private * priv, t_u8 * ta, int tid,
  *
  *  @param priv    A pointer to mlan_private
  *  @param ta      ta to find in reordering table
- *  @param tid	   tid to find in reordering table
+ *  @param tid     tid to find in reordering table
  *
  *  @return        A pointer to structure RxReorderTbl
  */
@@ -782,6 +796,10 @@ mlan_11n_rxreorder_pkt(void *priv, t_u16 seq_num, t_u16 tid,
 		return ret;
 
 	} else {
+		if (rx_reor_tbl_ptr->flush_data) {
+			rx_reor_tbl_ptr->flush_data = MFALSE;
+			wlan_start_flush_data(priv, rx_reor_tbl_ptr);
+		}
 		if ((pkt_type == PKT_TYPE_AMSDU) && !rx_reor_tbl_ptr->amsdu) {
 			wlan_11n_dispatch_pkt(priv, payload);
 			LEAVE();
@@ -858,20 +876,29 @@ mlan_11n_rxreorder_pkt(void *priv, t_u16 seq_num, t_u16 tid,
 		 * If seq_num is less then starting win then ignore and drop
 		 * the packet
 		 */
-		if (rx_reor_tbl_ptr->force_no_drop || pkt_type == PKT_TYPE_BAR) {
+		if (rx_reor_tbl_ptr->force_no_drop) {
 			PRINTM(MDAT_D, "No drop packet\n");
 			rx_reor_tbl_ptr->force_no_drop = MFALSE;
 		} else {
-			if ((start_win + TWOPOW11) > (MAX_TID_VALUE - 1)) {	/* Wrap
-										 */
+			/* Wrap */
+			if ((start_win + TWOPOW11) > (MAX_TID_VALUE - 1)) {
 				if (seq_num >= ((start_win + (TWOPOW11)) &
 						(MAX_TID_VALUE - 1)) &&
 				    (seq_num < start_win)) {
+					if (pkt_type == PKT_TYPE_BAR)
+						PRINTM(MDAT_D,
+						       "BAR: start_win=%d, end_win=%d, seq_num=%d\n",
+						       start_win, end_win,
+						       seq_num);
 					ret = MLAN_STATUS_FAILURE;
 					goto done;
 				}
 			} else if ((seq_num < start_win) ||
-				   (seq_num > (start_win + (TWOPOW11)))) {
+				   (seq_num >= (start_win + (TWOPOW11)))) {
+				if (pkt_type == PKT_TYPE_BAR)
+					PRINTM(MDAT_D,
+					       "BAR: start_win=%d, end_win=%d, seq_num=%d\n",
+					       start_win, end_win, seq_num);
 				ret = MLAN_STATUS_FAILURE;
 				goto done;
 			}
@@ -1309,5 +1336,124 @@ wlan_update_rxreorder_tbl(pmlan_adapter pmadapter, t_u8 flag)
 			wlan_set_rxreorder_tbl_no_drop_flag(priv, flag);
 		}
 	}
+	return;
+}
+
+/**
+ *  @brief This function update all the rx_win_size based on coex flag
+ *
+ *  @param pmadapter    A pointer to mlan_adapter
+ *  @param coex_flag    coex flag
+ *
+ *  @return             N/A
+ */
+void
+wlan_update_ampdu_rxwinsize(pmlan_adapter pmadapter, t_u8 coex_flag)
+{
+	t_u8 i;
+	t_u32 rx_win_size = 0;
+	pmlan_private priv = MNULL;
+
+	ENTER();
+	if (!pmadapter->coex_rx_winsize) {
+		LEAVE();
+		return;
+	}
+	PRINTM(MEVENT, "Update rxwinsize %d\n", coex_flag);
+	for (i = 0; i < pmadapter->priv_num; i++) {
+		if (pmadapter->priv[i]) {
+			priv = pmadapter->priv[i];
+			rx_win_size = priv->add_ba_param.rx_win_size;
+			if (coex_flag == MTRUE) {
+#ifdef STA_SUPPORT
+				if (priv->bss_type == MLAN_BSS_TYPE_STA)
+					priv->add_ba_param.rx_win_size =
+						MLAN_STA_COEX_AMPDU_DEF_RXWINSIZE;
+#endif
+#ifdef WIFI_DIRECT_SUPPORT
+				if (priv->bss_type == MLAN_BSS_TYPE_WIFIDIRECT)
+					priv->add_ba_param.rx_win_size =
+						MLAN_WFD_COEX_AMPDU_DEF_RXWINSIZE;
+#endif
+#ifdef UAP_SUPPORT
+				if (priv->bss_type == MLAN_BSS_TYPE_UAP)
+					priv->add_ba_param.rx_win_size =
+						MLAN_UAP_COEX_AMPDU_DEF_RXWINSIZE;
+#endif
+
+			} else {
+#ifdef STA_SUPPORT
+				if (priv->bss_type == MLAN_BSS_TYPE_STA)
+					priv->add_ba_param.rx_win_size =
+						MLAN_STA_AMPDU_DEF_RXWINSIZE;
+#endif
+#ifdef WIFI_DIRECT_SUPPORT
+				if (priv->bss_type == MLAN_BSS_TYPE_WIFIDIRECT)
+					priv->add_ba_param.rx_win_size =
+						MLAN_WFD_AMPDU_DEF_TXRXWINSIZE;
+#endif
+#ifdef UAP_SUPPORT
+				if (priv->bss_type == MLAN_BSS_TYPE_UAP)
+					priv->add_ba_param.rx_win_size =
+						MLAN_UAP_AMPDU_DEF_RXWINSIZE;
+#endif
+			}
+			if (rx_win_size != priv->add_ba_param.rx_win_size) {
+				if (priv->media_connected == MTRUE) {
+					for (i = 0; i < MAX_NUM_TID; i++)
+						wlan_11n_delba(priv, i);
+					wlan_recv_event(priv,
+							MLAN_EVENT_ID_DRV_DEFER_HANDLING,
+							MNULL);
+				}
+			}
+		}
+	}
+	LEAVE();
+	return;
+}
+
+/**
+ *  @brief check coex for
+ *
+ *  @param pmadapter    A pointer to mlan_adapter
+ *
+ *  @return             N/A
+ */
+void
+wlan_coex_ampdu_rxwinsize(pmlan_adapter pmadapter)
+{
+	t_u8 i;
+	pmlan_private priv = MNULL;
+	t_u8 count = 0;
+	for (i = 0; i < pmadapter->priv_num; i++) {
+		if (pmadapter->priv[i]) {
+			priv = pmadapter->priv[i];
+#ifdef STA_SUPPORT
+			if (GET_BSS_ROLE((mlan_private *) priv) ==
+			    MLAN_BSS_ROLE_STA) {
+				if (priv->media_connected == MTRUE) {
+					count++;
+					if (pmadapter->tdls_status !=
+					    TDLS_NOT_SETUP)
+						count++;
+				}
+			}
+#endif
+#ifdef UAP_SUPPORT
+			if (GET_BSS_ROLE((mlan_private *) priv) ==
+			    MLAN_BSS_ROLE_UAP) {
+				if (priv->uap_bss_started)
+					count++;
+			}
+#endif
+		}
+		if (count >= 2)
+			break;
+	}
+	if (count >= 2)
+		wlan_update_ampdu_rxwinsize(pmadapter, MTRUE);
+	else
+		wlan_update_ampdu_rxwinsize(pmadapter, MFALSE);
 	return;
 }

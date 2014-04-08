@@ -2,7 +2,7 @@
  *
  *  @brief This file declares the exported symbols from MLAN.
  *
- *  Copyright (C) 2008-2013, Marvell International Ltd.
+ *  Copyright (C) 2008-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -40,6 +40,7 @@ EXPORT_SYMBOL(mlan_main_process);
 EXPORT_SYMBOL(mlan_rx_process);
 EXPORT_SYMBOL(mlan_select_wmm_queue);
 EXPORT_SYMBOL(mlan_interrupt);
+
 EXPORT_SYMBOL(mlan_pm_wakeup_card);
 #ifdef HISTOGRAM_SUPPORT
 EXPORT_SYMBOL(mlan_hist_data_get);

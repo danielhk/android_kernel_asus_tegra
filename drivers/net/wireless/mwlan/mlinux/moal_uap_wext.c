@@ -2,7 +2,7 @@
   *
   * @brief This file contains wireless extension standard ioctl functions
   *
-  * Copyright (C) 2010-2013, Marvell International Ltd.
+  * Copyright (C) 2010-2014, Marvell International Ltd.
   *
   * This software file (the "File") is distributed by Marvell International
   * Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -1083,7 +1083,6 @@ woal_set_mlme(struct net_device *dev,
 				goto done;
 			}
 			sta_list =
-				(mlan_ds_sta_list *)
 				kmalloc(sizeof(mlan_ds_sta_list), GFP_KERNEL);
 			if (sta_list == NULL) {
 				PRINTM(MERROR, "Memory allocation failed!\n");

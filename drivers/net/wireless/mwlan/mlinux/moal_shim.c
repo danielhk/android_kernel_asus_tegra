@@ -2,7 +2,7 @@
   *
   * @brief This file contains the callback functions registered to MLAN
   *
-  * Copyright (C) 2008-2013, Marvell International Ltd.
+  * Copyright (C) 2008-2014, Marvell International Ltd.
   *
   * This software file (the "File") is distributed by Marvell International
   * Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -65,7 +65,7 @@ extern int hw_test;
  *  @param flag     The type of the buffer to be allocated
  *  @param ppbuf    Pointer to a buffer location to store buffer pointer allocated
  *
- *  @return    	    MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
+ *  @return         MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
 mlan_status
 moal_malloc(IN t_void * pmoal_handle,
@@ -117,7 +117,7 @@ moal_mfree(IN t_void * pmoal_handle, IN t_u8 * pbuf)
  *  @param size     The size of the buffer to be allocated
  *  @param ppbuf    Pointer to a buffer location to store buffer pointer allocated
  *
- *  @return    	    MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
+ *  @return         MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
 mlan_status
 moal_vmalloc(IN t_void * pmoal_handle, IN t_u32 size, OUT t_u8 ** ppbuf)
@@ -141,7 +141,7 @@ moal_vmalloc(IN t_void * pmoal_handle, IN t_u32 size, OUT t_u8 ** ppbuf)
  *  @param pmoal_handle Pointer to the MOAL context
  *  @param pbuf     Pointer to the buffer to be freed
  *
- *  @return    	    MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
+ *  @return         MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
 mlan_status
 moal_vfree(IN t_void * pmoal_handle, IN t_u8 * pbuf)
@@ -163,7 +163,7 @@ moal_vfree(IN t_void * pmoal_handle, IN t_u8 * pbuf)
  *  @param byte     A constant byte
  *  @param num      Number of bytes to fill
  *
- *  @return    	    Pointer to the memory area
+ *  @return         Pointer to the memory area
  */
 t_void *
 moal_memset(IN t_void * pmoal_handle,
@@ -207,7 +207,7 @@ moal_memcpy(IN t_void * pmoal_handle,
  *  @param psrc     Pointer to the src memory
  *  @param num      Number of bytes to move
  *
- *  @return    	    Pointer to the dest memory
+ *  @return         Pointer to the dest memory
  */
 t_void *
 moal_memmove(IN t_void * pmoal_handle,
@@ -248,7 +248,7 @@ moal_memcmp(IN t_void * pmoal_handle,
  *  @param pmoal_handle Pointer to the MOAL context
  *  @param delay  delay in micro-second
  *
- *  @return    	  N/A
+ *  @return       N/A
  */
 t_void
 moal_udelay(IN t_void * pmoal_handle, IN t_u32 delay)
@@ -297,8 +297,11 @@ moal_init_timer(IN t_void * pmoal_handle,
 		IN t_void(*callback) (t_void * pcontext), IN t_void * pcontext)
 {
 	moal_drv_timer *timer = NULL;
+	t_u32 mem_flag = (in_interrupt() || irqs_disabled() ||
+			  !write_can_lock(&dev_base_lock)) ? GFP_ATOMIC :
+		GFP_KERNEL;
 
-	timer = (moal_drv_timer *) kmalloc(sizeof(moal_drv_timer), GFP_KERNEL);
+	timer = kmalloc(sizeof(moal_drv_timer), mem_flag);
 	if (timer == NULL)
 		return MLAN_STATUS_FAILURE;
 	woal_initialize_timer(timer, callback, pcontext);
@@ -387,7 +390,7 @@ moal_init_lock(IN t_void * pmoal_handle, OUT t_void ** pplock)
 	moal_handle *handle = (moal_handle *) pmoal_handle;
 	moal_lock *mlock = NULL;
 
-	mlock = (moal_lock *) kmalloc(sizeof(moal_lock), GFP_ATOMIC);
+	mlock = kmalloc(sizeof(moal_lock), GFP_ATOMIC);
 	if (!mlock)
 		return MLAN_STATUS_FAILURE;
 	spin_lock_init(&mlock->lock);
@@ -548,6 +551,7 @@ moal_ioctl_complete(IN t_void * pmoal_handle,
 	moal_handle *handle = (moal_handle *) pmoal_handle;
 	moal_private *priv = NULL;
 	wait_queue *wait;
+	unsigned long flags = 0;
 	ENTER();
 
 	if (!atomic_read(&handle->ioctl_pending))
@@ -556,8 +560,14 @@ moal_ioctl_complete(IN t_void * pmoal_handle,
 	else
 		atomic_dec(&handle->ioctl_pending);
 	priv = woal_bss_index_to_priv(handle, pioctl_req->bss_index);
+	if (!priv) {
+		PRINTM(MERROR,
+		       "IOCTL %p complete with NULL priv, bss_index=%d\n",
+		       pioctl_req, pioctl_req->bss_index);
+		LEAVE();
+		return MLAN_STATUS_SUCCESS;
+	}
 
-	wait = (wait_queue *) pioctl_req->reserved_1;
 	if (status != MLAN_STATUS_SUCCESS)
 		PRINTM(MERROR,
 		       "IOCTL failed: %p id=0x%x, sub_id=0x%x action=%d, status_code=0x%x\n",
@@ -570,6 +580,9 @@ moal_ioctl_complete(IN t_void * pmoal_handle,
 		       pioctl_req, pioctl_req->req_id,
 		       (*(t_u32 *) pioctl_req->pbuf), (int)pioctl_req->action,
 		       status, pioctl_req->status_code);
+
+	spin_lock_irqsave(&handle->driver_lock, flags);
+	wait = (wait_queue *) pioctl_req->reserved_1;
 	if (wait) {
 		wait->condition = MTRUE;
 		wait->status = status;
@@ -584,8 +597,10 @@ moal_ioctl_complete(IN t_void * pmoal_handle,
 				wake_up_interruptible(wait->wait);
 			}
 		}
+		spin_unlock_irqrestore(&handle->driver_lock, flags);
 	} else {
-		if (priv && (status == MLAN_STATUS_SUCCESS) &&
+		spin_unlock_irqrestore(&handle->driver_lock, flags);
+		if ((status == MLAN_STATUS_SUCCESS) &&
 		    (pioctl_req->action == MLAN_ACT_GET))
 			woal_process_ioctl_resp(priv, pioctl_req);
 		kfree(pioctl_req);
@@ -673,7 +688,7 @@ moal_send_packet_complete(IN t_void * pmoal_handle,
 				index = skb_get_queue_mapping(skb);
 				atomic_dec(&handle->tx_pending);
 				if (atomic_dec_return
-				    (&priv->wmm_tx_pending[index]) <
+				    (&priv->wmm_tx_pending[index]) ==
 				    LOW_TX_PENDING) {
 					struct netdev_queue *txq =
 						netdev_get_tx_queue(priv->
@@ -811,6 +826,7 @@ moal_recv_packet(IN t_void * pmoal_handle, IN pmlan_buffer pmbuf)
 	mlan_status status = MLAN_STATUS_SUCCESS;
 	moal_private *priv = NULL;
 	struct sk_buff *skb = NULL;
+	moal_handle *handle = (moal_handle *) pmoal_handle;
 	ENTER();
 	if (pmbuf) {
 		priv = woal_bss_index_to_priv(pmoal_handle, pmbuf->bss_index);
@@ -849,8 +865,13 @@ moal_recv_packet(IN t_void * pmoal_handle, IN pmlan_buffer pmbuf)
 			priv->stats.rx_packets++;
 			if (in_interrupt())
 				netif_rx(skb);
-			else
-				netif_rx_ni(skb);
+			else {
+				if (atomic_read(&handle->rx_pending) >
+				    MAX_RX_PENDING_THRHLD)
+					netif_rx(skb);
+				else
+					netif_rx_ni(skb);
+			}
 		}
 	}
 done:
@@ -871,6 +892,9 @@ moal_recv_event(IN t_void * pmoal_handle, IN pmlan_event pmevent)
 {
 #ifdef STA_SUPPORT
 	int custom_len = 0;
+#ifdef STA_CFG80211
+	unsigned long flags;
+#endif
 #endif
 	moal_private *priv = NULL;
 #if defined(STA_SUPPORT) || defined(UAP_SUPPORT)
@@ -967,20 +991,8 @@ moal_recv_event(IN t_void * pmoal_handle, IN pmlan_event pmevent)
 
 	case MLAN_EVENT_ID_DRV_SCAN_REPORT:
 		PRINTM(MINFO, "Scan report\n");
-		if (priv->phandle->scan_pending_on_block == MTRUE) {
-			priv->phandle->scan_pending_on_block = MFALSE;
-			MOAL_REL_SEMAPHORE(&priv->phandle->async_sem);
-		}
-
 		if (priv->report_scan_result) {
 			priv->report_scan_result = MFALSE;
-#ifdef STA_WEXT
-			if (IS_STA_WEXT(cfg80211_wext)) {
-				memset(&wrqu, 0, sizeof(union iwreq_data));
-				wireless_send_event(priv->netdev, SIOCGIWSCAN,
-						    &wrqu, NULL);
-			}
-#endif
 #ifdef STA_CFG80211
 			if (IS_STA_CFG80211(cfg80211_wext)) {
 				if (priv->scan_request) {
@@ -989,27 +1001,41 @@ moal_recv_event(IN t_void * pmoal_handle, IN pmlan_event pmevent)
 					woal_inform_bss_from_scan_result(priv,
 									 NULL,
 									 MOAL_NO_WAIT);
+					if (!priv->phandle->first_scan_done) {
+						priv->phandle->first_scan_done =
+							MTRUE;
+						woal_set_scan_time(priv,
+								   ACTIVE_SCAN_CHAN_TIME,
+								   PASSIVE_SCAN_CHAN_TIME,
+								   SPECIFIC_SCAN_CHAN_TIME);
+					}
 				}
-				spin_lock(&priv->scan_req_lock);
+				spin_lock_irqsave(&priv->scan_req_lock, flags);
 				if (priv->scan_request) {
 					cfg80211_scan_done(priv->scan_request,
 							   MFALSE);
 					priv->scan_request = NULL;
 				}
-				spin_unlock(&priv->scan_req_lock);
-				if (!priv->phandle->first_scan_done) {
-					priv->phandle->first_scan_done = MTRUE;
-					woal_set_scan_time(priv,
-							   ACTIVE_SCAN_CHAN_TIME,
-							   PASSIVE_SCAN_CHAN_TIME,
-							   SPECIFIC_SCAN_CHAN_TIME);
-				}
+				spin_unlock_irqrestore(&priv->scan_req_lock,
+						       flags);
+
 			}
 #endif /* STA_CFG80211 */
 
+#ifdef STA_WEXT
+			if (IS_STA_WEXT(cfg80211_wext)) {
+				memset(&wrqu, 0, sizeof(union iwreq_data));
+				wireless_send_event(priv->netdev, SIOCGIWSCAN,
+						    &wrqu, NULL);
+			}
+#endif
 			woal_broadcast_event(priv, (t_u8 *) & pmevent->event_id,
 					     sizeof(mlan_event_id));
 
+		}
+		if (priv->phandle->scan_pending_on_block == MTRUE) {
+			priv->phandle->scan_pending_on_block = MFALSE;
+			MOAL_REL_SEMAPHORE(&priv->phandle->async_sem);
 		}
 		break;
 
@@ -1575,9 +1601,11 @@ moal_recv_event(IN t_void * pmoal_handle, IN pmlan_event pmevent)
 			/* copy the station mac address */
 			memset(addr, 0xFF, ETH_ALEN);
 			memcpy(addr, pmevent->event_buf, ETH_ALEN);
-		/** these field add in kernel 3.2, but some kernel do have the pacth to
-				 * support it,like T3T and pxa978T 3.0.31 JB, these patch are
-				 * needed to support wpa_supplicant 2.x */
+		/** these field add in kernel 3.2, but some
+				 * kernel do have the pacth to support it,
+				 * like T3T and pxa978T 3.0.31 JB, these
+				 * patch are needed to support
+				 * wpa_supplicant 2.x */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 31) || defined(COMPAT_WIRELESS)
 			if (pmevent->event_len > ETH_ALEN) {
 				/* set station info filled flag */
@@ -1679,7 +1707,6 @@ moal_recv_event(IN t_void * pmoal_handle, IN pmlan_event pmevent)
 					remain_on_channel ? priv->phandle->chan.
 					center_freq :
 					woal_get_active_intf_freq(priv);
-
 				if (!freq) {
 					if (!priv->phandle->chan.center_freq) {
 						PRINTM(MERROR,

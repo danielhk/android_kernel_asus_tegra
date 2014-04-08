@@ -5,7 +5,7 @@
  *  IOCTL handlers as well as command preparation and response routines
  *  for sending scan commands to the firmware.
  *
- *  Copyright (C) 2008-2013, Marvell International Ltd.
+ *  Copyright (C) 2008-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -33,7 +33,6 @@ Change log:
 #include "mlan_main.h"
 #include "mlan_11n.h"
 #include "mlan_11h.h"
-
 /********************************************************
 			Local Constants
 ********************************************************/
@@ -57,15 +56,18 @@ Change log:
 /** Memory needed to store supported rate */
 #define RATE_TLV_MAX_SIZE   (sizeof(MrvlIEtypes_RatesParamSet_t) + HOSTCMD_SUPPORTED_RATES)
 
-/** Memory needed to store a max number/size WildCard SSID TLV for a firmware scan */
+/** Memory needed to store a max number/size WildCard
+ *  SSID TLV for a firmware scan */
 #define WILDCARD_SSID_TLV_MAX_SIZE                     \
 		(MRVDRV_MAX_SSID_LIST_LENGTH  *                \
 		 (sizeof(MrvlIEtypes_WildCardSsIdParamSet_t) + \
 		  MRVDRV_MAX_SSID_LENGTH))
 
-/** WPS TLV MAX size is MAX IE size plus 2 bytes for t_u16 MRVL TLV extension */
+/** WPS TLV MAX size is MAX IE size plus 2 bytes for
+ *  t_u16 MRVL TLV extension */
 #define WPS_TLV_MAX_SIZE   (sizeof(IEEEtypes_VendorSpecific_t) + 2)
-/** Maximum memory needed for a wlan_scan_cmd_config with all TLVs at max */
+/** Maximum memory needed for a wlan_scan_cmd_config
+ *  with all TLVs at max */
 #define MAX_SCAN_CFG_ALLOC (sizeof(wlan_scan_cmd_config)        \
 				+ sizeof(MrvlIEtypes_NumProbes_t)   \
 				+ sizeof(MrvlIETypes_HTCap_t)       \
@@ -79,7 +81,8 @@ Change log:
 ********************************************************/
 
 /**
- * Interally used to send a configured scan cmd between driver routines
+ * Interally used to send a configured scan cmd between
+ * driver routines
  */
 typedef union {
     /** Scan configuration (variable length) */
@@ -607,8 +610,10 @@ wlan_scan_channel_list(IN mlan_private * pmpriv,
 		 * Construct the Channel TLV for the scan command.  Continue to
 		 * insert channel TLVs until:
 		 *   - the tlv_idx hits the maximum configured per scan command
-		 *   - the next channel to insert is 0 (end of desired channel list)
-		 *   - done_early is set (controlling individual scanning of 1,6,11)
+		 *   - the next channel to insert is 0 (end of desired
+		 *     channel list)
+		 *   - done_early is set (controlling individual
+		 *     scanning of 1,6,11)
 		 */
 		while (tlv_idx < max_chan_per_scan &&
 		       ptmp_chan_list->chan_number && !done_early) {
@@ -763,10 +768,11 @@ wlan_scan_channel_list(IN mlan_private * pmpriv,
 				sizeof(pchan_tlv_out->chan_scan_param);
 
 			/*
-			 * The tlv buffer length is set to the number of bytes of the
-			 *   between the channel tlv pointer and the start of the
-			 *   tlv buffer.  This compensates for any TLVs that were appended
-			 *   before the channel list.
+			 * The tlv buffer length is set to the number of
+			 * bytes of the between the channel tlv pointer
+			 * and the start of the tlv buffer.  This
+			 * compensates for any TLVs that were appended
+			 * before the channel list.
 			 */
 			pscan_cfg_out->tlv_buf_len =
 				(t_u32) ((t_u8 *) pchan_tlv_out -
@@ -811,7 +817,7 @@ wlan_scan_channel_list(IN mlan_private * pmpriv,
 			ptmp_chan_list++;
 
 			/* Stop the loop if the *next* channel is in the 1,6,11
-			   set.  This will cause it to be the only channel
+			   set. This will cause it to be the only channel
 			   scanned on the next interation */
 			if (!filtered_scan &&
 			    (ptmp_chan_list->chan_number == 1 ||
@@ -820,8 +826,8 @@ wlan_scan_channel_list(IN mlan_private * pmpriv,
 				done_early = MTRUE;
 			}
 
-			/* Stop the loop if the *next* channel is 14 and region
-			   code is Japan (0x40 or 0xFF) */
+			/* Stop the loop if the *next* channel is 14 * and
+			   region code is Japan (0x40 or 0xFF) */
 			if ((pmadapter->region_code == COUNTRY_CODE_JP_40 ||
 			     pmadapter->region_code == COUNTRY_CODE_JP_FF)
 			    && (ptmp_chan_list->chan_number == 14)) {
@@ -983,7 +989,8 @@ wlan_scan_setup_scan_config(IN mlan_private * pmpriv,
 			 num_probes : pmadapter->scan_probes);
 		/*
 		 * Set the BSSID filter to the incoming configuration,
-		 *   if non-zero.  If not set, it will remain disabled (all zeros).
+		 *  if non-zero.  If not set, it will remain disabled
+		 * (all zeros).
 		 */
 		memcpy(pmadapter, pscan_cfg_out->specific_bssid,
 		       puser_scan_in->specific_bssid,
@@ -1046,9 +1053,9 @@ wlan_scan_setup_scan_config(IN mlan_private * pmpriv,
 
 		/*
 		 *  The default number of channels sent in the command is low to
-		 *    ensure the response buffer from the firmware does not truncate
-		 *    scan results.  That is not an issue with an SSID or BSSID
-		 *    filter applied to the scan results in the firmware.
+		 *  ensure the response buffer from the firmware does not
+		 *  truncate scan results.  That is not an issue with an SSID or
+		 *  BSSID filter applied to the scan results in the firmware.
 		 */
 		if ((ssid_idx && ssid_filter) ||
 		    memcmp(pmadapter, pscan_cfg_out->specific_bssid, &zero_mac,
@@ -1062,8 +1069,8 @@ wlan_scan_setup_scan_config(IN mlan_private * pmpriv,
 	}
 
 	/*
-	 *  If a specific BSSID or SSID is used, the number of channels in the
-	 *  scan command will be increased to the absolute maximum.
+	 *  If a specific BSSID or SSID is used, the number of channels in
+	 *  the scan command will be increased to the absolute maximum.
 	 */
 	if (*pfiltered_scan)
 		*pmax_chan_per_scan = MRVDRV_MAX_CHANNELS_PER_SPECIFIC_SCAN;
@@ -1130,8 +1137,8 @@ wlan_scan_setup_scan_config(IN mlan_private * pmpriv,
 	/*
 	 * Set the output for the channel TLV to the address in the tlv buffer
 	 *   past any TLVs that were added in this function (SSID, num_probes).
-	 *   Channel TLVs will be added past this for each scan command, preserving
-	 *   the TLVs that were previously added.
+	 *   Channel TLVs will be added past this for each scan command,
+	 *   preserving the TLVs that were previously added.
 	 */
 	*ppchan_list_out = (MrvlIEtypes_ChanListParamSet_t *) ptlv_pos;
 
@@ -1696,9 +1703,9 @@ wlan_interpret_bss_desc_with_ie(IN pmlan_adapter pmadapter,
 				    sizeof(IEEEtypes_WmmInfo_t)) {
 
 					/*
-					 * Only accept and copy the WMM IE if it matches
-					 * the size expected for the WMM Info IE or the
-					 * WMM Parameter IE.
+					 * Only accept and copy the WMM IE if
+					 * it matches the size expected for the
+					 * WMM Info IE or the WMM Parameter IE.
 					 */
 					memcpy(pmadapter,
 					       (t_u8 *) & pbss_entry->wmm_ie,
@@ -1956,17 +1963,19 @@ wlan_ret_802_11_scan_store_beacon(IN mlan_private * pmpriv,
 			       new_bcn_size);
 
 			/*
-			 *  If the old beacon size was less than the maximum
-			 *  we had allotted for the entry, and the new entry
-			 *  is even smaller, reset the max size to the old beacon
-			 *  entry and compress the storage space (leaving a new
-			 *  pad space of (old_bcn_size - new_bcn_size).
+			 *  If the old beacon size was less than the
+			 *  maximum we had allotted for the entry, and
+			 *  the new entry is even smaller, reset the
+			 *  max size to the old beacon entry and compress
+			 *  the storage space (leaving a new pad space of
+			 *  (old_bcn_size - new_bcn_size).
 			 */
 			if (old_bcn_size < bcn_space &&
 			    new_bcn_size <= old_bcn_size) {
 				/*
-				 * Old Beacon size is smaller than the allotted storage size.
-				 *   Shrink the allotted storage space.
+				 * Old Beacon size is smaller than the
+				 * allotted storage size. Shrink the
+				 * allotted storage space.
 				 */
 				PRINTM(MINFO,
 				       "AppControl: Smaller Duplicate Beacon (%d), "
@@ -1978,10 +1987,11 @@ wlan_ret_802_11_scan_store_beacon(IN mlan_private * pmpriv,
 					 pmadapter->bcn_buf)));
 
 				/*
-				 *  memmove (since the memory overlaps) the data
-				 *  after the beacon we just stored to the end of
-				 *  the current beacon.  This cleans up any unused
-				 *  space the old larger beacon was using in the buffer
+				 * memmove (since the memory overlaps) the data
+				 * after the beacon we just stored to the end
+				 * of the current beacon.  This cleans up any
+				 * unused space the old larger beacon was using
+				 * in the buffer
 				 */
 				memmove(pmadapter,
 					(void *)((t_ptr) pbcn_store +
@@ -1994,10 +2004,10 @@ wlan_ret_802_11_scan_store_beacon(IN mlan_private * pmpriv,
 						  (t_ptr) bcn_space)));
 
 				/*
-				 * Decrement the end pointer by the difference between
-				 *  the old larger size and the new smaller size since
-				 *  we are using less space due to the new beacon being
-				 *  smaller
+				 * Decrement the end pointer by the difference
+				 * between the old larger size and the new
+				 * smaller size since we are using less space
+				 * due to the new beacon being smaller
 				 */
 				pmadapter->pbcn_buf_end -=
 					(bcn_space - old_bcn_size);
@@ -2026,9 +2036,9 @@ wlan_ret_802_11_scan_store_beacon(IN mlan_private * pmpriv,
 		} else if (pmadapter->pbcn_buf_end + (new_bcn_size - bcn_space)
 			   < (pmadapter->bcn_buf + pmadapter->bcn_buf_size)) {
 			/*
-			 * Beacon is larger than space previously allocated (bcn_space)
-			 *   and there is enough space left in the beaconBuffer to store
-			 *   the additional data
+			 * Beacon is larger than space previously allocated
+			 * (bcn_space) and there is enough space left in the
+			 * beaconBuffer to store the additional data
 			 */
 			PRINTM(MINFO,
 			       "AppControl: Larger Duplicate Beacon (%d), "
@@ -2087,8 +2097,9 @@ wlan_ret_802_11_scan_store_beacon(IN mlan_private * pmpriv,
 			}
 		} else {
 			/*
-			 * Beacon is larger than the previously allocated space, but
-			 *   there is not enough free space to store the additional data
+			 * Beacon is larger than the previously allocated
+			 * space, but there is not enough free space to
+			 * store the additional data
 			 */
 			PRINTM(MERROR,
 			       "AppControl: Failed: Larger Duplicate Beacon (%d),"
@@ -2213,9 +2224,10 @@ wlan_ret_802_11_scan_store_beacon(IN mlan_private * pmpriv,
 					     pmadapter->bcn_buf_size)) {
 
 			/*
-			 * Copy the beacon buffer data from the local entry to the
-			 *   adapter dev struct buffer space used to store the raw
-			 *   beacon data for each entry in the scan table
+			 * Copy the beacon buffer data from the local entry
+			 * to the adapter dev struct buffer space used to
+			 * store the raw beacon data for each entry in the
+			 * scan table
 			 */
 			memcpy(pmadapter, pmadapter->pbcn_buf_end,
 			       pnew_beacon->pbeacon_buf,
@@ -2254,7 +2266,8 @@ wlan_ret_802_11_scan_store_beacon(IN mlan_private * pmpriv,
 				(pmadapter->pbcn_buf_end -
 				 pmadapter->bcn_buf)));
 
-			/* Storage failure; clear storage records for this bcn */
+			/* Storage failure; clear storage records for this
+			   bcn */
 			pnew_beacon->pbeacon_buf = MNULL;
 			pnew_beacon->beacon_buf_size = 0;
 			pnew_beacon->beacon_buf_size_max = 0;
@@ -2270,14 +2283,15 @@ wlan_ret_802_11_scan_store_beacon(IN mlan_private * pmpriv,
  *
  *  @param pmpriv       A pointer to mlan_private structure
  *
- *  @return             N/A
+ *  @return             MLAN_STATUS_SUCCESS, otherwise failure
  */
-static t_void
+static mlan_status
 wlan_restore_curr_bcn(IN mlan_private * pmpriv)
 {
 	mlan_adapter *pmadapter = pmpriv->adapter;
 	mlan_callbacks *pcb = (pmlan_callbacks) & pmadapter->callbacks;
 	BSSDescriptor_t *pcurr_bss = &pmpriv->curr_bss_params.bss_descriptor;
+	mlan_status ret = MLAN_STATUS_SUCCESS;
 
 	ENTER();
 
@@ -2293,7 +2307,9 @@ wlan_restore_curr_bcn(IN mlan_private * pmpriv)
 		       pmpriv->pcurr_bcn_buf, pmpriv->curr_bcn_size);
 		pcurr_bss->pbeacon_buf = pmadapter->pbcn_buf_end;
 		pcurr_bss->beacon_buf_size = pmpriv->curr_bcn_size;
-		pmadapter->pbcn_buf_end += pmpriv->curr_bcn_size;
+		pcurr_bss->beacon_buf_size_max =
+			pmpriv->curr_bcn_size + SCAN_BEACON_ENTRY_PAD;
+		pmadapter->pbcn_buf_end += pcurr_bss->beacon_buf_size_max;
 
 		/* adjust the pointers in the current bss descriptor */
 		if (pcurr_bss->pwpa_ie) {
@@ -2343,11 +2359,13 @@ wlan_restore_curr_bcn(IN mlan_private * pmpriv)
 		PRINTM(MINFO, "current beacon restored %d\n",
 		       pmpriv->curr_bcn_size);
 	} else {
-		PRINTM(MWARN,
+		PRINTM(MERROR,
 		       "curr_bcn_buf not saved or bcn_buf has no space\n");
+		ret = MLAN_STATUS_FAILURE;
 	}
 
 	LEAVE();
+	return ret;
 }
 
 /**
@@ -2370,6 +2388,7 @@ wlan_scan_process_results(IN mlan_private * pmpriv)
 	mlan_adapter *pmadapter = pmpriv->adapter;
 	t_s32 j;
 	t_u32 i;
+	mlan_status ret = MLAN_STATUS_SUCCESS;
 
 	ENTER();
 
@@ -2432,8 +2451,22 @@ wlan_scan_process_results(IN mlan_private * pmpriv)
 							      pmpriv->
 							      curr_bcn_buf_lock);
 		} else {
-			wlan_restore_curr_bcn(pmpriv);
+			ret = wlan_restore_curr_bcn(pmpriv);
+	    /** append current AP to the end of scan table when restore curr_bcn success */
+			if (ret == MLAN_STATUS_SUCCESS) {
+				if (pmadapter->num_in_scan_table <
+				    MRVDRV_MAX_BSSID_LIST)
+					pmadapter->num_in_scan_table++;
+				memcpy(pmadapter,
+				       &pmadapter->pscan_table[pmadapter->
+							       num_in_scan_table
+							       - 1],
+				       &pmpriv->curr_bss_params.bss_descriptor,
+				       sizeof(pmpriv->curr_bss_params.
+					      bss_descriptor));
+			}
 		}
+
 	}
 
 	for (i = 0; i < pmadapter->num_in_scan_table; i++)
@@ -2495,8 +2528,8 @@ wlan_scan_delete_table_entry(IN mlan_private * pmpriv, IN t_s32 table_idx)
 		pbeacon_buf = pmadapter->pscan_table[table_idx].pbeacon_buf;
 
 		/*
-		 * Remove the entry's buffer space, decrement the table end pointer
-		 *   by the amount we are removing
+		 * Remove the entry's buffer space, decrement the table
+		 * end pointer by the amount we are removing
 		 */
 		pmadapter->pbcn_buf_end -= beacon_buf_adj;
 
@@ -2661,8 +2694,8 @@ wlan_scan_delete_ssid_table_entry(IN mlan_private * pmpriv,
 	PRINTM(MINFO, "Scan: Delete Ssid Entry: %-32s\n", pdel_ssid->ssid);
 
 	/* If the requested SSID is found in the table, delete it.  Then keep
-	   searching the table for multiple entries for the SSID until no more
-	   are found */
+	   searching the table for multiple entries for the SSID until no
+	   more are found */
 	while ((table_idx = wlan_find_ssid_in_list(pmpriv,
 						   pdel_ssid,
 						   MNULL,
@@ -2804,8 +2837,8 @@ wlan_is_network_compatible(IN mlan_private * pmpriv,
 			pbss_desc->disable_11n = MTRUE;
 			/* Reject the following cases: */
 			/* case 1: RSN IE w/o WEP OUI and WPA IE w/o WEP OUI
-			   case 2: RSN IE w/o WEP OUI and No WPA IE case 3: WPA
-			   IE w/o WEP OUI and No RSN IE * */
+			   case 2: RSN IE w/o WEP OUI and No WPA IE
+			   case 3: WPA IE w/o WEP OUI and No RSN IE */
 			if (((pbss_desc->prsn_ie) &&
 			     ((*(pbss_desc->prsn_ie)).ieee_hdr.element_id ==
 			      RSN_IE)) || ((pbss_desc->pwpa_ie) &&
@@ -2836,8 +2869,8 @@ wlan_is_network_compatible(IN mlan_private * pmpriv,
 				WPA_IE))
 			   && !pmpriv->adhoc_aes_enabled
 			   /*
-			    * Privacy bit may NOT be set in some APs like LinkSys WRT54G
-			    * && pbss_desc->privacy
+			    * Privacy bit may NOT be set in some APs like
+			    * LinkSys WRT54G && pbss_desc->privacy
 			    */
 			) {
 			/* WPA enabled */
@@ -2882,8 +2915,8 @@ wlan_is_network_compatible(IN mlan_private * pmpriv,
 				RSN_IE))
 			   && !pmpriv->adhoc_aes_enabled
 			   /*
-			    * Privacy bit may NOT be set in some APs like LinkSys WRT54G
-			    * && pbss_desc->privacy
+			    * Privacy bit may NOT be set in some APs like
+			    * LinkSys WRT54G && pbss_desc->privacy
 			    */
 			) {
 			/* WPA2 enabled */
@@ -3109,6 +3142,21 @@ wlan_scan_networks(IN mlan_private * pmpriv,
 		       sizeof(BSSDescriptor_t) * MRVDRV_MAX_BSSID_LIST);
 		pmadapter->num_in_scan_table = 0;
 		pmadapter->pbcn_buf_end = pmadapter->bcn_buf;
+	/** appened current AP at the beginning of scantable to avoid no beacon buffer */
+		if (pmpriv->media_connected == MTRUE) {
+			ret = wlan_restore_curr_bcn(pmpriv);
+	    /** append current AP to scan table */
+			if (ret == MLAN_STATUS_SUCCESS) {
+				pmadapter->num_in_scan_table++;
+				memcpy(pmadapter,
+				       &pmadapter->pscan_table[pmadapter->
+							       num_in_scan_table
+							       - 1],
+				       &pmpriv->curr_bss_params.bss_descriptor,
+				       sizeof(pmpriv->curr_bss_params.
+					      bss_descriptor));
+			}
+		}
 	}
 
 	ret = wlan_scan_channel_list(pmpriv,
@@ -3303,14 +3351,16 @@ wlan_ret_802_11_scan(IN mlan_private * pmpriv,
 	ptlv = (MrvlIEtypes_Data_t *) (pscan_rsp->bss_desc_and_tlv_buffer +
 				       bytes_left);
 
-	/* Search the TLV buffer space in the scan response for any valid TLVs */
+	/* Search the TLV buffer space in the scan response for any valid
+	   TLVs */
 	wlan_ret_802_11_scan_get_tlv_ptrs(pmadapter,
 					  ptlv,
 					  tlv_buf_size,
 					  TLV_TYPE_TSFTIMESTAMP,
 					  (MrvlIEtypes_Data_t **) & ptsf_tlv);
 
-	/* Search the TLV buffer space in the scan response for any valid TLVs */
+	/* Search the TLV buffer space in the scan response for any valid
+	   TLVs */
 	wlan_ret_802_11_scan_get_tlv_ptrs(pmadapter,
 					  ptlv,
 					  tlv_buf_size,
@@ -3319,10 +3369,10 @@ wlan_ret_802_11_scan(IN mlan_private * pmpriv,
 					  pchan_band_tlv);
 
 	/*
-	 *  Process each scan response returned (pscan_rsp->number_of_sets).  Save
-	 *    the information in the bss_new_entry and then insert into the
-	 *    driver scan table either as an update to an existing entry
-	 *    or as an addition at the end of the table
+	 * Process each scan response returned (pscan_rsp->number_of_sets).
+	 * Save the information in the bss_new_entry and then insert into
+	 * the driver scan table either as an update to an existing entry
+	 * or as an addition at the end of the table
 	 */
 	ret = pcb->moal_malloc(pmadapter->pmoal_handle, sizeof(BSSDescriptor_t),
 			       MLAN_MEM_DEF, (t_u8 **) & bss_new_entry);
@@ -3361,8 +3411,8 @@ wlan_ret_802_11_scan(IN mlan_private * pmpriv,
 					bss_new_entry->channel =
 						pchan_band->chan_number;
 			}
-			/* Save the band designation for this entry for use in
-			   join */
+			/* Save the band designation for this entry for use
+			   in join */
 			bss_new_entry->bss_band = band;
 
 			cfp = wlan_find_cfp_by_band_and_channel(pmadapter,
@@ -3394,9 +3444,10 @@ wlan_ret_802_11_scan(IN mlan_private * pmpriv,
 				     mac_address,
 				     sizeof(bss_new_entry->mac_address))) {
 					/*
-					 * If the SSID matches as well, it is a duplicate of
-					 *   this entry.  Keep the bss_idx set to this
-					 *   entry so we replace the old contents in the table
+					 * If the SSID matches as well, it is a
+					 * duplicate of this entry.  Keep the
+					 * bss_idx set to this entry so we
+					 * replace the old contents in the table
 					 */
 					if ((bss_new_entry->ssid.ssid_len ==
 					     pmadapter->pscan_table[bss_idx].
@@ -3415,8 +3466,10 @@ wlan_ret_802_11_scan(IN mlan_private * pmpriv,
 						break;
 					}
 					/*
-					 * If the SSID is NULL for same BSSID keep the bss_idx set
-					 * to this entry so we replace the old contents in the table
+					 * If the SSID is NULL for same BSSID
+					 * keep the bss_idx set to this entry
+					 * so we replace the old contents in
+					 * the table
 					 */
 					if (!memcmp
 					    (pmadapter,
@@ -3432,13 +3485,13 @@ wlan_ret_802_11_scan(IN mlan_private * pmpriv,
 				}
 			}
 			/*
-			 * If the bss_idx is equal to the number of entries in the table,
-			 *   the new entry was not a duplicate; append it to the scan
-			 *   table
+			 * If the bss_idx is equal to the number of entries
+			 * in the table, the new entry was not a duplicate;
+			 * append it to the scan table
 			 */
 			if (bss_idx == num_in_table) {
-				/* Range check the bss_idx, keep it limited to
-				   the last entry */
+				/* Range check the bss_idx, keep it limited
+				   to the last entry */
 				if (bss_idx == MRVDRV_MAX_BSSID_LIST)
 					bss_idx--;
 				else
@@ -3446,9 +3499,9 @@ wlan_ret_802_11_scan(IN mlan_private * pmpriv,
 			}
 
 			/*
-			 * Save the beacon/probe response returned for later application
-			 *   retrieval.  Duplicate beacon/probe responses are updated if
-			 *   possible
+			 * Save the beacon/probe response returned for later
+			 * application retrieval. Duplicate beacon/probe
+			 * responses are updated if possible
 			 */
 			wlan_ret_802_11_scan_store_beacon(pmpriv,
 							  bss_idx,
@@ -3462,9 +3515,9 @@ wlan_ret_802_11_scan(IN mlan_private * pmpriv,
 			}
 			/*
 			 * If the TSF TLV was appended to the scan results, save
-			 *   this entry's TSF value in the networkTSF field.  The
-			 *   networkTSF is the firmware's TSF value at the time the
-			 *   beacon or probe response was received.
+			 * this entry's TSF value in the networkTSF field.  The
+			 * networkTSF is the firmware's TSF value at the time
+			 * the beacon or probe response was received.
 			 */
 			if (ptsf_tlv) {
 				memcpy(pmpriv->adapter, &tsf_val,
@@ -3632,7 +3685,6 @@ wlan_ret_802_11_scan_ext(IN mlan_private * pmpriv,
 	ENTER();
 
 	PRINTM(MINFO, "EXT scan returns successfully\n");
-
 	LEAVE();
 	return MLAN_STATUS_SUCCESS;
 }
@@ -3718,8 +3770,8 @@ wlan_parse_ext_scan_result(IN mlan_private * pmpriv,
 		pscan_rsp_tlv = MNULL;
 		pscan_info_tlv = MNULL;
 		bytes_left_for_tlv = bytes_left;
-		/* BSS response TLV with beacon or probe response buffer at the
-		   initial position of each descriptor */
+		/* BSS response TLV with beacon or probe response buffer at
+		   the initial position of each descriptor */
 		if (tlv_type == TLV_TYPE_BSS_SCAN_RSP) {
 			pbss_info = (t_u8 *) ptlv;
 			pscan_rsp_tlv = (MrvlIEtypes_Bss_Scan_Rsp_t *) ptlv;
@@ -3769,8 +3821,8 @@ wlan_parse_ext_scan_result(IN mlan_private * pmpriv,
 
 		/* Advance pointer to the beacon buffer length and update the
 		   bytes count so that the function
-		   wlan_interpret_bss_desc_with_ie() can handle the scan buffer
-		   withut any change */
+		   wlan_interpret_bss_desc_with_ie() can handle the scan
+		   buffer withut any change */
 		pbss_info += sizeof(t_u16);
 		bytes_left -= sizeof(t_u16);
 
@@ -3789,10 +3841,10 @@ wlan_parse_ext_scan_result(IN mlan_private * pmpriv,
 
 			band = BAND_G;
 			/*
-			 * If the BSS info TLV was appended to the scan results, save
-			 *   this entry's TSF value in the networkTSF field. The
-			 *   networkTSF is the firmware's TSF value at the time the
-			 *   beacon or probe response was received.
+			 * If the BSS info TLV was appended to the scan results,
+			 * save this entry's TSF value in the networkTSF field.
+			 * The networkTSF is the firmware's TSF value at the
+			 * time the beacon or probe response was received.
 			 */
 			if (pscan_info_tlv) {
 				/* RSSI is 2 byte long */
@@ -3842,9 +3894,10 @@ wlan_parse_ext_scan_result(IN mlan_private * pmpriv,
 				     mac_address,
 				     sizeof(bss_new_entry->mac_address))) {
 					/*
-					 * If the SSID matches as well, it is a duplicate of
-					 *   this entry.  Keep the bss_idx set to this
-					 *   entry so we replace the old contents in the table
+					 * If the SSID matches as well, it is a
+					 * duplicate of this entry.  Keep the
+					 * bss_idx set to this entry so we
+					 * replace the old contents in the table
 					 */
 					if ((bss_new_entry->ssid.ssid_len ==
 					     pmadapter->pscan_table[bss_idx].
@@ -3862,8 +3915,10 @@ wlan_parse_ext_scan_result(IN mlan_private * pmpriv,
 						break;
 					}
 					/*
-					 * If the SSID is NULL for same BSSID keep the bss_idx set
-					 * to this entry so we replace the old contents in the table
+					 * If the SSID is NULL for same BSSID
+					 * keep the bss_idx set to this entry
+					 * so we replace the old contents in
+					 * the table
 					 */
 					if (!memcmp
 					    (pmadapter,
@@ -3879,9 +3934,9 @@ wlan_parse_ext_scan_result(IN mlan_private * pmpriv,
 				}
 			}
 			/*
-			 * If the bss_idx is equal to the number of entries in the table,
-			 *   the new entry was not a duplicate; append it to the scan
-			 *   table
+			 * If the bss_idx is equal to the number of entries
+			 * in the table, the new entry was not a duplicate;
+			 * append it to the scan table
 			 */
 			if (bss_idx == num_in_table) {
 				/* Range check the bss_idx, keep it limited to
@@ -3893,9 +3948,9 @@ wlan_parse_ext_scan_result(IN mlan_private * pmpriv,
 			}
 
 			/*
-			 * Save the beacon/probe response returned for later application
-			 *   retrieval. Duplicate beacon/probe responses are updated if
-			 *   possible
+			 * Save the beacon/probe response returned for later
+			 * application retrieval. Duplicate beacon/probe
+			 * responses are updated if possible
 			 */
 			wlan_ret_802_11_scan_store_beacon(pmpriv,
 							  bss_idx,
@@ -4279,10 +4334,6 @@ wlan_cmd_bgscan_config(IN mlan_private * pmpriv,
 	bg_scan->enable = bg_scan_in->enable;
 	bg_scan->bss_type = bg_scan_in->bss_type;
 	cmd_size = sizeof(HostCmd_DS_802_11_BG_SCAN_CONFIG) + S_DS_GEN;
-	if (bg_scan_in->chan_per_scan)
-		bg_scan->chan_per_scan = bg_scan_in->chan_per_scan;
-	else
-		bg_scan->chan_per_scan = MRVDRV_MAX_CHANNELS_PER_SPECIFIC_SCAN;
 	if (bg_scan_in->scan_interval)
 		bg_scan->scan_interval =
 			wlan_cpu_to_le32(bg_scan_in->scan_interval);
@@ -4461,6 +4512,15 @@ wlan_cmd_bgscan_config(IN mlan_private * pmpriv,
 			sizeof(MrvlIEtypesHeader_t) +
 			sizeof(ChanScanParamSet_t) * chan_num;
 	}
+	if (bg_scan_in->chan_per_scan) {
+		bg_scan->chan_per_scan = bg_scan_in->chan_per_scan;
+	} else {
+		if (bg_scan_in->report_condition & BG_SCAN_WAIT_ALL_CHAN_DONE)
+			bg_scan->chan_per_scan = chan_num;
+		else
+			bg_scan->chan_per_scan =
+				MRVDRV_MAX_CHANNELS_PER_SPECIFIC_SCAN;
+	}
 
 	tlv_start_later = (MrvlIEtypes_StartLater_t *) tlv;
 	tlv_start_later->header.type =
@@ -4543,6 +4603,7 @@ wlan_ret_802_11_bgscan_query(IN mlan_private * pmpriv,
 		pscan->param.scan_resp.num_in_scan_table =
 			pmadapter->num_in_scan_table;
 		pscan->param.scan_resp.age_in_secs = pmadapter->age_in_secs;
+
 		pioctl_buf->data_read_written = sizeof(mlan_scan_resp) +
 			MLAN_SUB_COMMAND_SIZE;
 
@@ -4827,7 +4888,6 @@ wlan_scan_specific_ssid(IN mlan_private * pmpriv,
 		ret = MLAN_STATUS_FAILURE;
 		goto done;
 	}
-
 	wlan_scan_delete_ssid_table_entry(pmpriv, preq_ssid);
 
 	ret = pcb->moal_malloc(pmpriv->adapter->pmoal_handle,

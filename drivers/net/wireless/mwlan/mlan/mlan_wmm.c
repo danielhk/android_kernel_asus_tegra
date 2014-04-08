@@ -2,7 +2,7 @@
  *
  *  @brief This file contains functions for WMM.
  *
- *  Copyright (C) 2008-2013, Marvell International Ltd.
+ *  Copyright (C) 2008-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -322,10 +322,10 @@ wlan_wmm_eval_downgrade_ac(pmlan_private priv, mlan_wmm_ac_e eval_ac)
 	ret_ac = WMM_AC_BK;
 
 	/*
-	 *  Find the highest AC that is enabled and does not require admission
-	 *    control.  The spec disallows downgrading to an AC, which is enabled
-	 *    due to a completed admission control.  Unadmitted traffic is not
-	 *    to be sent on an AC with admitted traffic.
+	 * Find the highest AC that is enabled and does not require admission
+	 * control.  The spec disallows downgrading to an AC, which is enabled
+	 * due to a completed admission control.  Unadmitted traffic is not
+	 * to be sent on an AC with admitted traffic.
 	 */
 	for (down_ac = WMM_AC_BK; down_ac < eval_ac; down_ac++) {
 		pac_status = &priv->wmm.ac_status[down_ac];
@@ -367,7 +367,7 @@ wlan_wmm_convert_tos_to_ac(pmlan_adapter pmadapter, t_u32 tos)
  *  @brief  Evaluate a given TID and downgrade it to a lower TID if the
  *          WMM Parameter IE received from the AP indicates that the AP
  *          is disabled (due to call admission control (ACM bit). Mapping
- * 	        of TID to AC is taken care internally
+ *          of TID to AC is taken care internally
  *
  *  @param priv		Pointer to the mlan_private data struct
  *  @param tid      tid to evaluate for downgrading
@@ -789,7 +789,7 @@ wlan_wmm_get_highest_priolist_ptr(pmlan_adapter pmadapter,
 						  HIGH_PRIO_TID, MNULL, MNULL);
 			else
 				/* No packet at any TID for this priv.  Mark as
-				   such to skip * checking TIDs for this priv
+				   such to skip checking TIDs for this priv
 				   (until pkt is added). */
 				util_scalar_write(pmadapter->pmoal_handle,
 						  &priv_tmp->wmm.
@@ -1786,8 +1786,13 @@ wlan_wmm_init(pmlan_adapter pmadapter)
 		priv = pmadapter->priv[j];
 		if (priv) {
 			for (i = 0; i < MAX_NUM_TID; ++i) {
-				priv->aggr_prio_tbl[i].amsdu =
-					BA_STREAM_NOT_ALLOWED;
+				if (pmadapter->max_tx_buf_size >
+				    MLAN_TX_DATA_BUF_SIZE_2K)
+					priv->aggr_prio_tbl[i].amsdu =
+						tos_to_tid_inv[i];
+				else
+					priv->aggr_prio_tbl[i].amsdu =
+						BA_STREAM_NOT_ALLOWED;
 				priv->aggr_prio_tbl[i].ampdu_ap =
 					priv->aggr_prio_tbl[i].ampdu_user =
 					tos_to_tid_inv[i];
@@ -1797,6 +1802,8 @@ wlan_wmm_init(pmlan_adapter pmadapter)
 			}
 			priv->wmm.drv_pkt_delay_max = WMM_DRV_DELAY_MAX;
 
+			priv->aggr_prio_tbl[6].amsdu = BA_STREAM_NOT_ALLOWED;
+			priv->aggr_prio_tbl[7].amsdu = BA_STREAM_NOT_ALLOWED;
 			priv->aggr_prio_tbl[6].ampdu_ap
 				= priv->aggr_prio_tbl[6].ampdu_user =
 				BA_STREAM_NOT_ALLOWED;

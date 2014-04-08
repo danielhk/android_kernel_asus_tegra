@@ -2,7 +2,7 @@
  *
  * @brief This file contains definition for private IOCTL call.
  *
- * Copyright (C) 2013, Marvell International Ltd.
+ * Copyright (C) 2014, Marvell International Ltd.
  *
  * This software file (the "File") is distributed by Marvell International
  * Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -31,11 +31,11 @@ Change log:
 #define _WOAL_ETH_PRIV_H_
 
 /** Command disabled */
-#define	CMD_DISABLED                    0
+#define CMD_DISABLED                    0
 /** Command enabled */
-#define	CMD_ENABLED                     1
+#define CMD_ENABLED                     1
 /** Command get */
-#define	CMD_GET                         2
+#define CMD_GET                         2
 
 /** 2K bytes */
 #define WOAL_2K_BYTES       2000
@@ -84,7 +84,7 @@ Change log:
 #ifdef STA_SUPPORT
 #define PRIV_CMD_GETSCANTABLE   "getscantable"
 #define PRIV_CMD_SETUSERSCAN    "setuserscan"
-#define PRIV_CMD_EXTCAPCFG		"extcapcfg"
+#define PRIV_CMD_EXTCAPCFG      "extcapcfg"
 #endif
 #define PRIV_CMD_DEEPSLEEP      "deepsleep"
 #define PRIV_CMD_IPADDR         "ipaddr"
@@ -140,7 +140,7 @@ Change log:
 #define PRIV_CMD_OFFCHANNEL     "offchannel"
 #endif
 /** Private command: Verext */
-#define PRIV_CMD_VEREXT    	    "verext"
+#define PRIV_CMD_VEREXT         "verext"
 #define PRIV_CMD_WMM_CFG        "wmmcfg"
 #if defined(STA_SUPPORT)
 #define PRIV_CMD_11D_CFG        "11dcfg"
@@ -184,15 +184,21 @@ Change log:
 #define PRIV_CMD_TX_BF_CFG      "httxbfcfg"
 #define PRIV_CMD_PORT_CTRL      "port_ctrl"
 #define PRIV_CMD_PB_BYPASS      "pb_bypass"
+#define PRIV_CMD_COALESCE_STATUS    "coalesce_status"
 #define PRIV_CMD_SD_CMD53_RW        "sdcmd53rw"
 #if defined(WIFI_DIRECT_SUPPORT)
 #endif
+#ifdef WIFI_DIRECT_SUPPORT
+#if defined(STA_CFG80211) || defined(UAP_CFG80211)
+#endif
+#endif
+#define PRIV_CMD_COEX_RX_WINSIZE    "coex_rx_winsize"
 
 /** Private command ID for Android default commands */
-#define	WOAL_ANDROID_DEF_CMD        (SIOCDEVPRIVATE + 1)
+#define WOAL_ANDROID_DEF_CMD        (SIOCDEVPRIVATE + 1)
 
 /** Private command ID to send TLD configuration */
-#define	WOAL_TDLS_CONFIG            (SIOCDEVPRIVATE + 5)
+#define WOAL_TDLS_CONFIG            (SIOCDEVPRIVATE + 5)
 
 /** Private command ID to pass mgmt frame */
 #define WOAL_MGMT_FRAME_TX          WOAL_MGMT_FRAME_TX_IOCTL
@@ -201,7 +207,7 @@ Change log:
 #define WOAL_CUSTOM_IE_CFG          (SIOCDEVPRIVATE + 13)
 
 /** Private command ID for Android ICS priv CMDs */
-#define	WOAL_ANDROID_PRIV_CMD       (SIOCDEVPRIVATE + 14)
+#define WOAL_ANDROID_PRIV_CMD       (SIOCDEVPRIVATE + 14)
 
 /** Private command ID to get BSS type */
 #define WOAL_GET_BSS_TYPE           (SIOCDEVPRIVATE + 15)

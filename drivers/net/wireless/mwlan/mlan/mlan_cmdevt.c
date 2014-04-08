@@ -3,7 +3,7 @@
  *
  *  @brief This file contains the handling of CMD/EVENT in MLAN
  *
- *  Copyright (C) 2009-2013, Marvell International Ltd.
+ *  Copyright (C) 2009-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -92,7 +92,7 @@ wlan_dump_pending_commands(pmlan_adapter pmadapter)
 	HostCmd_DS_COMMAND *pcmd;
 
 	ENTER();
-
+	wlan_request_cmd_lock(pmadapter);
 	pcmd_node =
 		(cmd_ctrl_node *) util_peek_list(pmadapter->pmoal_handle,
 						 &pmadapter->cmd_pending_q,
@@ -101,6 +101,7 @@ wlan_dump_pending_commands(pmlan_adapter pmadapter)
 						 pmadapter->callbacks.
 						 moal_spin_unlock);
 	if (!pcmd_node) {
+		wlan_release_cmd_lock(pmadapter);
 		LEAVE();
 		return;
 	}
@@ -111,6 +112,7 @@ wlan_dump_pending_commands(pmlan_adapter pmadapter)
 		       wlan_le16_to_cpu(pcmd->command), pcmd_node->pioctl_buf);
 		pcmd_node = pcmd_node->pnext;
 	}
+	wlan_release_cmd_lock(pmadapter);
 #ifdef STA_SUPPORT
 	wlan_check_scan_queue(pmadapter);
 #endif
@@ -153,6 +155,10 @@ wlan_dump_info(mlan_adapter * pmadapter, t_u8 reason)
 		break;
 	default:
 		break;
+	}
+	if (pmadapter->dbg.num_no_cmd_node > 1) {
+		LEAVE();
+		return;
 	}
 	wlan_dump_pending_commands(pmadapter);
 	if (reason != REASON_CODE_CMD_TIMEOUT) {
@@ -1111,9 +1117,8 @@ wlan_process_event(pmlan_adapter pmadapter)
 
 	pmadapter->event_cause = 0;
 	pmadapter->pmlan_buffer_event = MNULL;
-	if (pmbuf) {
+	if (pmbuf)
 		wlan_free_mlan_buffer(pmadapter, pmbuf);
-	}
 
 	LEAVE();
 	return ret;
@@ -1652,15 +1657,9 @@ wlan_process_cmdresp(mlan_adapter * pmadapter)
 	    (pmadapter->last_init_cmd == cmdresp_no)) {
 		i = pmpriv->bss_index + 1;
 		while (i < pmadapter->priv_num &&
-		       !(pmpriv_next = pmadapter->priv[i]))
+		       (!(pmpriv_next = pmadapter->priv[i])
+			|| pmpriv_next->bss_virtual))
 			i++;
-		if (pmpriv_next && pmpriv_next->bss_virtual) {
-			i = pmpriv_next->bss_index + 1;
-	    /** skip virtual interface */
-			while (i < pmadapter->priv_num &&
-			       !(pmpriv_next = pmadapter->priv[i]))
-				i++;
-		}
 		if (!pmpriv_next || i >= pmadapter->priv_num) {
 #if defined(STA_SUPPORT)
 			if (pmadapter->pwarm_reset_ioctl_req) {
@@ -2989,7 +2988,7 @@ wlan_ret_tx_rate_cfg(IN pmlan_private pmpriv,
 
 /**
  *  @brief  This function issues adapter specific commands
- *  		to initialize firmware
+ *          to initialize firmware
  *
  *  @param pmadapter    A pointer to mlan_adapter structure
  *
@@ -3284,6 +3283,11 @@ wlan_ret_get_hw_spec(IN pmlan_private pmpriv,
 	ENTER();
 
 	pmadapter->fw_cap_info = wlan_le32_to_cpu(hw_spec->fw_cap_info);
+	pmadapter->fw_cap_info &= pmadapter->init_para.dev_cap_mask;
+
+	PRINTM(MMSG, "fw_cap_info=0x%x, dev_cap_mask=0x%x\n",
+	       wlan_le32_to_cpu(hw_spec->fw_cap_info),
+	       pmadapter->init_para.dev_cap_mask);
 #ifdef STA_SUPPORT
 	if (IS_SUPPORT_MULTI_BANDS(pmadapter))
 		pmadapter->fw_bands = (t_u8) GET_FW_DEFAULT_BANDS(pmadapter);
@@ -3354,6 +3358,14 @@ wlan_ret_get_hw_spec(IN pmlan_private pmpriv,
 		hw_spec->dev_mcs_support;
 	wlan_show_dot11ndevcap(pmadapter, pmadapter->hw_dot_11n_dev_cap);
 	wlan_show_devmcssupport(pmadapter, pmadapter->hw_dev_mcs_support);
+	if (ISSUPP_BEAMFORMING(pmadapter->hw_dot_11n_dev_cap)) {
+		PRINTM(MCMND, "Enable Beamforming\n");
+		for (i = 0; i < pmadapter->priv_num; i++) {
+			if (pmadapter->priv[i])
+				pmadapter->priv[i]->tx_bf_cap =
+					DEFAULT_11N_TX_BF_CAP;
+		}
+	}
 	pmadapter->mp_end_port = wlan_le16_to_cpu(hw_spec->mp_end_port);
 
 	for (i = 1; i <= (unsigned)(MAX_PORT - pmadapter->mp_end_port); i++)
@@ -3980,6 +3992,23 @@ wlan_cmd_reg_access(IN HostCmd_DS_COMMAND * cmd,
 			cau_reg->value = (t_u8) reg_rw->value;
 			break;
 		}
+	case HostCmd_CMD_TARGET_ACCESS:
+		{
+			HostCmd_DS_TARGET_ACCESS *target;
+			cmd->size =
+				wlan_cpu_to_le16(sizeof
+						 (HostCmd_DS_TARGET_ACCESS) +
+						 S_DS_GEN);
+			target = (HostCmd_DS_TARGET_ACCESS *) & cmd->params.
+				target;
+			target->action = wlan_cpu_to_le16(cmd_action);
+			target->csu_target =
+				wlan_cpu_to_le16(MLAN_CSU_TARGET_PSU);
+			target->address =
+				wlan_cpu_to_le16((t_u16) reg_rw->offset);
+			target->data = (t_u8) reg_rw->value;
+			break;
+		}
 	case HostCmd_CMD_802_11_EEPROM_ACCESS:
 		{
 			mlan_ds_read_eeprom *rd_eeprom =
@@ -4073,6 +4102,16 @@ wlan_ret_reg_access(mlan_adapter * pmadapter,
 				reg_rw->offset =
 					(t_u32) wlan_le16_to_cpu(reg->offset);
 				reg_rw->value = (t_u32) reg->value;
+				break;
+			}
+		case HostCmd_CMD_TARGET_ACCESS:
+			{
+				HostCmd_DS_TARGET_ACCESS *reg;
+				reg = (HostCmd_DS_TARGET_ACCESS *) & resp->
+					params.target;
+				reg_rw->offset =
+					(t_u32) wlan_le16_to_cpu(reg->address);
+				reg_rw->value = (t_u32) reg->data;
 				break;
 			}
 		case HostCmd_CMD_802_11_EEPROM_ACCESS:

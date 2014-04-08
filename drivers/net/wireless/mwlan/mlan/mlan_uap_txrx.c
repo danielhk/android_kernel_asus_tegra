@@ -2,7 +2,7 @@
  *
  *  @brief This file contains AP mode transmit and receive functions
  *
- *  Copyright (C) 2009-2013, Marvell International Ltd.
+ *  Copyright (C) 2009-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -35,7 +35,6 @@ Change log:
 #include "mlan_wmm.h"
 #include "mlan_11n_aggr.h"
 #include "mlan_11n_rxreorder.h"
-
 /********************************************************
 			Local Functions
 ********************************************************/

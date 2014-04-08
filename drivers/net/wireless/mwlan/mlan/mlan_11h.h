@@ -3,7 +3,7 @@
  *  @brief This header file contains data structures and
  *  function declarations of 802.11h
  *
- *  Copyright (C) 2008-2013, Marvell International Ltd.
+ *  Copyright (C) 2008-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -94,7 +94,7 @@ extern t_bool wlan_11h_radar_detect_required(mlan_private * priv, t_u8 channel);
 /** Perform a standard availibility check on the specified channel */
 extern t_s32 wlan_11h_issue_radar_detect(mlan_private * priv,
 					 pmlan_ioctl_req pioctl_req,
-					 t_u8 channel);
+					 t_u8 channel, t_u8 chan_width);
 
 /** Check previously issued radar report for a channel */
 extern mlan_status wlan_11h_check_chan_report(mlan_private * priv, t_u8 chan);
@@ -154,7 +154,6 @@ extern mlan_status wlan_11h_radar_detected_callback(t_void * priv);
 
 /** Handler for RADAR_DETECTED */
 extern mlan_status wlan_11h_radar_detected_handling(mlan_adapter * pmadapter);
-
 /** DFS Event pre-processing */
 extern mlan_status wlan_11h_dfs_event_preprocessing(mlan_adapter * pmadapter);
 

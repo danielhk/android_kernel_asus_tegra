@@ -2,7 +2,7 @@
   *
   * @brief This file contains wireless extension standard ioctl functions
   *
-  * Copyright (C) 2008-2013, Marvell International Ltd.
+  * Copyright (C) 2008-2014, Marvell International Ltd.
   *
   * This software file (the "File") is distributed by Marvell International
   * Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -28,15 +28,15 @@ Change log:
 
 #ifdef STA_SUPPORT
 /** Approximate amount of data needed to pass a scan result back to iwlist */
-#define MAX_SCAN_CELL_SIZE  (IW_EV_ADDR_LEN             \
-							+ MLAN_MAX_SSID_LENGTH      \
-							+ IW_EV_UINT_LEN            \
-							+ IW_EV_FREQ_LEN            \
-							+ IW_EV_QUAL_LEN            \
-							+ MLAN_MAX_SSID_LENGTH      \
-							+ IW_EV_PARAM_LEN           \
-							+ 40)	/* 40 for WPAIE
-								 */
+#define MAX_SCAN_CELL_SIZE  \
+	(IW_EV_ADDR_LEN             \
+	+ MLAN_MAX_SSID_LENGTH      \
+	+ IW_EV_UINT_LEN            \
+	+ IW_EV_FREQ_LEN            \
+	+ IW_EV_QUAL_LEN            \
+	+ MLAN_MAX_SSID_LENGTH      \
+	+ IW_EV_PARAM_LEN           \
+	+ 40)			/* 40 for WPAIE */
 /** Macro for minimum size of scan buffer */
 #define MIN_ACCEPTED_GET_SCAN_BUF 8000
 
@@ -448,9 +448,12 @@ woal_set_wap(struct net_device *dev, struct iw_request_info *info,
 	     struct sockaddr *awrq, char *extra)
 {
 	int ret = 0;
-	const t_u8 bcast[MLAN_MAC_ADDR_LENGTH] =
-		{ 255, 255, 255, 255, 255, 255 };
-	const t_u8 zero_mac[MLAN_MAC_ADDR_LENGTH] = { 0, 0, 0, 0, 0, 0 };
+	const t_u8 bcast[MLAN_MAC_ADDR_LENGTH] = {
+		255, 255, 255, 255, 255, 255
+	};
+	const t_u8 zero_mac[MLAN_MAC_ADDR_LENGTH] = {
+		0, 0, 0, 0, 0, 0
+	};
 	moal_private *priv = (moal_private *) netdev_priv(dev);
 	mlan_ssid_bssid ssid_bssid;
 	mlan_bss_info bss_info;
@@ -1773,10 +1776,12 @@ woal_get_range(struct net_device *dev, struct iw_request_info *info,
 	moal_802_11_rates rates;
 	mlan_chan_list *pchan_list = NULL;
 	mlan_bss_info bss_info;
+	gfp_t flag;
 
 	ENTER();
 
-	pchan_list = kmalloc(sizeof(mlan_chan_list), GFP_KERNEL);
+	flag = (in_atomic() || irqs_disabled())? GFP_ATOMIC : GFP_KERNEL;
+	pchan_list = kzalloc(sizeof(mlan_chan_list), flag);
 	if (!pchan_list) {
 		LEAVE();
 		return -ENOMEM;
@@ -1802,8 +1807,6 @@ woal_get_range(struct net_device *dev, struct iw_request_info *info,
 	       range->num_bitrates);
 
 	range->num_frequency = 0;
-
-	memset(pchan_list, 0, sizeof(mlan_chan_list));
 
 	woal_get_channel_list(priv, MOAL_IOCTL_WAIT, pchan_list);
 
@@ -1992,31 +1995,38 @@ woal_set_priv(struct net_device *dev, struct iw_request_info *info,
 	char *pdata = NULL;
 	t_u8 country_code[COUNTRY_CODE_LEN];
 	int len = 0;
+	gfp_t flag;
 	ENTER();
 	if (!priv || !priv->phandle) {
 		PRINTM(MERROR, "priv or handle is NULL\n");
 		ret = -EFAULT;
 		goto done;
 	}
-	buf = kmalloc(dwrq->length + 1, GFP_KERNEL);
+	flag = (in_atomic() || irqs_disabled())? GFP_ATOMIC : GFP_KERNEL;
+	buf = kzalloc(dwrq->length + 1, flag);
 	if (!buf) {
 		ret = -ENOMEM;
 		goto done;
 	}
-	memset(buf, 0, dwrq->length + 1);
 	if (copy_from_user(buf, dwrq->pointer, dwrq->length)) {
 		ret = -EFAULT;
 		goto done;
 	}
-	PRINTM(MIOCTL, "SIOCSIWPRIV requst = %s\n", buf);
+	PRINTM(MIOCTL, "SIOCSIWPRIV request = %s\n", buf);
 	if (strncmp(buf, "RSSILOW-THRESHOLD", strlen("RSSILOW-THRESHOLD")) == 0) {
-		pdata = buf + strlen("RSSILOW-THRESHOLD") + 1;
-		if (MLAN_STATUS_SUCCESS !=
-		    woal_set_rssi_low_threshold(priv, pdata, MOAL_IOCTL_WAIT)) {
+		if (dwrq->length > strlen("RSSILOW-THRESHOLD") + 1) {
+			pdata = buf + strlen("RSSILOW-THRESHOLD") + 1;
+			if (MLAN_STATUS_SUCCESS !=
+			    woal_set_rssi_low_threshold(priv, pdata,
+							MOAL_IOCTL_WAIT)) {
+				ret = -EFAULT;
+				goto done;
+			}
+			len = sprintf(buf, "OK\n") + 1;
+		} else {
 			ret = -EFAULT;
 			goto done;
 		}
-		len = sprintf(buf, "OK\n") + 1;
 	} else if (strncmp(buf, "RSSI", strlen("RSSI")) == 0) {
 		if (MLAN_STATUS_SUCCESS != woal_get_bss_info(priv,
 							     MOAL_IOCTL_WAIT,
@@ -2076,15 +2086,20 @@ woal_set_priv(struct net_device *dev, struct iw_request_info *info,
 		PRINTM(MIOCTL, "Set Passive Scan\n");
 		len = sprintf(buf, "OK\n") + 1;
 	} else if (strncmp(buf, "POWERMODE", strlen("POWERMODE")) == 0) {
-		pdata = buf + strlen("POWERMODE") + 1;
-		if (!hw_test) {
-			if (MLAN_STATUS_SUCCESS !=
-			    woal_set_powermode(priv, pdata)) {
-				ret = -EFAULT;
-				goto done;
+		if (dwrq->length > strlen("POWERMODE") + 1) {
+			pdata = buf + strlen("POWERMODE") + 1;
+			if (!hw_test) {
+				if (MLAN_STATUS_SUCCESS !=
+				    woal_set_powermode(priv, pdata)) {
+					ret = -EFAULT;
+					goto done;
+				}
 			}
+			len = sprintf(buf, "OK\n") + 1;
+		} else {
+			ret = -EFAULT;
+			goto done;
 		}
-		len = sprintf(buf, "OK\n") + 1;
 	} else if (strncmp(buf, "COUNTRY", strlen("COUNTRY")) == 0) {
 		memset(country_code, 0, sizeof(country_code));
 		memcpy(country_code, buf + strlen("COUNTRY") + 1,
@@ -2170,35 +2185,58 @@ woal_set_priv(struct net_device *dev, struct iw_request_info *info,
 #endif
 		len = sprintf(buf, "OK\n") + 1;
 	} else if (strncmp(buf, "RXFILTER-ADD", strlen("RXFILTER-ADD")) == 0) {
-		pdata = buf + strlen("RXFILTER-ADD") + 1;
-		if (MLAN_STATUS_SUCCESS != woal_add_rxfilter(priv, pdata)) {
+		if (dwrq->length > strlen("RXFILTER-ADD") + 1) {
+			pdata = buf + strlen("RXFILTER-ADD") + 1;
+			if (MLAN_STATUS_SUCCESS !=
+			    woal_add_rxfilter(priv, pdata)) {
+				ret = -EFAULT;
+				goto done;
+			}
+			len = sprintf(buf, "OK\n") + 1;
+		} else {
 			ret = -EFAULT;
 			goto done;
 		}
-		len = sprintf(buf, "OK\n") + 1;
 	} else if (strncmp(buf, "RXFILTER-REMOVE", strlen("RXFILTER-REMOVE")) ==
 		   0) {
-		pdata = buf + strlen("RXFILTER-REMOVE") + 1;
-		if (MLAN_STATUS_SUCCESS != woal_remove_rxfilter(priv, pdata)) {
+		if (dwrq->length > strlen("RXFILTER-REMOVE") + 1) {
+			pdata = buf + strlen("RXFILTER-REMOVE") + 1;
+			if (MLAN_STATUS_SUCCESS !=
+			    woal_remove_rxfilter(priv, pdata)) {
+				ret = -EFAULT;
+				goto done;
+			}
+			len = sprintf(buf, "OK\n") + 1;
+		} else {
 			ret = -EFAULT;
 			goto done;
 		}
-		len = sprintf(buf, "OK\n") + 1;
 	} else if (strncmp(buf, "QOSINFO", strlen("QOSINFO")) == 0) {
-		pdata = buf + strlen("QOSINFO") + 1;
-		if (MLAN_STATUS_SUCCESS !=
-		    woal_priv_qos_cfg(priv, MLAN_ACT_SET, pdata)) {
+		if (dwrq->length > strlen("QOSINFO") + 1) {
+			pdata = buf + strlen("QOSINFO") + 1;
+			if (MLAN_STATUS_SUCCESS !=
+			    woal_priv_qos_cfg(priv, MLAN_ACT_SET, pdata)) {
+				ret = -EFAULT;
+				goto done;
+			}
+			len = sprintf(buf, "OK\n") + 1;
+		} else {
 			ret = -EFAULT;
 			goto done;
 		}
-		len = sprintf(buf, "OK\n") + 1;
 	} else if (strncmp(buf, "SLEEPPD", strlen("SLEEPPD")) == 0) {
-		pdata = buf + strlen("SLEEPPD") + 1;
-		if (MLAN_STATUS_SUCCESS != woal_set_sleeppd(priv, pdata)) {
+		if (dwrq->length > strlen("SLEEPPD") + 1) {
+			pdata = buf + strlen("SLEEPPD") + 1;
+			if (MLAN_STATUS_SUCCESS !=
+			    woal_set_sleeppd(priv, pdata)) {
+				ret = -EFAULT;
+				goto done;
+			}
+			len = sprintf(buf, "OK\n") + 1;
+		} else {
 			ret = -EFAULT;
 			goto done;
 		}
-		len = sprintf(buf, "OK\n") + 1;
 	} else {
 		PRINTM(MIOCTL, "Unknow PRIVATE command: %s, ignored\n", buf);
 		ret = -EFAULT;
@@ -2532,6 +2570,7 @@ woal_get_scan(struct net_device *dev, struct iw_request_info *info,
 	t_u8 *pbeacon;
 	IEEEtypes_ElementId_e element_id;
 	t_u8 element_len;
+	gfp_t flag;
 
 	ENTER();
 
@@ -2539,8 +2578,8 @@ woal_get_scan(struct net_device *dev, struct iw_request_info *info,
 		LEAVE();
 		return -EAGAIN;
 	}
-
-	buf = kmalloc((buf_size), GFP_KERNEL);
+	flag = (in_atomic() || irqs_disabled())? GFP_ATOMIC : GFP_KERNEL;
+	buf = kzalloc((buf_size), flag);
 	if (!buf) {
 		PRINTM(MERROR, "Cannot allocate buffer!\n");
 		ret = -EFAULT;
@@ -2724,7 +2763,6 @@ woal_get_scan(struct net_device *dev, struct iw_request_info *info,
 
 		/* Beacon Interval */
 		memset(&iwe, 0, sizeof(iwe));
-		memset(buf, 0, buf_size);
 		ptr = buf;
 		ptr += sprintf(ptr, "Beacon interval=%d",
 			       scan_table[i].beacon_period);

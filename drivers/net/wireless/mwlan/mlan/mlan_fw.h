@@ -4,7 +4,7 @@
  *  structures and declares global function prototypes used
  *  in MLAN module.
  *
- *  Copyright (C) 2008-2013, Marvell International Ltd.
+ *  Copyright (C) 2008-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -405,33 +405,33 @@ typedef enum _WLAN_802_11_WEP_STATUS {
 									 */
 
 /** TLV type : TDLS IDLE TIMEOUT */
-#define TLV_TYPE_TDLS_IDLE_TIMEOUT               (PROPRIETARY_TLV_BASE_ID + 0xC2)	/* 0x01C2
-											 */
+#define TLV_TYPE_TDLS_IDLE_TIMEOUT   (PROPRIETARY_TLV_BASE_ID + 0xC2)	/* 0x01C2
+									 */
 
 /** TLV type : HT Capabilities */
-#define TLV_TYPE_HT_CAP                  (PROPRIETARY_TLV_BASE_ID + 0x4a)	/* 0x014a
-										 */
+#define TLV_TYPE_HT_CAP              (PROPRIETARY_TLV_BASE_ID + 0x4a)	/* 0x014a
+									 */
 /** TLV type : HT Information */
-#define TLV_TYPE_HT_INFO                 (PROPRIETARY_TLV_BASE_ID + 0x4b)	/* 0x014b
-										 */
+#define TLV_TYPE_HT_INFO             (PROPRIETARY_TLV_BASE_ID + 0x4b)	/* 0x014b
+									 */
 /** TLV type : Secondary Channel Offset */
-#define TLV_SECONDARY_CHANNEL_OFFSET     (PROPRIETARY_TLV_BASE_ID + 0x4c)	/* 0x014c
-										 */
+#define TLV_SECONDARY_CHANNEL_OFFSET (PROPRIETARY_TLV_BASE_ID + 0x4c)	/* 0x014c
+									 */
 /** TLV type : 20/40 BSS Coexistence */
-#define TLV_TYPE_2040BSS_COEXISTENCE     (PROPRIETARY_TLV_BASE_ID + 0x4d)	/* 0x014d
-										 */
+#define TLV_TYPE_2040BSS_COEXISTENCE (PROPRIETARY_TLV_BASE_ID + 0x4d)	/* 0x014d
+									 */
 /** TLV type : Overlapping BSS Scan Parameters */
-#define TLV_TYPE_OVERLAP_BSS_SCAN_PARAM  (PROPRIETARY_TLV_BASE_ID + 0x4e)	/* 0x014e
+#define TLV_TYPE_OVERLAP_BSS_SCAN_PARAM (PROPRIETARY_TLV_BASE_ID + 0x4e)	/* 0x014e
 										 */
 /** TLV type : Extended capabilities */
-#define TLV_TYPE_EXTCAP                  (PROPRIETARY_TLV_BASE_ID + 0x4f)	/* 0x014f
-										 */
+#define TLV_TYPE_EXTCAP              (PROPRIETARY_TLV_BASE_ID + 0x4f)	/* 0x014f
+									 */
 /** TLV type : Set of MCS values that STA desires to use within the BSS */
-#define TLV_TYPE_HT_OPERATIONAL_MCS_SET  (PROPRIETARY_TLV_BASE_ID + 0x50)	/* 0x0150
+#define TLV_TYPE_HT_OPERATIONAL_MCS_SET (PROPRIETARY_TLV_BASE_ID + 0x50)	/* 0x0150
 										 */
 /** TLV type : RXBA_SYNC */
-#define TLV_TYPE_RXBA_SYNC               (PROPRIETARY_TLV_BASE_ID + 0x99)	/* 0x0199
-										 */
+#define TLV_TYPE_RXBA_SYNC           (PROPRIETARY_TLV_BASE_ID + 0x99)	/* 0x0199
+									 */
 /** ADDBA TID mask */
 #define ADDBA_TID_MASK   (MBIT(2) | MBIT(3) | MBIT(4) | MBIT(5))
 /** DELBA TID mask */
@@ -474,15 +474,15 @@ typedef enum _WLAN_802_11_WEP_STATUS {
 #define NON_GREENFIELD_STAS     0x04
 
 /** Greenfield support */
-#define HWSPEC_GREENFIELD_SUPP	 MBIT(29)
+#define HWSPEC_GREENFIELD_SUPP   MBIT(29)
 /** RX STBC support */
-#define HWSPEC_RXSTBC_SUPP	 MBIT(26)
+#define HWSPEC_RXSTBC_SUPP   MBIT(26)
 /** ShortGI @ 40Mhz support */
-#define HWSPEC_SHORTGI40_SUPP	 MBIT(24)
+#define HWSPEC_SHORTGI40_SUPP    MBIT(24)
 /** ShortGI @ 20Mhz support */
-#define HWSPEC_SHORTGI20_SUPP	 MBIT(23)
+#define HWSPEC_SHORTGI20_SUPP    MBIT(23)
 /** Channel width 40Mhz support */
-#define HWSPEC_CHANBW40_SUPP	 MBIT(17)
+#define HWSPEC_CHANBW40_SUPP     MBIT(17)
 /** 40Mhz intolarent enable */
 #define CAPINFO_40MHZ_INTOLARENT MBIT(8)
 
@@ -490,9 +490,13 @@ typedef enum _WLAN_802_11_WEP_STATUS {
 #define DEFAULT_11N_CAP_MASK_BG (HWSPEC_SHORTGI20_SUPP | HWSPEC_RXSTBC_SUPP)
 /** Default 11n capability mask for 5GHz */
 #define DEFAULT_11N_CAP_MASK_A  (HWSPEC_CHANBW40_SUPP | HWSPEC_SHORTGI20_SUPP | \
-							HWSPEC_SHORTGI40_SUPP | HWSPEC_RXSTBC_SUPP)
+		HWSPEC_SHORTGI40_SUPP | HWSPEC_RXSTBC_SUPP)
+
+/** Default 11n TX BF capability **/
+#define DEFAULT_11N_TX_BF_CAP   0x09E1E008
+
 /** Bits to ignore in hw_dev_cap as these bits are set in get_hw_spec */
-#define IGN_HW_DEV_CAP		(CAPINFO_40MHZ_INTOLARENT)
+#define IGN_HW_DEV_CAP      (CAPINFO_40MHZ_INTOLARENT)
 
 /** HW_SPEC FwCapInfo */
 #define ISSUPP_11NENABLED(FwCapInfo) (FwCapInfo & MBIT(11))
@@ -817,7 +821,7 @@ typedef enum _WLAN_802_11_WEP_STATUS {
 #define HostCmd_CMD_802_11_SLEEP_PERIOD       0x0068
 
 /** Host Command ID: 802.11 BG scan config */
-#define HostCmd_CMD_802_11_BG_SCAN_CONFIG  	  0x006b
+#define HostCmd_CMD_802_11_BG_SCAN_CONFIG     0x006b
 /** Host Command ID : 802.11 BG scan query */
 #define HostCmd_CMD_802_11_BG_SCAN_QUERY      0x006c
 
@@ -902,7 +906,7 @@ typedef enum _WLAN_802_11_WEP_STATUS {
 /** Host Command ID: Configure Tx Buf size */
 #define HostCmd_CMD_RECONFIGURE_TX_BUFF       0x00d9
 /** Host Command ID: AMSDU Aggr Ctrl */
-#define HostCmd_CMD_AMSDU_AGGR_CTRL	      	  0x00df
+#define HostCmd_CMD_AMSDU_AGGR_CTRL           0x00df
 /** Host Command ID: Configure TX Beamforming capability */
 #define HostCmd_CMD_TX_BF_CFG                 0x0104
 
@@ -910,7 +914,7 @@ typedef enum _WLAN_802_11_WEP_STATUS {
 #define HostCmd_CMD_TXPWR_CFG                 0x00d1
 
 /** Host Command ID : Soft Reset */
-#define  HostCmd_CMD_SOFT_RESET		          0x00d5
+#define  HostCmd_CMD_SOFT_RESET               0x00d5
 
 /** Host Command ID : 802.11 b/g/n rate configration */
 #define HostCmd_CMD_TX_RATE_CFG               0x00d6
@@ -930,7 +934,7 @@ typedef enum _WLAN_802_11_WEP_STATUS {
 /** Host Command ID : TDLS configuration */
 #define  HostCmd_CMD_TDLS_CONFIG              0x0100
 /** Host Command ID : TDLS operation */
-#define HostCmd_CMD_TDLS_OPERATION			0x0122
+#define HostCmd_CMD_TDLS_OPERATION          0x0122
 
 /** Host Command ID : Extended scan support */
 #define  HostCmd_CMD_802_11_SCAN_EXT          0x0107
@@ -966,7 +970,7 @@ typedef enum _WLAN_802_11_WEP_STATUS {
 /** Host Command ID: P2P PARAMS CONFIG */
 #define HOST_CMD_P2P_PARAMS_CONFIG              0x00ea
 /** Host Command ID: WIFI_DIRECT_MODE_CONFIG */
-#define HOST_CMD_WIFI_DIRECT_MODE_CONFIG	0x00eb
+#define HOST_CMD_WIFI_DIRECT_MODE_CONFIG    0x00eb
 /** Host Command ID: Remain On Channel */
 #define HostCmd_CMD_802_11_REMAIN_ON_CHANNEL     0x010d
 #endif
@@ -979,6 +983,9 @@ typedef enum _WLAN_802_11_WEP_STATUS {
 
 /** Host Command ID: reject addba request */
 #define HostCmd_CMD_REJECT_ADDBA_REQ         0x0119
+
+/** Host Command ID : Target device access */
+#define HostCmd_CMD_TARGET_ACCESS            0x012a
 
 /** Enhanced PS modes */
 typedef enum _ENH_PS_MODES {
@@ -1154,7 +1161,7 @@ typedef enum _ENH_PS_MODES {
 /** Card Event definition : BG scan report */
 #define EVENT_BG_SCAN_REPORT            0x00000018
 /** Card Event definition : BG scan stopped */
-#define EVENT_BG_SCAN_STOPPED		0x00000065
+#define EVENT_BG_SCAN_STOPPED       0x00000065
 
 /** Card Event definition : Beacon RSSI low */
 #define EVENT_RSSI_LOW                  0x00000019
@@ -1274,7 +1281,7 @@ typedef enum _ENH_PS_MODES {
 /** event type for tdls setup failure */
 #define TDLS_EVENT_TYPE_SETUP_FAILURE         1
 /** event type for tdls setup request received */
-#define TDLS_EVENT_TYPE_SETUP_REQ      		  2
+#define TDLS_EVENT_TYPE_SETUP_REQ             2
 /** event type for tdls link torn down */
 #define TDLS_EVENT_TYPE_LINK_TORN_DOWN        3
 /** event type for tdls link established */
@@ -1293,9 +1300,9 @@ typedef enum _ENH_PS_MODES {
 /** Packet received on direct link */
 #define RXPD_FLAG_PKT_DIRECT_LINK             1
 /** TDLS base channel */
-#define TDLS_BASE_CHANNEL	0
+#define TDLS_BASE_CHANNEL   0
 /** TDLS off channel */
-#define TDLS_OFF_CHANNEL	1
+#define TDLS_OFF_CHANNEL    1
 
 /** structure for channel switch result from TDLS FW */
 typedef MLAN_PACK_START struct _chan_switch_result {
@@ -1416,7 +1423,7 @@ typedef MLAN_PACK_START struct _MrvlIEtypes_TDLS_Idle_Timeout_t {
 /** Bit mask for TxPD status field for last packet */
 #define MRVDRV_TxPD_POWER_MGMT_LAST_PACKET 0x08
 
-/** Bit mask for TxPD status field for TDLS packet */
+/** Bit mask for TxPD flags field for TDLS packet */
 #define MRVDRV_TxPD_FLAGS_TDLS_PACKET MBIT(4)
 
 /** Packet type: 802.11 */
@@ -1448,10 +1455,11 @@ typedef MLAN_PACK_START struct _TxPD {
 	t_u8 priority;
     /** Transmit Pkt Flags*/
 	t_u8 flags;
-    /** Amount of time the packet has been queued in the driver (units = 2ms)*/
+    /** Amount of time the packet has been queued
+      * in the driver (units = 2ms)*/
 	t_u8 pkt_delay_2ms;
     /** Reserved */
-	t_u8 reserved1;
+	t_u8 reserved[5];
 } MLAN_PACK_END TxPD, *PTxPD;
 
 /** RxPD Descriptor */
@@ -1507,7 +1515,8 @@ typedef MLAN_PACK_START struct _UapTxPD {
 	t_u8 priority;
 	/** Transmit Pkt Flags*/
 	t_u8 flags;
-	/** Amount of time the packet has been queued in the driver (units = 2ms)*/
+    /** Amount of time the packet has been queued
+      * in the driver (units = 2ms)*/
 	t_u8 pkt_delay_2ms;
 	/** Reserved */
 	t_u8 reserved1;
@@ -1531,7 +1540,7 @@ typedef MLAN_PACK_START struct _UapRxPD {
 	t_u16 seq_num;
     /** Packet Priority */
 	t_u8 priority;
-     /** Reserved */
+    /** Reserved */
 	t_u8 reserved;
 } MLAN_PACK_END UapRxPD, *PUapRxPD;
 
@@ -2815,14 +2824,14 @@ typedef MLAN_PACK_START struct _HostCmd_DS_802_11_RF_TX_POWER {
 } MLAN_PACK_END HostCmd_DS_802_11_RF_TX_POWER;
 
 /** Connection type infra */
-#define CONNECTION_TYPE_INFRA 	0
+#define CONNECTION_TYPE_INFRA   0
 /** Connection type adhoc */
-#define CONNECTION_TYPE_ADHOC	1
+#define CONNECTION_TYPE_ADHOC   1
 #ifdef WIFI_DIRECT_SUPPORT
 /** BSS Mode: WIFIDIRECT Client */
-#define BSS_MODE_WIFIDIRECT_CLIENT 	0
+#define BSS_MODE_WIFIDIRECT_CLIENT  0
 /** BSS Mode: WIFIDIRECT GO */
-#define BSS_MODE_WIFIDIRECT_GO     	2
+#define BSS_MODE_WIFIDIRECT_GO      2
 #endif
 /** HostCmd_DS_SET_BSS_MODE */
 typedef MLAN_PACK_START struct _HostCmd_DS_SET_BSS_MODE {
@@ -3822,6 +3831,18 @@ typedef MLAN_PACK_START struct _HostCmd_DS_MEM_ACCESS {
 	t_u32 value;
 } MLAN_PACK_END HostCmd_DS_MEM_ACCESS;
 
+/** HostCmd_DS_TARGET_ACCESS */
+typedef MLAN_PACK_START struct _HostCmd_DS_TARGET_ACCESS {
+	/** Action */
+	t_u16 action;
+	/** CSU Target Device. 1: CSU, 2: PSU */
+	t_u16 csu_target;
+	/** Target Device Address */
+	t_u16 address;
+	/** Data */
+	t_u8 data;
+} MLAN_PACK_END HostCmd_DS_TARGET_ACCESS;
+
 /** HostCmd_DS_SUBSCRIBE_EVENT */
 typedef MLAN_PACK_START struct _HostCmd_DS_SUBSCRIBE_EVENT {
     /** Action */
@@ -4197,16 +4218,34 @@ typedef MLAN_PACK_START struct _MrvlIEtypes_mac_filter_t {
 /** setting for band_config - band=5GHZ */
 #define BAND_CONFIG_5GHZ        0x01
 
-/** MrvlIEtypes_retry_limit_t */
+/** Band_Config_t */
+typedef MLAN_PACK_START struct _Band_Config_t {
+#ifdef BIG_ENDIAN_SUPPORT
+    /** Channel Selection Mode - (00)=manual, (01)=ACS */
+	t_u8 scanMode:2;
+    /** Secondary Channel Offset - (00)=None, (01)=Above, (11)=Below */
+	t_u8 chan2Offset:2;
+    /** Channel Width - (00)=20MHz, (10)=40MHz, (11)=80MHz */
+	t_u8 chanWidth:2;
+    /** Band Info - (00)=2.4GHz, (01)=5GHz */
+	t_u8 chanBand:2;
+#else
+    /** Band Info - (00)=2.4GHz, (01)=5GHz */
+	t_u8 chanBand:2;
+    /** Channel Width - (00)=20MHz, (10)=40MHz, (11)=80MHz */
+	t_u8 chanWidth:2;
+    /** Secondary Channel Offset - (00)=None, (01)=Above, (11)=Below */
+	t_u8 chan2Offset:2;
+    /** Channel Selection Mode - (00)=manual, (01)=ACS */
+	t_u8 scanMode:2;
+#endif
+} MLAN_PACK_END Band_Config_t;
+
+/** MrvlIEtypes_channel_band_t */
 typedef MLAN_PACK_START struct _MrvlIEtypes_channel_band_t {
     /** Header */
 	MrvlIEtypesHeader_t header;
-    /** Band Configuration
-     *
-     * [7-6] Channel Selection Mode; 00 manual, 01 ACS
-     * [3-2] Channel Width; 00 20 MHz
-     * [1-0] Band Info; 00 2.4 GHz
-     */
+    /** Band Configuration */
 	t_u8 band_config;
     /** channel */
 	t_u8 channel;
@@ -4478,11 +4517,10 @@ typedef MLAN_PACK_START struct {
 
 /**  TPC Info structure sent in CMD_802_11_TPC_INFO command to firmware */
 typedef MLAN_PACK_START struct {
+    /**< Local constraint */
 	MrvlIEtypes_LocalPowerConstraint_t local_constraint;
-							  /**< Local
-                                                          constraint */
-	MrvlIEtypes_PowerCapability_t power_cap;	  /**< Power
-                                                          Capability */
+    /**< Power Capability */
+	MrvlIEtypes_PowerCapability_t power_cap;
 
 } MLAN_PACK_END HostCmd_DS_802_11_TPC_INFO;
 
@@ -4908,6 +4946,8 @@ typedef struct MLAN_PACK_START _HostCmd_DS_COMMAND {
 		HostCmd_DS_802_11_EEPROM_ACCESS eeprom;
 	/** Memory access */
 		HostCmd_DS_MEM_ACCESS mem;
+	/** Target device access */
+		HostCmd_DS_TARGET_ACCESS target;
 
 	/** Inactivity timeout extend */
 		HostCmd_DS_INACTIVITY_TIMEOUT_EXT inactivity_to;

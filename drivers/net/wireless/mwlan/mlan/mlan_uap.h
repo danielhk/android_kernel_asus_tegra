@@ -3,7 +3,7 @@
  *  @brief This file contains related macros, enum, and struct
  *  of uap functionalities
  *
- *  Copyright (C) 2009-2013, Marvell International Ltd.
+ *  Copyright (C) 2009-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -51,9 +51,6 @@ Change log:
 /** Convert RxPD from little endian format to CPU format */
 #define uap_endian_convert_RxPD(x)  do {} while (0)
 #endif /* BIG_ENDIAN_SUPPORT */
-
-/** Band config 5GHz */
-#define UAP_BAND_CONFIG_5GHZ  0x01
 
 /** Packet forwarding to be done by FW or host */
 #define PKT_FWD_FW_BIT  0x01

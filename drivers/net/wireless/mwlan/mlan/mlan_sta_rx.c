@@ -3,7 +3,7 @@
  *  @brief This file contains the handling of RX in MLAN
  *  module.
  *
- *  Copyright (C) 2008-2013, Marvell International Ltd.
+ *  Copyright (C) 2008-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -323,10 +323,12 @@ wlan_process_rx_packet(pmlan_adapter pmadapter, pmlan_buffer pmbuf)
 	RxPD *prx_pd;
 	int hdr_chop;
 	EthII_Hdr_t *peth_hdr;
-	t_u8 rfc1042_eth_hdr[MLAN_MAC_ADDR_LENGTH] =
-		{ 0xaa, 0xaa, 0x03, 0x00, 0x00, 0x00 };
-	t_u8 snap_oui_802_h[MLAN_MAC_ADDR_LENGTH] =
-		{ 0xaa, 0xaa, 0x03, 0x00, 0x00, 0xf8 };
+	t_u8 rfc1042_eth_hdr[MLAN_MAC_ADDR_LENGTH] = {
+		0xaa, 0xaa, 0x03, 0x00, 0x00, 0x00
+	};
+	t_u8 snap_oui_802_h[MLAN_MAC_ADDR_LENGTH] = {
+		0xaa, 0xaa, 0x03, 0x00, 0x00, 0xf8
+	};
 	t_u8 appletalk_aarp_type[2] = { 0x80, 0xf3 };
 	t_u8 ipx_snap_type[2] = { 0x81, 0x37 };
 	t_u8 tdls_action_type[2] = { 0x89, 0x0d };
@@ -376,12 +378,12 @@ wlan_process_rx_packet(pmlan_adapter pmadapter, pmlan_buffer pmbuf)
 	     memcmp(pmadapter, &prx_pkt->rfc1042_hdr.snap_type,
 		    ipx_snap_type, sizeof(ipx_snap_type)))) {
 		/*
-		 *  Replace the 803 header and rfc1042 header (llc/snap) with an
-		 *    EthernetII header, keep the src/dst and snap_type (ethertype).
-		 *  The firmware only passes up SNAP frames converting
-		 *    all RX Data from 802.11 to 802.2/LLC/SNAP frames.
-		 *  To create the Ethernet II, just move the src, dst address right
-		 *    before the snap_type.
+		 * Replace the 803 header and rfc1042 header (llc/snap) with an
+		 * EthernetII header, keep the src/dst and snap_type (ethertype).
+		 * The firmware only passes up SNAP frames converting
+		 * all RX Data from 802.11 to 802.2/LLC/SNAP frames.
+		 * To create the Ethernet II, just move the src, dst address
+		 * right before the snap_type.
 		 */
 		peth_hdr = (EthII_Hdr_t *)
 			((t_u8 *) & prx_pkt->eth803_hdr

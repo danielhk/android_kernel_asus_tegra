@@ -4,7 +4,7 @@
  *  it prepares command and sends it to firmware when
  *  it is ready.
  *
- *  Copyright (C) 2008-2013, Marvell International Ltd.
+ *  Copyright (C) 2008-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -966,26 +966,26 @@ wlan_cmd_802_11_supplicant_pmk(IN pmlan_private pmpriv,
 	ENTER();
 	/*
 	 * Parse the rest of the buf here
-	 *      1)  <ssid="valid ssid"> - This will get the passphrase, AKMP
-	 *          for specified ssid, if none specified then it will get all.
-	 *          Eg: iwpriv <mlanX> passphrase 0:ssid=marvell
-	 *      2)  <psk="psk">:<passphrase="passphare">:<bssid="00:50:43:ef:23:f3">
-	 *          <ssid="valid ssid"> - passphrase and psk cannot be provided to
-	 *          the same SSID, Takes one SSID at a time, If ssid= is present
-	 *          the it should contain a passphrase or psk. If no arguments are
-	 *          provided then AKMP=802.1x, and passphrase should be provided
-	 *          after association.
-	 *          End of each parameter should be followed by a ':'(except for the
-	 *          last parameter) as the delimiter. If ':' has to be used in
-	 *          an SSID then a '/' should be preceded to ':' as a escape.
-	 *          Eg:iwpriv <mlanX> passphrase
-	 *                    "1:ssid=mrvl AP:psk=abcdefgh:bssid=00:50:43:ef:23:f3"
-	 *          iwpriv <mlanX> passphrase
-	 *                 "1:ssid=mrvl/: AP:psk=abcdefgd:bssid=00:50:43:ef:23:f3"
-	 *          iwpriv <mlanX> passphrase "1:ssid=mrvlAP:psk=abcdefgd"
-	 *      3)  <ssid="valid ssid"> - This will clear the passphrase
-	 *          for specified ssid, if none specified then it will clear all.
-	 *          Eg: iwpriv <mlanX> passphrase 2:ssid=marvell
+	 *  1) <ssid="valid ssid"> - This will get the passphrase, AKMP
+	 *     for specified ssid, if none specified then it will get all.
+	 *     Eg: iwpriv <mlanX> passphrase 0:ssid=marvell
+	 *  2) <psk="psk">:<passphrase="passphare">:<bssid="00:50:43:ef:23:f3">
+	 *     <ssid="valid ssid"> - passphrase and psk cannot be provided to
+	 *     the same SSID, Takes one SSID at a time, If ssid= is present
+	 *     the it should contain a passphrase or psk. If no arguments are
+	 *     provided then AKMP=802.1x, and passphrase should be provided
+	 *     after association.
+	 *     End of each parameter should be followed by a ':'(except for the
+	 *     last parameter) as the delimiter. If ':' has to be used in
+	 *     an SSID then a '/' should be preceded to ':' as a escape.
+	 *     Eg:iwpriv <mlanX> passphrase
+	 *               "1:ssid=mrvl AP:psk=abcdefgh:bssid=00:50:43:ef:23:f3"
+	 *     iwpriv <mlanX> passphrase
+	 *            "1:ssid=mrvl/: AP:psk=abcdefgd:bssid=00:50:43:ef:23:f3"
+	 *     iwpriv <mlanX> passphrase "1:ssid=mrvlAP:psk=abcdefgd"
+	 *  3) <ssid="valid ssid"> - This will clear the passphrase
+	 *     for specified ssid, if none specified then it will clear all.
+	 *     Eg: iwpriv <mlanX> passphrase 2:ssid=marvell
 	 */
 
 	/* -1 is for t_u8 TlvBuffer[1] as this should not be included */
@@ -2315,6 +2315,7 @@ wlan_ops_sta_prepare_cmd(IN t_void * priv,
 	case HostCmd_CMD_BBP_REG_ACCESS:
 	case HostCmd_CMD_RF_REG_ACCESS:
 	case HostCmd_CMD_CAU_REG_ACCESS:
+	case HostCmd_CMD_TARGET_ACCESS:
 	case HostCmd_CMD_802_11_EEPROM_ACCESS:
 		ret = wlan_cmd_reg_access(cmd_ptr, cmd_action, pdata_buf);
 		break;
@@ -2389,8 +2390,8 @@ wlan_ops_sta_prepare_cmd(IN t_void * priv,
 /**
  *  @brief  This function issues commands to initialize firmware
  *
- *  @param priv     	A pointer to mlan_private structure
- *  @param first_bss	flag for first BSS
+ *  @param priv         A pointer to mlan_private structure
+ *  @param first_bss    flag for first BSS
  *
  *  @return		MLAN_STATUS_PENDING or MLAN_STATUS_FAILURE
  */

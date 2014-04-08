@@ -2,7 +2,7 @@
  *
  *  @brief This file contains APIs to MOAL module.
  *
- *  Copyright (C) 2008-2013, Marvell International Ltd.
+ *  Copyright (C) 2008-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -274,6 +274,7 @@ mlan_register(IN pmlan_device pmdevice, OUT t_void ** ppmlan_adapter)
 	pmadapter->init_para.dfs_master_radar_det_en =
 		DFS_MASTER_RADAR_DETECT_EN;
 	pmadapter->init_para.dfs_slave_radar_det_en = DFS_SLAVE_RADAR_DETECT_EN;
+	pmadapter->init_para.dev_cap_mask = pmdevice->dev_cap_mask;
 	pmadapter->rx_work_flag = pmdevice->rx_work;
 
 	pmadapter->priv_num = 0;
@@ -603,9 +604,9 @@ mlan_init_fw(IN t_void * pmlan_adapter)
  *
  *  @return     MLAN_STATUS_SUCCESS
  *                              The firmware shutdown call succeeded.
- *	            MLAN_STATUS_PENDING
+ *              MLAN_STATUS_PENDING
  *                              The firmware shutdown call is pending.
- *	            MLAN_STATUS_FAILURE
+ *              MLAN_STATUS_FAILURE
  *                              The firmware shutdown call failed.
  */
 mlan_status
@@ -760,15 +761,11 @@ mlan_main_process(IN t_void * pmlan_adapter)
 		pcb->moal_spin_unlock(pmadapter->pmoal_handle,
 				      pmadapter->pmain_proc_lock);
 		goto exit_main_proc;
-	} else {
+	} else
 		pmadapter->mlan_processing = MTRUE;
-		pcb->moal_spin_unlock(pmadapter->pmoal_handle,
-				      pmadapter->pmain_proc_lock);
-	}
+
 process_start:
 	do {
-		pcb->moal_spin_lock(pmadapter->pmoal_handle,
-				    pmadapter->pmain_proc_lock);
 		pmadapter->more_task_flag = MFALSE;
 		pcb->moal_spin_unlock(pmadapter->pmoal_handle,
 				      pmadapter->pmain_proc_lock);
@@ -812,6 +809,8 @@ process_start:
 		    )) {
 			wlan_pm_wakeup_card(pmadapter);
 			pmadapter->pm_wakeup_fw_try = MTRUE;
+			pcb->moal_spin_lock(pmadapter->pmoal_handle,
+					    pmadapter->pmain_proc_lock);
 			continue;
 		}
 		if (IS_CARD_RX_RCVD(pmadapter)) {
@@ -875,11 +874,9 @@ process_start:
 
 		/* Check if we need to confirm Sleep Request received
 		   previously */
-		if (pmadapter->ps_state == PS_STATE_PRE_SLEEP) {
-			if (!pmadapter->cmd_sent && !pmadapter->curr_cmd) {
+		if (pmadapter->ps_state == PS_STATE_PRE_SLEEP)
+			if (!pmadapter->cmd_sent && !pmadapter->curr_cmd)
 				wlan_check_ps_cond(pmadapter);
-			}
-		}
 
 		/*
 		 * The ps_state may have been changed during processing of
@@ -889,8 +886,11 @@ process_start:
 		    || (pmadapter->ps_state == PS_STATE_PRE_SLEEP)
 		    || (pmadapter->ps_state == PS_STATE_SLEEP_CFM)
 		    || (pmadapter->tx_lock_flag == MTRUE)
-			)
+			) {
+			pcb->moal_spin_lock(pmadapter->pmoal_handle,
+					    pmadapter->pmain_proc_lock);
 			continue;
+		}
 
 		if (!pmadapter->cmd_sent && !pmadapter->curr_cmd
 		    && wlan_is_send_cmd_allowed(pmadapter->tdls_status)
@@ -950,15 +950,15 @@ process_start:
 		}
 #endif
 
+		pcb->moal_spin_lock(pmadapter->pmoal_handle,
+				    pmadapter->pmain_proc_lock);
 	} while (MTRUE);
 
 	pcb->moal_spin_lock(pmadapter->pmoal_handle,
 			    pmadapter->pmain_proc_lock);
-	if (pmadapter->more_task_flag == MTRUE) {
-		pcb->moal_spin_unlock(pmadapter->pmoal_handle,
-				      pmadapter->pmain_proc_lock);
+	if (pmadapter->more_task_flag == MTRUE)
 		goto process_start;
-	}
+
 	pmadapter->mlan_processing = MFALSE;
 	pcb->moal_spin_unlock(pmadapter->pmoal_handle,
 			      pmadapter->pmain_proc_lock);
@@ -1123,14 +1123,15 @@ mlan_interrupt(IN t_void * adapter)
 }
 
 /**
- *  @brief This function wake up card
+ *  @brief This function wakeup firmware.
  *
  *  @param adapter  A pointer to mlan_adapter structure
  *  @return         N/A
  */
-t_void mlan_pm_wakeup_card(IN t_void *pmlan_adapter)
+t_void
+mlan_pm_wakeup_card(IN t_void * adapter)
 {
-	mlan_adapter *pmadapter = (mlan_adapter *)pmlan_adapter;
+	mlan_adapter *pmadapter = (mlan_adapter *) adapter;
 	ENTER();
 	wlan_pm_wakeup_card(pmadapter);
 	LEAVE();

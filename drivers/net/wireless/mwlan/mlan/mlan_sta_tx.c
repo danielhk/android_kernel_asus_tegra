@@ -3,7 +3,7 @@
  *  @brief This file contains the handling of data packet
  *  transmission in MLAN module.
  *
- *  Copyright (C) 2008-2013, Marvell International Ltd.
+ *  Copyright (C) 2008-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -50,7 +50,7 @@ Change log:
 /**
  *  @brief This function fill the txpd for tx packet
  *
- *  @param priv	   A pointer to mlan_private structure
+ *  @param priv    A pointer to mlan_private structure
  *  @param pmbuf   A pointer to the mlan_buffer for process
  *
  *  @return        headptr or MNULL

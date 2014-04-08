@@ -3,7 +3,7 @@
  *  @brief This file contains related macros, enum, and struct
  *  of 11n RxReordering functionalities
  *
- *  Copyright (C) 2008-2013, Marvell International Ltd.
+ *  Copyright (C) 2008-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -46,7 +46,8 @@ Change log:
 #define DELBA_TID_POS			12
 /** Position of INITIATOR in DelBA Param set */
 #define DELBA_INITIATOR_POS		11
-/** Reason code: Requested from peer STA as it does not want to use the mechanism */
+/** Reason code: Requested from peer STA as it does not want to
+  * use the mechanism */
 #define REASON_CODE_STA_DONT_WANT	37
 /** Reason code: Requested from peer STA due to timeout*/
 #define REASON_CODE_STA_TIMEOUT		39
@@ -94,6 +95,7 @@ RxReorderTbl *wlan_11n_get_rxreorder_tbl(mlan_private * priv, int tid,
 					 t_u8 * ta);
 void wlan_11n_rxba_sync_event(mlan_private * priv, t_u8 * event_buf, t_u16 len);
 void wlan_update_rxreorder_tbl(pmlan_adapter pmadapter, t_u8 flag);
+void wlan_coex_ampdu_rxwinsize(pmlan_adapter pmadapter);
 
 /** clean up reorder_tbl */
 void wlan_cleanup_reorder_tbl(mlan_private * priv, t_u8 * ta);

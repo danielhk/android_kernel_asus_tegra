@@ -2,7 +2,7 @@
   *
   * @brief This file contains standard ioctl functions
   *
-  * Copyright (C) 2008-2013, Marvell International Ltd.
+  * Copyright (C) 2008-2014, Marvell International Ltd.
   *
   * This software file (the "File") is distributed by Marvell International
   * Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -117,7 +117,7 @@ woal_associate_ssid_bssid(moal_private * priv, struct iwreq *wrq)
 				ssid_bssid.bssid[mac_idx] =
 					(t_u8) woal_atox(buf + i);
 
-			while ((isxdigit(buf[i + 1]) && (i < buflen))) {
+			while ((i < buflen) && (isxdigit(buf[i + 1]))) {
 				/* Skip entire hex value */
 				i++;
 			}
@@ -1546,15 +1546,12 @@ woal_band_cfg(moal_private * priv, struct iwreq *wrq)
 			ret = -EFAULT;
 			goto error;
 		}
-		data[0] = radio_cfg->param.band_cfg.config_bands;	/* Infra
-									   Band
-									 */
-		data[1] = radio_cfg->param.band_cfg.adhoc_start_band;	/* Adhoc
-									   Band
-									 */
-		data[2] = radio_cfg->param.band_cfg.adhoc_channel;	/* Adhoc
-									   Channel
-									 */
+		/* Infra Band */
+		data[0] = radio_cfg->param.band_cfg.config_bands;
+		/* Adhoc Band */
+		data[1] = radio_cfg->param.band_cfg.adhoc_start_band;
+		/* Adhoc Channel */
+		data[2] = radio_cfg->param.band_cfg.adhoc_channel;
 		wrq->u.data.length = 3;
 		if (radio_cfg->param.band_cfg.adhoc_start_band & BAND_GN
 		    || radio_cfg->param.band_cfg.adhoc_start_band & BAND_AN) {
@@ -2929,6 +2926,74 @@ done:
 }
 
 /**
+ *  @brief Control Coalescing status Enable/Disable
+ *
+ *  @param priv     Pointer to the moal_private driver data struct
+ *  @param wrq      Pointer to user data
+ *
+ *  @return         0 --success, otherwise fail
+ */
+static int
+woal_coalescing_status_ioctl(moal_private * priv, struct iwreq *wrq)
+{
+	int ret = 0;
+	mlan_ds_misc_cfg *pcoal = NULL;
+	mlan_ioctl_req *req = NULL;
+	char buf[8];
+	struct iwreq *wreq = (struct iwreq *)wrq;
+	mlan_status status = MLAN_STATUS_SUCCESS;
+
+	ENTER();
+
+	req = woal_alloc_mlan_ioctl_req(sizeof(mlan_ds_misc_cfg));
+	if (req == NULL) {
+		ret = -ENOMEM;
+		goto done;
+	}
+	pcoal = (mlan_ds_misc_cfg *) req->pbuf;
+
+	memset(buf, 0, sizeof(buf));
+	if (!wrq->u.data.length) {
+		req->action = MLAN_ACT_GET;
+	} else {
+		req->action = MLAN_ACT_SET;
+		if (copy_from_user(buf, wrq->u.data.pointer,
+				   MIN(sizeof(buf) - 1, wreq->u.data.length))) {
+			PRINTM(MINFO, "Copy from user failed\n");
+			ret = -EFAULT;
+			goto done;
+		}
+		if (buf[0] == 1)
+			pcoal->param.coalescing_status =
+				MLAN_MISC_COALESCING_ENABLE;
+		else
+			pcoal->param.coalescing_status =
+				MLAN_MISC_COALESCING_DISABLE;
+	}
+
+	req->req_id = MLAN_IOCTL_MISC_CFG;
+	pcoal->sub_command = MLAN_OID_MISC_COALESCING_STATUS;
+
+	status = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
+	if (status != MLAN_STATUS_SUCCESS) {
+		ret = -EFAULT;
+		goto done;
+	}
+	buf[0] = ((mlan_ds_misc_cfg *) req->pbuf)->param.coalescing_status;
+
+	if (copy_to_user(wrq->u.data.pointer, buf, wrq->u.data.length)) {
+		ret = -EFAULT;
+		goto done;
+	}
+
+done:
+	if (status != MLAN_STATUS_PENDING)
+		kfree(req);
+	LEAVE();
+	return ret;
+}
+
+/**
  *  @brief Set/get user provisioned local power constraint
  *
  *  @param priv     A pointer to moal_private structure
@@ -3592,6 +3657,9 @@ woal_passphrase(moal_private * priv, struct iwreq *wrq)
 
 	if (action == 2)
 		sec->param.passphrase.psk_type = MLAN_PSK_CLEAR;
+	else if (action == 0)
+		sec->param.passphrase.psk_type = MLAN_PSK_QUERY;
+
 	status = woal_request_ioctl(priv, req, MOAL_IOCTL_WAIT);
 	if (status != MLAN_STATUS_SUCCESS) {
 		ret = -EFAULT;
@@ -4215,8 +4283,9 @@ woal_tx_bf_cfg_ioctl(moal_private * priv, struct iwreq *wrq)
 			break;
 		case SET_GET_BF_PERIODICITY:
 			/* First arg = 2 BfAction Second arg = 18 MAC
-			   "00:50:43:20:BF:64;" Third arg = 1 (min char) TX BF
-			   interval 10 (max char) u32 maximum value 4294967295 */
+			   "00:50:43:20:BF:64;" Third arg = 1 (min char) TX
+			   BF interval 10 (max char) u32 maximum value
+			   4294967295 */
 			if (char_count < 19 || char_count > 30) {
 				PRINTM(MERROR, "Invalid argument\n");
 				ret = -EINVAL;
@@ -4242,7 +4311,7 @@ woal_tx_bf_cfg_ioctl(moal_private * priv, struct iwreq *wrq)
 			/* Handle only SET operation here First arg = 2
 			   BfAction Second arg = 18 MAC "00:50:43:20:BF:64;"
 			   Third arg = 2 enable/disable bf Fourth arg = 2
-			   enable/disable sounding Fifth arg = 1 FB Type */
+			   enable/disable sounding * Fifth arg = 1 FB Type */
 			if (char_count != 25 && char_count != 1) {
 				PRINTM(MERROR, "Invalid argument\n");
 				ret = -EINVAL;
@@ -4264,9 +4333,9 @@ woal_tx_bf_cfg_ioctl(moal_private * priv, struct iwreq *wrq)
 			}
 			break;
 		case SET_SNR_THR_PEER:
-			/* First arg = 2 BfAction Second arg = 18 MAC
-			   "00:50:43:20:BF:64;" Third arg = 1/2 SNR u8 - can be
-			   1/2 charerters */
+			/* First arg = 2 BfAction * Second arg = 18 MAC
+			   "00:50:43:20:BF:64;" * Third arg = 1/2 SNR u8 - can
+			   be 1/2 charerters */
 			if (char_count != 1 &&
 			    !(char_count == 21 || char_count == 22)) {
 				PRINTM(MERROR, "Invalid argument\n");
@@ -4329,20 +4398,6 @@ woal_tx_bf_cfg_ioctl(moal_private * priv, struct iwreq *wrq)
 				sprintf(buf + data_length, "%d ",
 					(int)bf_global->bf_mode);
 			break;
-		case TRIGGER_SOUNDING_FOR_PEER:
-			data_length += sprintf(buf + data_length,
-					       "%02x:%02x:%02x:%02x:%02x:%02x",
-					       bf_sound->peer_mac[0],
-					       bf_sound->peer_mac[1],
-					       bf_sound->peer_mac[2],
-					       bf_sound->peer_mac[3],
-					       bf_sound->peer_mac[4],
-					       bf_sound->peer_mac[5]);
-			data_length += sprintf(buf + data_length, "%c", ';');
-			data_length +=
-				sprintf(buf + data_length, "%d",
-					bf_sound->status);
-			break;
 		case SET_GET_BF_PERIODICITY:
 			data_length += sprintf(buf + data_length,
 					       "%02x:%02x:%02x:%02x:%02x:%02x",
@@ -4401,9 +4456,6 @@ woal_tx_bf_cfg_ioctl(moal_private * priv, struct iwreq *wrq)
 				bf_snr++;
 			}
 			break;
-		default:
-			ret = -EINVAL;
-			goto done;
 		}
 		buf[data_length] = '\0';
 	}
@@ -4770,13 +4822,13 @@ woal_cmd53rdwr_ioctl(moal_private * priv, struct iwreq *wrq)
 
 	ENTER();
 
-	buf = (t_u8 *) kmalloc(WOAL_2K_BYTES, GFP_KERNEL);
+	buf = kmalloc(WOAL_2K_BYTES, GFP_KERNEL);
 	if (!buf) {
 		PRINTM(MERROR, "Cannot allocate buffer for command!\n");
 		ret = -EFAULT;
 		goto done;
 	}
-	data = (t_u8 *) kmalloc(WOAL_2K_BYTES, GFP_KERNEL);
+	data = kmalloc(WOAL_2K_BYTES, GFP_KERNEL);
 	if (!data) {
 		PRINTM(MERROR, "Cannot allocate buffer for command!\n");
 		ret = -EFAULT;
@@ -6296,6 +6348,9 @@ woal_wext_do_ioctl(struct net_device *dev, struct ifreq *req, int cmd)
 			break;
 		case WOAL_PORT_CTRL:
 			ret = woal_port_ctrl(priv, wrq);
+			break;
+		case WOAL_COALESCING_STATUS:
+			ret = woal_coalescing_status_ioctl(priv, wrq);
 			break;
 #if defined(WIFI_DIRECT_SUPPORT)
 #if defined(STA_SUPPORT) && defined(UAP_SUPPORT)

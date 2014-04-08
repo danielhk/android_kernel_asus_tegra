@@ -4,7 +4,7 @@
  *  structures and declares global function prototypes used
  *  in MLAN module.
  *
- *  Copyright (C) 2008-2013, Marvell International Ltd.
+ *  Copyright (C) 2008-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -40,12 +40,18 @@ extern mlan_status(*get_sys_time_callback) (IN t_void * pmoal_handle,
 extern t_u32 mlan_drvdbg;
 
 #ifdef	DEBUG_LEVEL2
-#define	PRINTM_MINFO(msg...)  do {if ((mlan_drvdbg & MINFO) && (print_callback)) \
-				  print_callback(MNULL, MINFO, msg); } while (0)
-#define	PRINTM_MWARN(msg...)  do {if ((mlan_drvdbg & MWARN) && (print_callback)) \
-				  print_callback(MNULL, MWARN, msg); } while (0)
-#define	PRINTM_MENTRY(msg...) do {if ((mlan_drvdbg & MENTRY) && (print_callback)) \
-				  print_callback(MNULL, MENTRY, msg); } while (0)
+#define	PRINTM_MINFO(msg...) do { \
+	if ((mlan_drvdbg & MINFO) && (print_callback)) \
+		print_callback(MNULL, MINFO, msg); \
+	} while (0)
+#define	PRINTM_MWARN(msg...)  do { \
+	if ((mlan_drvdbg & MWARN) && (print_callback)) \
+		print_callback(MNULL, MWARN, msg); \
+	} while (0)
+#define	PRINTM_MENTRY(msg...) do { \
+	if ((mlan_drvdbg & MENTRY) && (print_callback)) \
+		print_callback(MNULL, MENTRY, msg); \
+} while (0)
 #define PRINTM_GET_SYS_TIME(level, psec, pusec)              \
 do {                                                         \
 	if ((level & mlan_drvdbg) && (get_sys_time_callback))\
@@ -77,31 +83,55 @@ do {                                                    \
 
 #endif /* DEBUG_LEVEL2 */
 
-#define	PRINTM_MFW_D(msg...)  do {if ((mlan_drvdbg & MFW_D) && (print_callback)) \
-				  print_callback(MNULL, MFW_D, msg); } while (0)
-#define	PRINTM_MCMD_D(msg...) do {if ((mlan_drvdbg & MCMD_D) && (print_callback)) \
-				  print_callback(MNULL, MCMD_D, msg); } while (0)
-#define	PRINTM_MDAT_D(msg...) do {if ((mlan_drvdbg & MDAT_D) && (print_callback)) \
-				  print_callback(MNULL, MDAT_D, msg); } while (0)
-#define	PRINTM_MIF_D(msg...) do {if ((mlan_drvdbg & MIF_D) && (print_callback)) \
-				  print_callback(MNULL, MIF_D, msg); } while (0)
+#define	PRINTM_MFW_D(msg...)  do { \
+	if ((mlan_drvdbg & MFW_D) && (print_callback)) \
+		print_callback(MNULL, MFW_D, msg); \
+	} while (0)
+#define	PRINTM_MCMD_D(msg...) do { \
+	if ((mlan_drvdbg & MCMD_D) && (print_callback)) \
+		print_callback(MNULL, MCMD_D, msg); \
+	} while (0)
+#define	PRINTM_MDAT_D(msg...) do { \
+	if ((mlan_drvdbg & MDAT_D) && (print_callback)) \
+		print_callback(MNULL, MDAT_D, msg); \
+	} while (0)
+#define	PRINTM_MIF_D(msg...) do { \
+	if ((mlan_drvdbg & MIF_D) && (print_callback)) \
+		print_callback(MNULL, MIF_D, msg); \
+	} while (0)
 
-#define	PRINTM_MIOCTL(msg...) do {if ((mlan_drvdbg & MIOCTL) && (print_callback)) \
-				  print_callback(MNULL, MIOCTL, msg); } while (0)
-#define	PRINTM_MINTR(msg...)  do {if ((mlan_drvdbg & MINTR) && (print_callback)) \
-				  print_callback(MNULL, MINTR, msg); } while (0)
-#define	PRINTM_MEVENT(msg...) do {if ((mlan_drvdbg & MEVENT) && (print_callback)) \
-				  print_callback(MNULL, MEVENT, msg); } while (0)
-#define	PRINTM_MCMND(msg...)  do {if ((mlan_drvdbg & MCMND) && (print_callback)) \
-				  print_callback(MNULL, MCMND, msg); } while (0)
-#define	PRINTM_MDATA(msg...)  do {if ((mlan_drvdbg & MDATA) && (print_callback)) \
-				  print_callback(MNULL, MDATA, msg); } while (0)
-#define	PRINTM_MERROR(msg...) do {if ((mlan_drvdbg & MERROR) && (print_callback)) \
-				  print_callback(MNULL, MERROR, msg); } while (0)
-#define	PRINTM_MFATAL(msg...) do {if ((mlan_drvdbg & MFATAL) && (print_callback)) \
-				  print_callback(MNULL, MFATAL, msg); } while (0)
-#define	PRINTM_MMSG(msg...)   do {if ((mlan_drvdbg & MMSG) && (print_callback)) \
-				  print_callback(MNULL, MMSG, msg); } while (0)
+#define	PRINTM_MIOCTL(msg...) do { \
+	if ((mlan_drvdbg & MIOCTL) && (print_callback)) \
+		print_callback(MNULL, MIOCTL, msg); \
+	} while (0)
+#define	PRINTM_MINTR(msg...)  do { \
+	if ((mlan_drvdbg & MINTR) && (print_callback)) \
+		print_callback(MNULL, MINTR, msg); \
+	} while (0)
+#define	PRINTM_MEVENT(msg...) do { \
+	if ((mlan_drvdbg & MEVENT) && (print_callback)) \
+		print_callback(MNULL, MEVENT, msg); \
+	} while (0)
+#define	PRINTM_MCMND(msg...)  do { \
+	if ((mlan_drvdbg & MCMND) && (print_callback)) \
+		print_callback(MNULL, MCMND, msg); \
+	} while (0)
+#define	PRINTM_MDATA(msg...)  do { \
+	if ((mlan_drvdbg & MDATA) && (print_callback)) \
+		print_callback(MNULL, MDATA, msg); \
+	} while (0)
+#define	PRINTM_MERROR(msg...) do { \
+	if ((mlan_drvdbg & MERROR) && (print_callback)) \
+		print_callback(MNULL, MERROR, msg); \
+	} while (0)
+#define	PRINTM_MFATAL(msg...) do { \
+	if ((mlan_drvdbg & MFATAL) && (print_callback)) \
+		print_callback(MNULL, MFATAL, msg); \
+	} while (0)
+#define	PRINTM_MMSG(msg...) do { \
+	if ((mlan_drvdbg & MMSG) && (print_callback)) \
+		print_callback(MNULL, MMSG, msg); \
+	} while (0)
 
 #define	PRINTM(level, msg...) PRINTM_##level((char *)msg)
 
@@ -439,8 +469,8 @@ do {                                    \
 
 /** Is cmd_resp, event or data packet received? */
 #define IS_CARD_RX_RCVD(adapter) (adapter->cmd_resp_received || \
-								adapter->event_received || \
-								adapter->data_received)
+	adapter->event_received || \
+	adapter->data_received)
 /** Type command */
 #define MLAN_TYPE_CMD			1
 /** Type data */
@@ -830,7 +860,7 @@ typedef struct {
 	mlan_status(*get_chan_callback) (t_void *);
     /** current ioctl_req (to be completed in callback) */
 	pmlan_ioctl_req pioctl_req_curr;
-    /** band_cfg from MrvlIEtypes_channel_band_t */
+    /** band config from MrvlIEtypes_channel_band_t */
 	t_u8 band_config;
     /** channel from MrvlIEtypes_channel_band_t */
 	t_u8 channel;
@@ -1176,6 +1206,8 @@ struct _RxReorderTbl {
 	t_u8 force_no_drop;
     /** flag for check start win */
 	t_u8 check_start_win;
+    /** flush data flag */
+	t_u8 flush_data;
 };
 
 /** BSS priority node */
@@ -1522,6 +1554,8 @@ typedef struct _mlan_init_para {
 	t_u32 dfs_master_radar_det_en;
     /** 802.11H DFS Slave Radar Detect */
 	t_u32 dfs_slave_radar_det_en;
+    /** dev cap mask */
+	t_u32 dev_cap_mask;
 } mlan_init_para, *pmlan_init_para;
 
 /** Adapter data structure for MLAN */
@@ -1904,6 +1938,8 @@ typedef struct _mlan_adapter {
 	/* TDLS_NOT_SETUP|TDLS_SWITCHING_CHANNEL|TDLS_IN_BASE_CHANNEL|TDLS_IN_SWITCH_CHANNEL */
 	tdlsStatus_e tdls_status;
 
+    /** Control coex RX window size configuration */
+	t_u8 coex_rx_winsize;
 } mlan_adapter, *pmlan_adapter;
 
 /** Ethernet packet type for EAPOL */
@@ -2492,16 +2528,15 @@ t_u8 wlan_is_wmm_ie_present(pmlan_adapter pmadapter, t_u8 * pbuf,
  *
  *  @param priv     A pointer to mlan_private
  *  @param mac      station mac address
- *  @return 	    TDLS_NOT_SETUP/TDLS_SETUP_INPROGRESS/TDLS_SETUP_COMPLETE/TDLS_SETUP_FAILURE/TDLS_TEAR_DOWN
+ *  @return         TDLS_NOT_SETUP/TDLS_SETUP_INPROGRESS/TDLS_SETUP_COMPLETE/TDLS_SETUP_FAILURE/TDLS_TEAR_DOWN
  */
 static INLINE tdlsStatus_e
 wlan_get_tdls_link_status(mlan_private * priv, t_u8 * mac)
 {
 	sta_node *sta_ptr = MNULL;
 	sta_ptr = wlan_get_station_entry(priv, mac);
-	if (sta_ptr) {
+	if (sta_ptr)
 		return sta_ptr->status;
-	}
 	return TDLS_NOT_SETUP;
 }
 
@@ -2509,7 +2544,7 @@ wlan_get_tdls_link_status(mlan_private * priv, t_u8 * mac)
  *  @brief This function checks if TDLS link is in channel switching
  *
  *  @param status     tdls link status
- *  @return 	    MTRUE/MFALSE
+ *  @return         MTRUE/MFALSE
  */
 static INLINE int
 wlan_is_tdls_link_chan_switching(tdlsStatus_e status)
@@ -2521,7 +2556,7 @@ wlan_is_tdls_link_chan_switching(tdlsStatus_e status)
  *  @brief This function checks if send command to firmware is allowed
  *
  *  @param status     tdls link status
- *  @return 	    MTRUE/MFALSE
+ *  @return         MTRUE/MFALSE
  */
 static INLINE int
 wlan_is_send_cmd_allowed(tdlsStatus_e status)
@@ -2542,7 +2577,7 @@ wlan_is_send_cmd_allowed(tdlsStatus_e status)
  *  @brief This function checks if TDLS link is setup
  *
  *  @param status     tdls link status
- *  @return 	    MTRUE/MFALSE
+ *  @return         MTRUE/MFALSE
  */
 static INLINE int
 wlan_is_tdls_link_setup(tdlsStatus_e status)
@@ -2592,6 +2627,9 @@ t_void wlan_drop_tx_pkts(pmlan_private priv);
 /* process the recevied packet and bridge the packet */
 mlan_status wlan_uap_recv_packet(IN mlan_private * priv, IN pmlan_buffer pmbuf);
 #endif /* UAP_SUPPORT */
+
+mlan_status wlan_misc_ioctl_coalescing_status(IN pmlan_adapter pmadapter,
+					      IN pmlan_ioctl_req pioctl_req);
 
 mlan_status wlan_misc_ioctl_custom_ie_list(IN pmlan_adapter pmadapter,
 					   IN pmlan_ioctl_req pioctl_req,
@@ -2746,8 +2784,8 @@ wlan_strlen(const char *str)
 {
 	t_u32 i;
 
-	for (i = 0; str[i] != 0; i++) {
-	}
+	for (i = 0; str[i] != 0; i++) ;
+
 	return i;
 }
 
@@ -2797,10 +2835,10 @@ t_void wlan_delay_func(mlan_adapter * pmadapter, t_u32 delay, t_delay_unit u);
 
 /** Function to check if any command is pending in the queue */
 #define IS_COMMAND_PENDING(pmadapter) \
-			((cmd_ctrl_node *)util_peek_list(pmadapter->pmoal_handle, \
-			&pmadapter->cmd_pending_q,\
-			pmadapter->callbacks.moal_spin_lock,\
-			pmadapter->callbacks.moal_spin_unlock))
+	((cmd_ctrl_node *)util_peek_list(pmadapter->pmoal_handle, \
+	&pmadapter->cmd_pending_q,\
+	pmadapter->callbacks.moal_spin_lock,\
+	pmadapter->callbacks.moal_spin_unlock))
 
 /** Get BSS number from priv */
 #define GET_BSS_NUM(priv)   ((priv)->bss_num)

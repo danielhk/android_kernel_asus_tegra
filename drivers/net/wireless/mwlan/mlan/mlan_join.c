@@ -6,7 +6,7 @@
  *  for sending adhoc start, adhoc join, and association commands
  *  to the firmware.
  *
- *  Copyright (C) 2008-2013, Marvell International Ltd.
+ *  Copyright (C) 2008-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -35,7 +35,6 @@ Change log:
 #include "mlan_wmm.h"
 #include "mlan_11n.h"
 #include "mlan_11h.h"
-
 /********************************************************
 			Local Constants
 ********************************************************/
@@ -551,7 +550,7 @@ wlan_cmd_802_11_associate(IN mlan_private * pmpriv,
 	MrvlIEtypes_SsParamSet_t *pss_tlv;
 	MrvlIEtypes_RatesParamSet_t *prates_tlv;
 	MrvlIEtypes_AuthType_t *pauth_tlv;
-	MrvlIEtypes_RsnParamSet_t *prsn_ie_tlv;
+	MrvlIEtypes_RsnParamSet_t *prsn_ie_tlv = MNULL;
 	MrvlIEtypes_ChanListParamSet_t *pchan_tlv;
 	WLAN_802_11_RATES rates;
 	t_u32 rates_size;
@@ -1098,6 +1097,7 @@ wlan_ret_802_11_associate(IN mlan_private * pmpriv,
 
 	/* Send OBSS scan param to the application if available */
 	wlan_2040_coex_event(pmpriv);
+	wlan_coex_ampdu_rxwinsize(pmadapter);
 
 	if (!pmpriv->sec_info.wpa_enabled
 	    && !pmpriv->sec_info.wpa2_enabled
@@ -1855,8 +1855,9 @@ wlan_ret_802_11_ad_hoc(IN mlan_private * pmpriv,
 		PRINTM(MINFO, "ADHOC_J_RESP  %s\n", pbss_desc->ssid.ssid);
 
 		/*
-		 * Make a copy of current BSSID descriptor, only needed for join since
-		 * the current descriptor is already being used for adhoc start
+		 * Make a copy of current BSSID descriptor, only needed
+		 * for join since the current descriptor is already
+		 * being used for adhoc start
 		 */
 		memcpy(pmpriv->adapter, &pmpriv->curr_bss_params.bss_descriptor,
 		       pbss_desc, sizeof(BSSDescriptor_t));

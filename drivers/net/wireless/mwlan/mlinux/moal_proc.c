@@ -2,7 +2,7 @@
   *
   * @brief This file contains functions for proc file.
   *
-  * Copyright (C) 2008-2013, Marvell International Ltd.
+  * Copyright (C) 2008-2014, Marvell International Ltd.
   *
   * This software file (the "File") is distributed by Marvell International
   * Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -28,7 +28,7 @@ Change log:
 #ifdef UAP_SUPPORT
 #include    "moal_uap.h"
 #endif
-#include 	"moal_sdio.h"
+#include    "moal_sdio.h"
 
 /********************************************************
 		Local Variables
@@ -298,14 +298,14 @@ parse_cmd52_string(const char *buffer, size_t len, int *func, int *reg,
 	int ret = MLAN_STATUS_SUCCESS;
 	char *string = NULL;
 	char *pos = NULL;
+	gfp_t flag;
 
 	ENTER();
-
-	string = (char *)kmalloc(CMD52_STR_LEN, GFP_KERNEL);
+	flag = (in_atomic() || irqs_disabled())? GFP_ATOMIC : GFP_KERNEL;
+	string = kzalloc(CMD52_STR_LEN, flag);
 	if (string == NULL)
 		return -ENOMEM;
 
-	memset(string, 0, CMD52_STR_LEN);
 	memcpy(string, buffer + strlen("sdcmd52rw="),
 	       MIN((CMD52_STR_LEN - 1), (len - strlen("sdcmd52rw="))));
 	string = strstrip(string);
@@ -405,8 +405,10 @@ woal_config_write(struct file *f, const char __user * buf, size_t count,
 		priv = woal_get_priv(handle, MLAN_BSS_ROLE_ANY);
 		if (priv) {
 			PRINTM(MERROR, "Recevie debug_dump command\n");
+			drvdbg &= ~MFW_D;
 			woal_mlan_debug_info(priv);
 			woal_moal_debug_info(priv, NULL, MFALSE);
+
 			woal_dump_firmware_info(handle);
 		}
 	}

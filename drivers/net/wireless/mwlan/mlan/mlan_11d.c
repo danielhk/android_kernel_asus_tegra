@@ -2,7 +2,7 @@
  *
  *  @brief This file contains functions for 802.11D.
  *
- *  Copyright (C) 2008-2013, Marvell International Ltd.
+ *  Copyright (C) 2008-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -512,8 +512,9 @@ wlan_11d_process_country_info(mlan_private * pmpriv,
 			     (j < parsed_region_chan->no_of_chan &&
 			      j < MAX_NO_OF_CHAN); j++) {
 				/*
-				 * Channel already exists, update the tx power with new tx
-				 * power, since country IE is valid here.
+				 * Channel already exists, update the tx power
+				 * with new tx power, since country IE is valid
+				 * here.
 				 */
 				if (region_chan.chan_pwr[i].chan ==
 				    parsed_region_chan->chan_pwr[j].chan &&
@@ -528,8 +529,9 @@ wlan_11d_process_country_info(mlan_private * pmpriv,
 			if (j == parsed_region_chan->no_of_chan &&
 			    j < MAX_NO_OF_CHAN) {
 				/*
-				 * Channel does not exist in the channel power table,
-				 * update this new chan and tx_power to the channel power table
+				 * Channel does not exist in the channel power
+				 * table, update this new chan and tx_power
+				 * to the channel power table
 				 */
 				parsed_region_chan->
 					chan_pwr[parsed_region_chan->
@@ -1154,7 +1156,8 @@ wlan_11d_set_universaltable(mlan_private * pmpriv, t_u8 band)
  *  @param chan                 Chan number
  *  @param parsed_region_chan   Pointer to parsed_region_chan_11d_t
  *
- *  @return                     PASSIVE if chan is unknown; ACTIVE if chan is known
+ *  @return                     PASSIVE if chan is unknown; ACTIVE
+ *                              if chan is known
  */
 t_u8
 wlan_11d_get_scan_type(pmlan_adapter pmadapter,
@@ -1351,9 +1354,10 @@ wlan_11d_parse_dnld_countryinfo(mlan_private * pmpriv,
 					     ((j < region_chan.no_of_chan)
 					      && (j < MAX_NO_OF_CHAN)); j++) {
 						/*
-						 * Channel already exists, use minimum of existing
-						 * tx power and tx_power received from
-						 * country info of the current AP
+						 * Channel already exists, use minimum
+						 * of existing tx power and tx_power
+						 * received from country info of the
+						 * current AP
 						 */
 						if (region_chan.chan_pwr[i].
 						    chan ==

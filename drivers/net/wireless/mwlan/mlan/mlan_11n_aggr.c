@@ -2,7 +2,7 @@
  *
  *  @brief This file contains functions for 11n Aggregation.
  *
- *  Copyright (C) 2008-2013, Marvell International Ltd.
+ *  Copyright (C) 2008-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -329,14 +329,14 @@ done:
 /**
  *  @brief Aggregate multiple packets into one single AMSDU packet
  *
- *  @param priv 	A pointer to mlan_private structure
- *  @param pra_list	Pointer to the RA List table containing the pointers
+ *  @param priv     A pointer to mlan_private structure
+ *  @param pra_list Pointer to the RA List table containing the pointers
  *                  to packets.
- *  @param headroom	Any interface specific headroom that may be need. TxPD
+ *  @param headroom Any interface specific headroom that may be need. TxPD
  *                  will be formed leaving this headroom.
- *  @param ptrindex	Pointer index
+ *  @param ptrindex Pointer index
  *
- *  @return		Final packet size or MLAN_STATUS_FAILURE
+ *  @return     Final packet size or MLAN_STATUS_FAILURE
  */
 int
 wlan_11n_aggregate_pkt(mlan_private * priv, raListTbl * pra_list,

@@ -3,7 +3,7 @@
  *  @brief This file contains SDIO MMC IF (interface) module
  *  related functions.
  *
- * Copyright (C) 2008-2013, Marvell International Ltd.
+ * Copyright (C) 2008-2014, Marvell International Ltd.
  *
  * This software file (the "File") is distributed by Marvell International
  * Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -389,7 +389,23 @@ woal_sdio_suspend(struct device *dev)
 		LEAVE();
 		return MLAN_STATUS_SUCCESS;
 	}
-
+	if (woal_check_driver_status(handle)) {
+		PRINTM(MERROR, "Allow suspend when device is in hang state\n");
+#ifdef MMC_PM_SKIP_RESUME_PROBE
+		PRINTM(MCMND,
+		       "suspend with MMC_PM_KEEP_POWER and MMC_PM_SKIP_RESUME_PROBE\n");
+		ret = sdio_set_host_pm_flags(func,
+					     MMC_PM_KEEP_POWER |
+					     MMC_PM_SKIP_RESUME_PROBE);
+#else
+		PRINTM(MCMND, "suspend with MMC_PM_KEEP_POWER\n");
+		ret = sdio_set_host_pm_flags(func, MMC_PM_KEEP_POWER);
+#endif
+		handle->hs_force_count++;
+		handle->is_suspended = MTRUE;
+		LEAVE();
+		return MLAN_STATUS_SUCCESS;
+	}
 	handle->suspend_fail = MFALSE;
 	memset(&pm_info, 0, sizeof(pm_info));
 	if (MLAN_STATUS_SUCCESS ==
@@ -477,8 +493,12 @@ woal_sdio_resume(struct device *dev)
 		LEAVE();
 		return MLAN_STATUS_SUCCESS;
 	}
-
 	handle->is_suspended = MFALSE;
+	if (woal_check_driver_status(handle)) {
+		PRINTM(MERROR, "Resuem, device is in hang state\n");
+		LEAVE();
+		return MLAN_STATUS_SUCCESS;
+	}
 	for (i = 0; i < handle->priv_num; i++)
 		netif_device_attach(handle->priv[i]->netdev);
 
@@ -566,16 +586,19 @@ woal_write_data_sync(moal_handle * handle, mlan_buffer * pmbuf, t_u32 port,
 		 BLOCK_MODE) ? (pmbuf->data_len /
 				MLAN_SDIO_BLOCK_SIZE) : pmbuf->data_len;
 	t_u32 ioport = (port & MLAN_SDIO_IO_PORT_MASK);
+	int status = 0;
 #ifdef SDIO_MMC_DEBUG
 	handle->cmd53w = 1;
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 32)
 	sdio_claim_host(((struct sdio_mmc_card *)handle->card)->func);
 #endif
-	if (!sdio_writesb
-	    (((struct sdio_mmc_card *)handle->card)->func, ioport, buffer,
-	     blkcnt * blksz))
+	status = sdio_writesb(((struct sdio_mmc_card *)handle->card)->func,
+			      ioport, buffer, blkcnt * blksz);
+	if (!status)
 		ret = MLAN_STATUS_SUCCESS;
+	else
+		PRINTM(MERROR, "cmd53 write error=%d\n", status);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 32)
 	sdio_release_host(((struct sdio_mmc_card *)handle->card)->func);
 #endif
@@ -609,18 +632,21 @@ woal_read_data_sync(moal_handle * handle, mlan_buffer * pmbuf, t_u32 port,
 		 BLOCK_MODE) ? (pmbuf->data_len /
 				MLAN_SDIO_BLOCK_SIZE) : pmbuf->data_len;
 	t_u32 ioport = (port & MLAN_SDIO_IO_PORT_MASK);
+	int status = 0;
 #ifdef SDIO_MMC_DEBUG
 	handle->cmd53r = 1;
 #endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 32)
 	sdio_claim_host(((struct sdio_mmc_card *)handle->card)->func);
 #endif
-	if (!sdio_readsb
-	    (((struct sdio_mmc_card *)handle->card)->func, buffer, ioport,
-	     blkcnt * blksz))
+	status = sdio_readsb(((struct sdio_mmc_card *)handle->card)->func,
+			     buffer, ioport, blkcnt * blksz);
+	if (!status) {
 		ret = MLAN_STATUS_SUCCESS;
-	else
+	} else {
+		PRINTM(MERROR, "cmd53 read error=%d\n", status);
 		woal_dump_sdio_reg(handle);
+	}
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 32)
 	sdio_release_host(((struct sdio_mmc_card *)handle->card)->func);
 #endif
@@ -633,7 +659,7 @@ woal_read_data_sync(moal_handle * handle, mlan_buffer * pmbuf, t_u32 port,
 /**
  *  @brief This function registers the IF module in bus driver
  *
- *  @return	   MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
+ *  @return    MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
 mlan_status
 woal_bus_register(void)

@@ -2,7 +2,7 @@
   *
   * @brief This file contains the functions for uAP CFG80211.
   *
-  * Copyright (C) 2011-2013, Marvell International Ltd.
+  * Copyright (C) 2011-2014, Marvell International Ltd.
   *
   * This software file (the "File") is distributed by Marvell International
   * Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -439,14 +439,23 @@ woal_cfg80211_beacon_config(moal_private * priv,
 	struct ieee80211_mgmt *head = NULL;
 	t_u16 capab_info = 0;
 #endif
-	t_u8 rates_bg[13] =
-		{ 0x82, 0x84, 0x8b, 0x96, 0x0c, 0x12, 0x18, 0x24, 0x30, 0x48,
-		0x60, 0x6c, 0
+	t_u8 rates_bg[13] = {
+		0x82, 0x84, 0x8b, 0x96,
+		0x0c, 0x12, 0x18, 0x24,
+		0x30, 0x48, 0x60, 0x6c,
+		0x00
 	};
-	t_u8 rates_a[9] = { 0x8c, 0x12, 0x98, 0x24, 0xb0, 0x48, 0x60, 0x6c, 0 };
+	t_u8 rates_a[9] = {
+		0x8c, 0x12, 0x98, 0x24,
+		0xb0, 0x48, 0x60, 0x6c,
+		0x00
+	};
 #ifdef WIFI_DIRECT_SUPPORT
-	t_u8 rates_wfd[9] =
-		{ 0x8c, 0x12, 0x18, 0x24, 0x30, 0x48, 0x60, 0x6c, 0 };
+	t_u8 rates_wfd[9] = {
+		0x8c, 0x12, 0x18, 0x24,
+		0x30, 0x48, 0x60, 0x6c,
+		0x00
+	};
 #endif
 	t_u8 chan2Offset = 0;
 	t_u8 enable_11n = MTRUE;
@@ -577,10 +586,13 @@ woal_cfg80211_beacon_config(moal_private * priv,
 				memcpy(sys_config.rates, rates_a,
 				       sizeof(rates_a));
 		}
-		sys_config.ht_cap_info = 0x111c;
+		/* Disable GreenField by default */
+		sys_config.ht_cap_info = 0x110c;
+		if (enable_11n)
+			sys_config.ht_cap_info |= 0x20;
 		if (chan2Offset) {
 			sys_config.band_cfg |= chan2Offset;
-			sys_config.ht_cap_info |= 0x72;
+			sys_config.ht_cap_info |= 0x42;
 			sys_config.ampdu_param = 3;
 		}
 		PRINTM(MCMND,
@@ -762,10 +774,13 @@ woal_cfg80211_beacon_config(moal_private * priv,
 	if ((sys_config.protocol == PROTOCOL_STATIC_WEP) ||
 	    (sys_config.protocol == PROTOCOL_WPA))
 		enable_11n = MFALSE;
-	if (!enable_11n)
+	if (!enable_11n) {
 		woal_uap_set_11n_status(&sys_config, MLAN_ACT_DISABLE);
-	else
+	} else {
 		woal_uap_set_11n_status(&sys_config, MLAN_ACT_ENABLE);
+		woal_set_get_tx_bf_cap(priv, MLAN_ACT_GET,
+				       &sys_config.tx_bf_cap);
+	}
 	if (MLAN_STATUS_SUCCESS != woal_set_get_sys_config(priv,
 							   MLAN_ACT_SET,
 							   MOAL_IOCTL_WAIT,
@@ -799,7 +814,7 @@ woal_virt_if_setup(struct net_device *dev)
 
 /**
  * @brief This function adds a new interface. It will
- * 		allocate, initialize and register the device.
+ *        allocate, initialize and register the device.
  *
  *  @param handle    A pointer to moal_handle structure
  *  @param bss_index BSS index number
@@ -852,6 +867,9 @@ woal_alloc_virt_interface(moal_handle * handle, t_u8 bss_index, t_u8 bss_type,
 	INIT_LIST_HEAD(&priv->tcp_sess_queue);
 	spin_lock_init(&priv->tcp_sess_lock);
 
+	spin_lock_init(&priv->scan_req_lock);
+	spin_lock_init(&priv->connect_lock);
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 24)
 	SET_MODULE_OWNER(dev);
 #endif
@@ -893,6 +911,8 @@ woal_cfg80211_add_virt_if(struct wiphy *wiphy,
 	moal_private *priv = NULL, *new_priv = NULL;
 	moal_handle *handle = (moal_handle *) woal_get_wiphy_priv(wiphy);
 	struct wireless_dev *wdev = NULL;
+	moal_private *vir_priv;
+	int i = 0;
 
 	ENTER();
 	ASSERT_RTNL();
@@ -905,9 +925,20 @@ woal_cfg80211_add_virt_if(struct wiphy *wiphy,
 	}
 	if (priv->phandle->drv_mode.intf_num == priv->phandle->priv_num) {
 		PRINTM(MERROR, "max virtual interface limit reached\n");
-		LEAVE();
-		return -ENOMEM;
+		for (i = 0; i < priv->phandle->priv_num; i++) {
+			vir_priv = priv->phandle->priv[i];
+			if (vir_priv->bss_virtual) {
+				woal_cfg80211_del_virt_if(wiphy,
+							  vir_priv->netdev);
+				break;
+			}
+		}
+		if (priv->phandle->drv_mode.intf_num == priv->phandle->priv_num) {
+			LEAVE();
+			return -ENOMEM;
+		}
 	}
+	PRINTM(MMSG, "Add virtual interface %s\n", name);
 	if ((type != NL80211_IFTYPE_P2P_CLIENT) &&
 	    (type != NL80211_IFTYPE_P2P_GO)) {
 		PRINTM(MERROR, "Invalid iftype: %d\n", type);
@@ -1037,8 +1068,9 @@ woal_cfg80211_del_virt_if(struct wiphy *wiphy, struct net_device *dev)
 		vir_priv = priv->phandle->priv[i];
 		if (vir_priv) {
 			if (vir_priv->netdev == dev) {
-				PRINTM(MIOCTL,
-				       "Find virtual interface, index=%d\n", i);
+				PRINTM(MMSG,
+				       "Del virtual interface %s, index=%d\n",
+				       dev->name, i);
 				break;
 			}
 		}
@@ -1047,7 +1079,6 @@ woal_cfg80211_del_virt_if(struct wiphy *wiphy, struct net_device *dev)
 		woal_stop_queue(dev);
 		netif_carrier_off(dev);
 		netif_device_detach(dev);
-		woal_cancel_scan(vir_priv, MOAL_IOCTL_WAIT);
 		if (handle->is_remain_timer_set) {
 			woal_cancel_timer(&handle->remain_timer);
 			woal_remain_timer_func(handle);
@@ -1140,6 +1171,13 @@ woal_remove_virtual_interface(moal_handle * handle)
 			if (priv->bss_virtual) {
 				PRINTM(MCMND, "Remove virtual interface %s\n",
 				       priv->netdev->name);
+#ifdef CONFIG_PROC_FS
+#ifdef PROC_DEBUG
+				/* Remove proc debug */
+				woal_debug_remove(priv);
+#endif /* PROC_DEBUG */
+				woal_proc_remove(priv);
+#endif /* CONFIG_PROC_FS */
 				netif_device_detach(priv->netdev);
 				if (priv->netdev->reg_state ==
 				    NETREG_REGISTERED)

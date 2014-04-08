@@ -2,7 +2,7 @@
  *
  *  @brief This file contains MLAN event handling.
  *
- *  Copyright (C) 2008-2013, Marvell International Ltd.
+ *  Copyright (C) 2008-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -295,7 +295,7 @@ wlan_parse_tdls_event(pmlan_private priv, pmlan_buffer pevent)
  *
  *  @param priv    A pointer to mlan_private
  *
- *  @return		   N/A
+ *  @return        N/A
  */
 void
 wlan_send_tdls_tear_down_request(pmlan_private priv)
@@ -387,6 +387,7 @@ wlan_reset_connect_state(pmlan_private priv, t_u8 drv_disconnect)
 	priv->rxpd_rate = 0;
 	priv->rxpd_htinfo = 0;
 	priv->max_amsdu = 0;
+	wlan_coex_ampdu_rxwinsize(pmadapter);
 
 	priv->sec_info.ewpa_enabled = MFALSE;
 	priv->sec_info.wpa_enabled = MFALSE;
@@ -495,11 +496,10 @@ wlan_2040_coex_event(pmlan_private pmpriv)
 /**
  *  @brief This function will process tx pause event
  *
- *
  *  @param priv    A pointer to mlan_private
  *  @param pevent  A pointer to event buf
  *
- *  @return	       N/A
+ *  @return        N/A
  */
 static void
 wlan_process_sta_tx_pause_event(pmlan_private priv, pmlan_buffer pevent)
@@ -527,8 +527,7 @@ wlan_process_sta_tx_pause_event(pmlan_private priv, pmlan_buffer pevent)
 		}
 		if (tlv_type == TLV_TYPE_TX_PAUSE) {
 			tx_pause_tlv = (MrvlIEtypes_tx_pause_t *) tlv;
-			PRINTM(MCMND,
-			       "TDLS TxPause: " MACSTR " pause=%d, pkts=%d\n",
+			PRINTM(MCMND, "TxPause: " MACSTR " pause=%d, pkts=%d\n",
 			       MAC2STR(tx_pause_tlv->peermac),
 			       tx_pause_tlv->tx_pause, tx_pause_tlv->pkt_cnt);
 			if (bssid &&

@@ -2,7 +2,7 @@
  *
  *  @brief This file contains functions for 802.11H.
  *
- *  Copyright (C) 2008-2013, Marvell International Ltd.
+ *  Copyright (C) 2008-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -115,8 +115,10 @@ IEEEtypes_SupportChan_Subband_t wlan_11h_unii_upper_band = { 149, 5 };
 
 /** Internally passed structure used to send a CMD_802_11_TPC_INFO command */
 typedef struct {
-	t_u8 chan;		/**< Channel to which the power constraint applies */
-	t_u8 power_constraint;	/**< Local power constraint to send to firmware */
+	t_u8 chan;
+	       /**< Channel to which the power constraint applies */
+	t_u8 power_constraint;
+			   /**< Local power constraint to send to firmware */
 } wlan_11h_tpc_info_param_t;
 
 /********************************************************
@@ -343,8 +345,8 @@ wlan_11h_set_supp_channels_ie(mlan_private * priv,
 	} else if (band & BAND_A) {
 		/*
 		 * Set the supported channel elements based on the region code,
-		 *   incrementing num_subbands for each sub-band we append to the
-		 *   element.
+		 * incrementing num_subbands for each sub-band we append to the
+		 * element.
 		 */
 		switch (cfp_a) {
 		case 0x10:	/* USA FCC */
@@ -776,7 +778,8 @@ wlan_11h_process_adhoc(mlan_private * priv,
 
 	if (p11h_bss_info) {
 		/*
-		 * Copy the DFS Owner/Recovery Interval from the BSS we are joining
+		 * Copy the DFS Owner/Recovery Interval from the BSS
+		 * we are joining
 		 */
 		memcpy(adapter, dfs_elem.dfs_owner,
 		       p11h_bss_info->ibss_dfs.dfs_owner,
@@ -800,7 +803,8 @@ wlan_11h_process_adhoc(mlan_private * priv,
 	 */
 	if (p11h_bss_info) {
 		/*
-		 * If there was a quiet element, include it in adhoc join command
+		 * If there was a quiet element, include it in
+		 * adhoc join command
 		 */
 		if (p11h_bss_info->quiet.element_id == QUIET) {
 			size_appended
@@ -844,16 +848,16 @@ wlan_11h_process_adhoc(mlan_private * priv,
 
 	PRINTM(MINFO, "WEILIE 1: ppbuffer = %p\n", *ppbuffer);
 
-	ret_len += wlan_11h_set_local_power_constraint_tlv(ppbuffer,
-							   (t_u8) channel,
-							   (t_u8)
-							   local_constraint,
-							   (t_u8) priv->
-							   adapter->state_11h.
-							   min_tx_power_capability,
-							   (t_u8) priv->
-							   adapter->state_11h.
-							   max_tx_power_capability);
+	ret_len +=
+		wlan_11h_set_local_power_constraint_tlv(ppbuffer,
+							(t_u8) channel,
+							(t_u8) local_constraint,
+							(t_u8) priv->adapter->
+							state_11h.
+							min_tx_power_capability,
+							(t_u8) priv->adapter->
+							state_11h.
+							max_tx_power_capability);
 	PRINTM(MINFO, "WEILIE 2: ppbuffer = %p\n", *ppbuffer);
 
 	LEAVE();
@@ -1026,8 +1030,8 @@ wlan_is_intf_active(mlan_private * pmpriv)
 #ifdef UAP_SUPPORT
 	if (GET_BSS_ROLE(pmpriv) == MLAN_BSS_ROLE_UAP)
 		/* NOTE: UAP's media_connected == true only after first STA
-		   associated.  Need different variable to tell if UAP has been
-		   started. */
+		   associated. Need different variable to tell if UAP has
+		   been started. */
 		ret = pmpriv->uap_bss_started;
 	else
 #endif
@@ -1251,18 +1255,20 @@ wlan_11h_get_uap_start_channel(mlan_private * priv, t_u8 uap_band_cfg)
 	ENTER();
 
 	/*
-	 * Set start_chn to the Default.  Used if 11h is disabled or the band
-	 *   does not require 11h support.
+	 * Set start_chn to the Default.
+	 * Used if 11h is disabled or the band
+	 * does not require 11h support.
 	 */
 	start_chn = DEFAULT_AD_HOC_CHANNEL;
 
 	/*
 	 * Check that we are looking for a channel in the A Band
 	 */
-	if (uap_band_cfg & UAP_BAND_CONFIG_5GHZ) {
+	if (uap_band_cfg & BAND_CONFIG_5GHZ) {
 		/*
-		 * Set default to the A Band default. Used if random selection fails
-		 *   or if 11h is not enabled
+		 * Set default to the A Band default.
+		 * Used if random selection fails
+		 * or if 11h is not enabled
 		 */
 		start_chn = DEFAULT_AD_HOC_CHANNEL_A;
 
@@ -1272,7 +1278,7 @@ wlan_11h_get_uap_start_channel(mlan_private * priv, t_u8 uap_band_cfg)
 		if (wlan_11h_is_enabled(priv)) {
 			/*
 			 * Search the region_channel tables for a channel table
-			 *   that is marked for the A Band.
+			 * that is marked for the A Band.
 			 */
 			for (region = 0; (region < MAX_REGION_CHANNEL_NUM);
 			     region++) {
@@ -1284,9 +1290,10 @@ wlan_11h_get_uap_start_channel(mlan_private * priv, t_u8 uap_band_cfg)
 				    && chn_tbl->region == adapter->region_code
 				    && chn_tbl->band & BAND_A) {
 					/*
-					 * Set the start channel.  Get a random number and
-					 *   use it to pick an entry in the table between 0
-					 *   and the number of channels in the table (NumCFP).
+					 * Set the start channel.  Get a random
+					 * number and use it to pick an entry
+					 * in the table between 0 and the number
+					 * of channels in the table (NumCFP).
 					 */
 					do {
 						rand_entry =
@@ -1832,8 +1839,9 @@ wlan_11h_get_adhoc_start_channel(mlan_private * priv)
 	    || (adapter->adhoc_start_band & BAND_AN)
 		) {
 		/*
-		 * Set default to the A Band default. Used if random selection fails
-		 *   or if 11h is not enabled
+		 * Set default to the A Band default.
+		 * Used if random selection fails
+		 * or if 11h is not enabled
 		 */
 		start_chn = DEFAULT_AD_HOC_CHANNEL_A;
 
@@ -1855,9 +1863,10 @@ wlan_11h_get_adhoc_start_channel(mlan_private * priv)
 				    && chn_tbl->region == adapter->region_code
 				    && chn_tbl->band & BAND_A) {
 					/*
-					 * Set the start channel.  Get a random number and
-					 *   use it to pick an entry in the table between 0
-					 *   and the number of channels in the table (NumCFP).
+					 * Set the start channel.  Get a random
+					 * number and use it to pick an entry
+					 * in the table between 0 and the number
+					 * of channels in the table (NumCFP).
 					 */
 					do {
 						rand_entry =
@@ -1955,8 +1964,8 @@ wlan_11h_radar_detect_required(mlan_private * priv, t_u8 channel)
 	ENTER();
 
 	/*
-	 *   No checks for 11h or measurement code being enabled is placed here
-	 *   since regulatory requirements exist whether we support them or not.
+	 * No checks for 11h or measurement code being enabled is placed here
+	 * since regulatory requirements exist whether we support them or not.
 	 */
 
 	required = wlan_get_cfp_radar_detect(priv, channel);
@@ -1997,6 +2006,7 @@ wlan_11h_radar_detect_required(mlan_private * priv, t_u8 channel)
  *  @param priv         Private driver information structure
  *  @param pioctl_req   Pointer to IOCTL request buffer
  *  @param channel      Channel on which to perform radar measurement
+ *  @param chan_width   Width of channel on which to perform radar measurement
  *
  *  @return
  *    - MTRUE  if radar measurement request was successfully issued
@@ -2007,7 +2017,8 @@ wlan_11h_radar_detect_required(mlan_private * priv, t_u8 channel)
  */
 t_s32
 wlan_11h_issue_radar_detect(mlan_private * priv,
-			    pmlan_ioctl_req pioctl_req, t_u8 channel)
+			    pmlan_ioctl_req pioctl_req,
+			    t_u8 channel, t_u8 chan_width)
 {
 	t_s32 ret;
 	HostCmd_DS_CHAN_RPT_REQ chan_rpt_req;
@@ -2021,7 +2032,7 @@ wlan_11h_issue_radar_detect(mlan_private * priv,
 		       sizeof(chan_rpt_req));
 
 		chan_rpt_req.chan_desc.startFreq = START_FREQ_11A_BAND;
-		chan_rpt_req.chan_desc.chanWidth = 0;	/* 1 for 40Mhz */
+		chan_rpt_req.chan_desc.chanWidth = chan_width;
 		chan_rpt_req.chan_desc.chanNum = channel;
 		chan_rpt_req.millisec_dwell_time =
 			WLAN_11H_CHANNEL_AVAIL_CHECK_DURATION;
@@ -2154,7 +2165,8 @@ wlan_11h_process_start(mlan_private * priv,
 #endif
 		}
 
-		/* Activate 11h functions in firmware, turns on capability bit */
+		/* Activate 11h functions in firmware, turns on capability
+		   bit */
 		wlan_11h_activate(priv, MNULL, MTRUE);
 		pcap_info->spectrum_mgmt = MTRUE;
 
@@ -2256,7 +2268,8 @@ wlan_11h_process_join(mlan_private * priv,
 							pattempted_bss_desc);
 #endif
 		}
-		/* Activate 11h functions in firmware, turns on capability bit */
+		/* Activate 11h functions in firmware, turns on capability
+		   bit */
 		wlan_11h_activate(priv, MNULL, MTRUE);
 		pcap_info->spectrum_mgmt = MTRUE;
 
@@ -2309,7 +2322,8 @@ wlan_11h_process_join(mlan_private * priv,
  *  @param pinfo_buf Void buffer pass through with data necessary for a
  *                   specific command type
  */
-/**  @return          MLAN_STATUS_SUCCESS, MLAN_STATUS_FAILURE or MLAN_STATUS_PENDING
+/**  @return          MLAN_STATUS_SUCCESS, MLAN_STATUS_FAILURE
+ *                    or MLAN_STATUS_PENDING
  */
 /**  @sa wlan_11h_cmd_tpc_request
  *  @sa wlan_11h_cmd_tpc_info
@@ -2497,8 +2511,8 @@ wlan_11h_process_bss_elem(mlan_adapter * pmadapter,
 	case SUPPORTED_CHANNELS:
 	case TPC_REQUEST:
 		/*
-		 * These elements are not in beacons/probe responses.  Included here
-		 *   to cover set of enumerated 11h elements.
+		 * These elements are not in beacons/probe responses.
+		 * Included here to cover set of enumerated 11h elements.
 		 */
 		break;
 
@@ -3018,9 +3032,8 @@ wlan_11h_radar_detected_handling(mlan_adapter * pmadapter)
 				t_u16 dtim_pd_msec = 1;
 				t_u16 bcn_dtim_msec;
 
-				if (wlan_11h_is_dfs_master(pmpriv)) {	/* adhoc
-									   creator
-									 */
+				/* adhoc creator */
+				if (wlan_11h_is_dfs_master(pmpriv)) {
 					bcn_pd_msec = pmpriv->beacon_period;
 				} else {
 					bcn_pd_msec =
@@ -3198,6 +3211,7 @@ wlan_11h_radar_detected_handling(mlan_adapter * pmadapter)
 		/* else */
 		pstate_rdh->priv_curr_idx = RDH_STAGE_FIRST_ENTRY_PRIV_IDX;
 		pstate_rdh->stage = RDH_SET_NEW_CHANNEL;
+
 #ifdef DFS_TESTING_SUPPORT
 		if (pmadapter->dfs_test_params.no_channel_change_on_radar) {
 			PRINTM(MCMD_D,
@@ -3229,11 +3243,8 @@ wlan_11h_radar_detected_handling(mlan_adapter * pmadapter)
 					MNULL;
 				pmpriv->uap_state_chan_cb.get_chan_callback =
 					wlan_11h_radar_detected_callback;
-				pstate_rdh->uap_band_cfg |= UAP_BAND_CONFIG_5GHZ;	/* DFS
-											   only
-											   in
-											   5GHz
-											 */
+				/* DFS only in 5GHz */
+				pstate_rdh->uap_band_cfg |= BAND_CONFIG_5GHZ;
 				ret = wlan_uap_set_channel(pmpriv,
 							   pstate_rdh->
 							   uap_band_cfg,
@@ -3361,6 +3372,7 @@ rdh_restart_intfs:
 		PRINTM(MCMD_D, "%s(): finished - stage(%d)=%s\n",
 		       __func__, pstate_rdh->stage,
 		       rdh_stage_str[pstate_rdh->stage]);
+
 		break;
 
 	default:

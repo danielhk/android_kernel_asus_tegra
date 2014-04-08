@@ -2,7 +2,7 @@
  *
  *  @brief This file contains SDIO specific code
  *
- *  Copyright (C) 2008-2013, Marvell International Ltd.
+ *  Copyright (C) 2008-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -295,7 +295,7 @@ wlan_sdio_poll_card_status(mlan_adapter * pmadapter, t_u8 bits)
  *  @brief This function reads firmware status registers
  *
  *  @param pmadapter    A pointer to mlan_adapter structure
- *  @param dat	        A pointer to keep returned data
+ *  @param dat          A pointer to keep returned data
  *  @return             MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
 static mlan_status
@@ -327,7 +327,7 @@ wlan_sdio_read_fw_status(mlan_adapter * pmadapter, t_u16 * dat)
 /**  @brief This function disables the host interrupts mask.
  *
  *  @param pmadapter    A pointer to mlan_adapter structure
- *  @param mask	        the interrupt mask
+ *  @param mask         the interrupt mask
  *  @return             MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
 static mlan_status
@@ -365,7 +365,7 @@ wlan_sdio_disable_host_int_mask(pmlan_adapter pmadapter, t_u8 mask)
  *  @brief This function enables the host interrupts mask
  *
  *  @param pmadapter A pointer to mlan_adapter structure
- *  @param mask	   the interrupt mask
+ *  @param mask    the interrupt mask
  *  @return        MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
  */
 static mlan_status
@@ -391,7 +391,7 @@ wlan_sdio_enable_host_int_mask(pmlan_adapter pmadapter, t_u8 mask)
 /**
  *  @brief This function reads data from the card.
  *
- *  @param pmadapter 	A pointer to mlan_adapter structure
+ *  @param pmadapter A pointer to mlan_adapter structure
  *  @param type     A pointer to keep type as data or command
  *  @param nb       A pointer to keep the data/cmd length returned in buffer
  *  @param pmbuf    A pointer to the SDIO data/cmd buffer
@@ -714,6 +714,13 @@ wlan_decode_rx_packet(mlan_adapter * pmadapter, mlan_buffer * pmbuf,
 			pmbuf->data_len = pmadapter->upld_len;
 			pmbuf->data_offset += INTF_HEADER_LEN;
 			pmadapter->curr_cmd->respbuf = pmbuf;
+			if (pmadapter->upld_len >= MRVDRV_SIZE_OF_CMD_BUFFER) {
+				PRINTM(MMSG, "Invalid CmdResp len=%d\n",
+				       pmadapter->upld_len);
+				DBG_HEXDUMP(MERROR, "Invalid CmdResp",
+					    pmbuf->pbuf + pmbuf->data_offset,
+					    MAX_DATA_DUMP_LEN);
+			}
 		}
 		break;
 
@@ -1003,6 +1010,8 @@ wlan_send_mp_aggr_buf(mlan_adapter * pmadapter)
 	cmd53_port = (pmadapter->ioport | SDIO_MPA_ADDR_BASE |
 		      (pmadapter->mpa_tx.ports << 4)) +
 		pmadapter->mpa_tx.start_port;
+	if (pmadapter->mpa_tx.pkt_cnt == 1)
+		cmd53_port = pmadapter->ioport + pmadapter->mpa_tx.start_port;
 
 	ret = wlan_write_data_sync(pmadapter, &mbuf_aggr, cmd53_port);
 	if (!(pmadapter->mp_wr_bitmap & (1 << pmadapter->curr_wr_port))
@@ -1601,7 +1610,7 @@ done:
  *  @brief This function sends data to the card.
  *
  *  @param pmadapter A pointer to mlan_adapter structure
- *  @param type	     data or command
+ *  @param type      data or command
  *  @param pmbuf     A pointer to mlan_buffer (pmbuf->data_len should include SDIO header)
  *  @param tx_param  A pointer to mlan_tx_param
  *  @return          MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE

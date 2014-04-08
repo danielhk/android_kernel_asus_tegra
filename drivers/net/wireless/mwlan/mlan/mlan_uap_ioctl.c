@@ -2,7 +2,7 @@
  *
  *  @brief This file contains the handling of AP mode ioctls
  *
- *  Copyright (C) 2009-2013, Marvell International Ltd.
+ *  Copyright (C) 2009-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -103,6 +103,7 @@ wlan_uap_callback_bss_ioctl_start(IN t_void * priv)
 	if ((puap_state_chan_cb->band_config & BAND_CONFIG_5GHZ) &&
 	    wlan_11h_radar_detect_required(pmpriv,
 					   puap_state_chan_cb->channel)) {
+
 		/* first check if channel is under NOP */
 		if (wlan_11h_is_channel_under_nop(pmpriv->adapter,
 						  puap_state_chan_cb->
@@ -992,6 +993,8 @@ wlan_uap_callback_11h_channel_check_req(IN t_void * priv)
 	mlan_private *pmpriv = (mlan_private *) priv;
 	mlan_callbacks *pcb = (mlan_callbacks *) & pmpriv->adapter->callbacks;
 	wlan_uap_get_info_cb_t *puap_state_chan_cb = &pmpriv->uap_state_chan_cb;
+	Band_Config_t *pband_cfg =
+		(Band_Config_t *) (&puap_state_chan_cb->band_config);
 	/* keep copy as local variable */
 	pmlan_ioctl_req pioctl = puap_state_chan_cb->pioctl_req_curr;
 
@@ -1021,7 +1024,8 @@ wlan_uap_callback_11h_channel_check_req(IN t_void * priv)
 		/* Check for radar on the channel */
 		ret = wlan_11h_issue_radar_detect(pmpriv,
 						  pioctl,
-						  puap_state_chan_cb->channel);
+						  puap_state_chan_cb->channel,
+						  pband_cfg->chanWidth);
 		if (ret == MLAN_STATUS_SUCCESS)
 			ret = MLAN_STATUS_PENDING;
 	} else {

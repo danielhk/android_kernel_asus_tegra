@@ -2,7 +2,7 @@
  *
  *  @brief This file contains the handling of AP mode command and event
  *
- *  Copyright (C) 2009-2013, Marvell International Ltd.
+ *  Copyright (C) 2009-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -62,6 +62,93 @@ uap_process_cmdresp_error(mlan_private * pmpriv, HostCmd_DS_COMMAND * resp,
 	/*
 	 * Handling errors here
 	 */
+	switch (resp->command) {
+	case HOST_CMD_APCMD_SYS_CONFIGURE:
+		{
+			HostCmd_DS_SYS_CONFIG *sys_config =
+				(HostCmd_DS_SYS_CONFIG *) & resp->params.
+				sys_config;
+			t_u16 resp_len = 0, travel_len = 0, index;
+			mlan_ds_misc_custom_ie *cust_ie = MNULL;
+			mlan_ds_misc_cfg *misc = MNULL;
+			custom_ie *cptr;
+
+			if (pioctl_buf->req_id != MLAN_IOCTL_MISC_CFG)
+				break;
+			misc = (mlan_ds_misc_cfg *) pioctl_buf->pbuf;
+			if ((pioctl_buf->action == MLAN_ACT_SET) &&
+			    (misc->sub_command == MLAN_OID_MISC_CUSTOM_IE)) {
+				cust_ie =
+					(mlan_ds_misc_custom_ie *) sys_config->
+					tlv_buffer;
+				if (cust_ie) {
+					cust_ie->type =
+						wlan_le16_to_cpu(cust_ie->type);
+					resp_len = cust_ie->len =
+						wlan_le16_to_cpu(cust_ie->len);
+					travel_len = 0;
+					/* conversion for index, mask, len */
+					if (resp_len == sizeof(t_u16))
+						cust_ie->ie_data_list[0].
+							ie_index =
+							wlan_cpu_to_le16
+							(cust_ie->
+							 ie_data_list[0].
+							 ie_index);
+
+					while (resp_len > sizeof(t_u16)) {
+						cptr = (custom_ie
+							*) (((t_u8 *) cust_ie->
+							     ie_data_list) +
+							    travel_len);
+						index = cptr->ie_index =
+							wlan_le16_to_cpu(cptr->
+									 ie_index);
+						cptr->mgmt_subtype_mask =
+							wlan_le16_to_cpu(cptr->
+									 mgmt_subtype_mask);
+						cptr->ie_length =
+							wlan_le16_to_cpu(cptr->
+									 ie_length);
+						travel_len +=
+							cptr->ie_length +
+							sizeof(custom_ie) -
+							MAX_IE_SIZE;
+						resp_len -=
+							cptr->ie_length +
+							sizeof(custom_ie) -
+							MAX_IE_SIZE;
+						if ((pmpriv->mgmt_ie[index].
+						     mgmt_subtype_mask ==
+						     cptr->mgmt_subtype_mask) &&
+						    (pmpriv->mgmt_ie[index].
+						     ie_length ==
+						     cptr->ie_length) &&
+						    !memcmp(pmpriv->adapter,
+							    pmpriv->
+							    mgmt_ie[index].
+							    ie_buffer,
+							    cptr->ie_buffer,
+							    cptr->ie_length)) {
+							PRINTM(MERROR,
+							       "set custom ie fail, remove ie index :%d\n",
+							       index);
+							memset(pmadapter,
+							       &pmpriv->
+							       mgmt_ie[index],
+							       0,
+							       sizeof
+							       (custom_ie));
+						}
+					}
+				}
+			}
+		}
+		break;
+	default:
+		break;
+	}
+
 	wlan_insert_cmd_to_free_q(pmadapter, pmadapter->curr_cmd);
 
 	wlan_request_cmd_lock(pmadapter);
@@ -185,7 +272,7 @@ wlan_uap_cmd_802_11_hs_cfg(IN pmlan_private pmpriv,
  *  @brief This function prepares command of Tx data pause
  *
  *  @param pmpriv		A pointer to mlan_private structure
- *  @param cmd	   		A pointer to HostCmd_DS_COMMAND structure
+ *  @param cmd          A pointer to HostCmd_DS_COMMAND structure
  *  @param cmd_action   the action: GET or SET
  *  @param pdata_buf    A pointer to data buffer
  *  @return         MLAN_STATUS_SUCCESS
@@ -251,7 +338,6 @@ wlan_uap_ret_txdatapause(IN pmlan_private pmpriv,
 /**
  *  @brief This function will process tx pause event
  *
- *
  *  @param priv    A pointer to mlan_private
  *  @param pevent  A pointer to event buf
  *
@@ -287,16 +373,16 @@ wlan_process_tx_pause_event(pmlan_private priv, pmlan_buffer pevent)
 			       tx_pause_tlv->tx_pause, tx_pause_tlv->pkt_cnt);
 			if (!memcmp
 			    (priv->adapter, bc_mac, tx_pause_tlv->peermac,
-			     MLAN_MAC_ADDR_LENGTH)) {
+			     MLAN_MAC_ADDR_LENGTH))
 				wlan_update_ralist_tx_pause(priv,
 							    tx_pause_tlv->
 							    peermac,
 							    tx_pause_tlv->
 							    tx_pause);
-			} else if (!memcmp
-				   (priv->adapter, priv->curr_addr,
-				    tx_pause_tlv->peermac,
-				    MLAN_MAC_ADDR_LENGTH)) {
+			else if (!memcmp
+				 (priv->adapter, priv->curr_addr,
+				  tx_pause_tlv->peermac,
+				  MLAN_MAC_ADDR_LENGTH)) {
 				if (tx_pause_tlv->tx_pause)
 					priv->port_open = MFALSE;
 				else
@@ -676,7 +762,6 @@ wlan_uap_cmd_ap_config(pmlan_private pmpriv,
 		cmd_size += sizeof(MrvlIEtypes_eapol_gwk_hsk_retries_t);
 		tlv += sizeof(MrvlIEtypes_eapol_gwk_hsk_retries_t);
 	}
-
 	if ((bss->param.bss_config.filter.filter_mode <=
 	     MAC_FILTER_MODE_BLOCK_MAC)
 	    && (bss->param.bss_config.filter.mac_count <= MAX_MAC_FILTER_NUM)) {
@@ -1069,6 +1154,7 @@ wlan_uap_cmd_ap_config(pmlan_private pmpriv,
 
 	cmd->size = (t_u16) wlan_cpu_to_le16(cmd_size);
 	PRINTM(MCMND, "AP config: cmd_size=%d\n", cmd_size);
+
 	LEAVE();
 	return MLAN_STATUS_SUCCESS;
 }
@@ -1261,6 +1347,7 @@ wlan_uap_cmd_sys_configure(pmlan_private pmpriv,
 					       cust_ie->len);
 				}
 				break;
+
 			default:
 				PRINTM(MERROR,
 				       "Wrong data, or missing TLV_TYPE 0x%04x handler.\n",
@@ -1796,7 +1883,6 @@ wlan_uap_ret_cmd_ap_config(IN pmlan_private pmpriv,
 		tlv = (MrvlIEtypesHeader_t *) ((t_u8 *) tlv + tlv_len +
 					       sizeof(MrvlIEtypesHeader_t));
 	}
-
 	LEAVE();
 	return MLAN_STATUS_SUCCESS;
 }
@@ -2557,7 +2643,6 @@ wlan_uap_ret_sta_list(IN pmlan_private pmpriv,
 /**
  *  @brief This function will search for the specific ie
  *
- *
  *  @param priv    A pointer to mlan_private
  *  @param pevent  A pointer to event buf
  *  @param sta_ptr A pointer to sta_node
@@ -2658,7 +2743,6 @@ wlan_check_sta_capability(pmlan_private priv, pmlan_buffer pevent,
 /**
  *  @brief This function will search for the specific ie
  *
- *
  *  @param priv    A pointer to mlan_private
  *  @param pevent  A pointer to event buf
  *
@@ -2751,7 +2835,6 @@ wlan_check_uap_capability(pmlan_private priv, pmlan_buffer pevent)
 
 /**
  *  @brief This function will update WAPI PN in statation assoc event
- *
  *
  *  @param priv    A pointer to mlan_private
  *  @param pevent  A pointer to event buf
@@ -3154,7 +3237,7 @@ wlan_ops_uap_process_cmdresp(IN t_void * priv,
 
 		if (pmpriv->adapter->state_rdh.stage == RDH_STOP_INTFS)
 			wlan_11h_radar_detected_callback((t_void *) pmpriv);
-
+		wlan_coex_ampdu_rxwinsize(pmadapter);
 		break;
 	case HOST_CMD_APCMD_BSS_START:
 		if (pmpriv->adapter->state_rdh.stage == RDH_RESTART_INTFS)
@@ -3164,6 +3247,7 @@ wlan_ops_uap_process_cmdresp(IN t_void * priv,
 		pmpriv->uap_bss_started = MFALSE;
 		ret = wlan_uap_ret_sys_reset(pmpriv, resp, pioctl_buf);
 		wlan_11h_check_update_radar_det_state(pmpriv);
+		wlan_coex_ampdu_rxwinsize(pmadapter);
 		break;
 	case HOST_CMD_APCMD_SYS_INFO:
 		break;
@@ -3367,6 +3451,7 @@ wlan_ops_uap_process_event(IN t_void * priv)
 		       MLAN_MAC_ADDR_LENGTH);
 		pevent->event_id = MLAN_EVENT_ID_UAP_FW_BSS_START;
 		wlan_check_uap_capability(pmpriv, pmbuf);
+		wlan_coex_ampdu_rxwinsize(pmadapter);
 		break;
 	case EVENT_MICRO_AP_BSS_ACTIVE:
 		PRINTM(MEVENT, "EVENT: MICRO_AP_BSS_ACTIVE\n");

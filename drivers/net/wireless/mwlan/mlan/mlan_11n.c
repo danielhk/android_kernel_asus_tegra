@@ -2,7 +2,7 @@
  *
  *  @brief This file contains functions for 11n handling.
  *
- *  Copyright (C) 2008-2013, Marvell International Ltd.
+ *  Copyright (C) 2008-2014, Marvell International Ltd.
  *
  *  This software file (the "File") is distributed by Marvell International
  *  Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -339,6 +339,33 @@ wlan_11n_ioctl_stream_cfg(IN pmlan_adapter pmadapter,
 }
 
 /**
+ *  @brief Set/get control to coex RX window size configuration
+ *
+ *  @param pmadapter    A pointer to mlan_adapter structure
+ *  @param pioctl_req   A pointer to ioctl request buffer
+ *
+ *  @return             MLAN_STATUS_SUCCESS --success, otherwise fail
+ */
+static mlan_status
+wlan_11n_ioctl_coex_rx_winsize(IN pmlan_adapter pmadapter,
+			       IN pmlan_ioctl_req pioctl_req)
+{
+	mlan_status ret = MLAN_STATUS_SUCCESS;
+	mlan_ds_11n_cfg *cfg = MNULL;
+
+	ENTER();
+
+	cfg = (mlan_ds_11n_cfg *) pioctl_req->pbuf;
+	if (pioctl_req->action == MLAN_ACT_GET)
+		cfg->param.coex_rx_winsize = pmadapter->coex_rx_winsize;
+	else if (pioctl_req->action == MLAN_ACT_SET)
+		pmadapter->coex_rx_winsize = (t_u8) cfg->param.coex_rx_winsize;
+
+	LEAVE();
+	return ret;
+}
+
+/**
  *  @brief This function will resend addba request to all
  *          the peer in the TxBAStreamTbl
  *
@@ -425,7 +452,7 @@ wlan_11n_ioctl_addba_param(IN pmlan_adapter pmadapter,
  *
  *  @param priv         A pointer to mlan_priv
  *  @param tid          tid
- *  @return 	        N/A
+ *  @return             N/A
  */
 void
 wlan_11n_delba(mlan_private * priv, int tid)
@@ -1034,9 +1061,9 @@ wlan_is_txbastreamptr_valid(mlan_private * priv, TxBAStreamTbl * ptxtblptr)
 
 /**
  *  @brief This function will return the pointer to a entry in BA Stream
- * 	        table which matches the ba_status requested
+ *          table which matches the ba_status requested
  *
- *  @param priv    	    A pointer to mlan_private
+ *  @param priv         A pointer to mlan_private
  *  @param ba_status    Current status of the BA stream
  *
  *  @return             A pointer to first entry matching status in BA stream
@@ -1385,8 +1412,9 @@ wlan_ret_11n_delba(mlan_private * priv, HostCmd_DS_COMMAND * resp)
 		if (ptx_ba_tbl)
 			wlan_send_addba(priv, ptx_ba_tbl->tid, ptx_ba_tbl->ra);
 	} else {		/*
-				 * In case of failure, recreate the deleted stream in
-				 * case we initiated the ADDBA
+				 * In case of failure, recreate
+				 * the deleted stream in case
+				 * we initiated the ADDBA
 				 */
 		if (INITIATOR_BIT(pdel_ba->del_ba_param_set)) {
 			wlan_11n_create_txbastream_tbl(priv,
@@ -1915,7 +1943,7 @@ wlan_ret_tx_bf_cfg(IN pmlan_private pmpriv,
 /**
  * @brief Get second channel offset
  *
- * @param chan 			  channel num
+ * @param chan            channel num
  * @return                second channel offset
  */
 t_u8
@@ -2036,9 +2064,8 @@ wlan_cmd_append_11n_tlv(IN mlan_private * pmpriv,
 			       sizeof(IEEEtypes_Header_t),
 			       pht_info->header.len);
 
-			if (!ISSUPP_CHANWIDTH40(usr_dot_11n_dev_cap)) {
+			if (!ISSUPP_CHANWIDTH40(usr_dot_11n_dev_cap))
 				RESET_CHANWIDTH40(pht_info->ht_info.field2);
-			}
 
 			*ppbuffer += sizeof(MrvlIETypes_HTInfo_t);
 			ret_len += sizeof(MrvlIETypes_HTInfo_t);
@@ -2190,6 +2217,9 @@ wlan_11n_cfg_ioctl(IN pmlan_adapter pmadapter, IN pmlan_ioctl_req pioctl_req)
 	case MLAN_OID_11N_CFG_STREAM_CFG:
 		status = wlan_11n_ioctl_stream_cfg(pmadapter, pioctl_req);
 		break;
+	case MLAN_OID_11N_CFG_COEX_RX_WINSIZE:
+		status = wlan_11n_ioctl_coex_rx_winsize(pmadapter, pioctl_req);
+		break;
 	default:
 		pioctl_req->status_code = MLAN_ERROR_IOCTL_INVALID;
 		status = MLAN_STATUS_FAILURE;
@@ -2273,7 +2303,7 @@ wlan_11n_deleteall_txbastream_tbl(mlan_private * priv)
  *          table which matches the give RA/TID pair
  *
  *  @param priv    A pointer to mlan_private
- *  @param tid	   TID to find in reordering table
+ *  @param tid     TID to find in reordering table
  *  @param ra      RA to find in reordering table
  *
  *  @return        A pointer to first entry matching RA/TID in BA stream
@@ -2322,7 +2352,7 @@ wlan_11n_get_txbastream_tbl(mlan_private * priv, int tid, t_u8 * ra)
  *
  *  @param priv      A pointer to mlan_private
  *  @param ra        RA to find in reordering table
- *  @param tid	     TID to find in reordering table
+ *  @param tid       TID to find in reordering table
  *  @param ba_status BA stream status to create the stream with
  *
  *  @return          N/A
@@ -2368,7 +2398,7 @@ wlan_11n_create_txbastream_tbl(mlan_private * priv,
  *  @brief This function will send a block ack to given tid/ra
  *
  *  @param priv     A pointer to mlan_private
- *  @param tid	    TID to send the ADDBA
+ *  @param tid      TID to send the ADDBA
  *  @param peer_mac MAC address to send the ADDBA
  *
  *  @return         MLAN_STATUS_SUCCESS or MLAN_STATUS_FAILURE
@@ -2457,7 +2487,7 @@ wlan_send_delba(mlan_private * priv, pmlan_ioctl_req pioctl_req, int tid,
 
 /**
  *  @brief This function handles the command response of
- *  		delete a block ack request
+ *          delete a block ack request
  *
  *  @param priv		A pointer to mlan_private structure
  *  @param del_ba	A pointer to command response buffer

@@ -3,7 +3,7 @@
   * @brief This file contains the major functions in UAP
   * driver.
   *
-  * Copyright (C) 2008-2013, Marvell International Ltd.
+  * Copyright (C) 2008-2014, Marvell International Ltd.
   *
   * This software file (the "File") is distributed by Marvell International
   * Ltd. under the terms of the GNU General Public License Version 2, June 1991
@@ -1542,6 +1542,53 @@ done:
 }
 
 /**
+ *  @brief Set/Get uap power mode
+ *
+ *  @param priv                 A pointer to moal_private structure
+ *  @param action               Action set or get
+ *  @param ps_mgmt              A pointer to mlan_ds_ps_mgmt structure
+ *
+ *  @return                     MLAN_STATUS_SUCCESS -- success, otherwise fail
+ */
+int
+woal_set_get_uap_power_mode(moal_private * priv, t_u32 action,
+			    mlan_ds_ps_mgmt * ps_mgmt)
+{
+	mlan_ioctl_req *ioctl_req = NULL;
+	mlan_ds_pm_cfg *pm_cfg = NULL;
+	mlan_status status = MLAN_STATUS_SUCCESS;
+
+	ENTER();
+	if (!ps_mgmt) {
+		LEAVE();
+		return MLAN_STATUS_FAILURE;
+	}
+
+	ioctl_req = woal_alloc_mlan_ioctl_req(sizeof(mlan_ds_pm_cfg));
+	if (ioctl_req == NULL) {
+		LEAVE();
+		return MLAN_STATUS_FAILURE;
+	}
+	pm_cfg = (mlan_ds_pm_cfg *) ioctl_req->pbuf;
+	pm_cfg->sub_command = MLAN_OID_PM_CFG_PS_MODE;
+	ioctl_req->req_id = MLAN_IOCTL_PM_CFG;
+	ioctl_req->action = action;
+	if (action == MLAN_ACT_SET)
+		memcpy(&pm_cfg->param.ps_mgmt, ps_mgmt,
+		       sizeof(mlan_ds_ps_mgmt));
+	status = woal_request_ioctl(priv, ioctl_req, MOAL_IOCTL_WAIT);
+	if (status == MLAN_STATUS_SUCCESS) {
+		if (action == MLAN_ACT_GET)
+			memcpy(ps_mgmt, &pm_cfg->param.ps_mgmt,
+			       sizeof(mlan_ds_ps_mgmt));
+	}
+	if (status != MLAN_STATUS_PENDING)
+		kfree(ioctl_req);
+	LEAVE();
+	return status;
+}
+
+/**
  *  @brief uap power mode ioctl handler
  *
  *  @param dev      A pointer to net_device structure
@@ -1922,14 +1969,20 @@ done:
 static int
 woal_uap_set_wapi_flag_ioctl(moal_private * priv, wapi_msg * msg)
 {
-	t_u8 wapi_psk_ie[] =
-		{ 0x44, 0x14, 0x01, 0x00, 0x01, 0x00, 0x00, 0x14, 0x72, 0x02,
-		0x01, 0x00, 0x00, 0x14, 0x72, 0x01, 0x00, 0x14, 0x72, 0x01,
+	t_u8 wapi_psk_ie[] = {
+		0x44, 0x14, 0x01, 0x00,
+		0x01, 0x00, 0x00, 0x14,
+		0x72, 0x02, 0x01, 0x00,
+		0x00, 0x14, 0x72, 0x01,
+		0x00, 0x14, 0x72, 0x01,
 		0x00, 0x00
 	};
-	t_u8 wapi_cert_ie[] =
-		{ 0x44, 0x14, 0x01, 0x00, 0x01, 0x00, 0x00, 0x14, 0x72, 0x01,
-		0x01, 0x00, 0x00, 0x14, 0x72, 0x01, 0x00, 0x14, 0x72, 0x01,
+	t_u8 wapi_cert_ie[] = {
+		0x44, 0x14, 0x01, 0x00,
+		0x01, 0x00, 0x00, 0x14,
+		0x72, 0x01, 0x01, 0x00,
+		0x00, 0x14, 0x72, 0x01,
+		0x00, 0x14, 0x72, 0x01,
 		0x00, 0x00
 	};
 	mlan_ds_misc_cfg *misc = NULL;
