@@ -112,9 +112,6 @@ static int la_scaling_enable_count;
 #define VALIDATE_ID(id) \
 	do { \
 		if (id >= TEGRA_LA_MAX_ID || id_to_index[id] == 0xFFFF) { \
-			print_hex_dump(KERN_WARNING, "id_to_index: ", \
-				DUMP_PREFIX_ADDRESS, 16, 1, \
-				id_to_index, sizeof(id_to_index), true); \
 			WARN_ONCE(1, "%s: invalid Id=%d", __func__, id); \
 			return -EINVAL; \
 		} \
