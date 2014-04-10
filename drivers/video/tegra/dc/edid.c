@@ -500,7 +500,8 @@ int tegra_edid_get_monspecs(struct tegra_edid *edid, struct fb_monspecs *specs)
 			 j, specs->modedb[j].xres, specs->modedb[j].yres,
 			 specs->modedb[j].refresh, specs->modedb[j].flag,
 			 specs->modedb[j].pixclock,
-			 PICOS2KHZ(specs->modedb[j].pixclock));
+			 specs->modedb[j].pixclock ?
+				PICOS2KHZ(specs->modedb[j].pixclock) : 0);
 	}
 
 	mutex_lock(&edid->lock);
