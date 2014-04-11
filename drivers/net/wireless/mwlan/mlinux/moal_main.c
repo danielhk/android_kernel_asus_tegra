@@ -5247,7 +5247,7 @@ done:
 #define DEBUG_DUMP_END_REG                0x6a
 #define ITCM_SIZE                         0x60000
 #define SQRAM_SIZE                        0x7c000
-#define DTCM_SIZE                         0x10000
+#define DTCM_SIZE                         0x14000
 
 /**
  *  @brief This function dump firmware memory to file
