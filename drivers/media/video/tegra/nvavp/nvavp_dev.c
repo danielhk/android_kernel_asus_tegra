@@ -1498,14 +1498,14 @@ static int tegra_nvavp_open(struct inode *inode, struct file *filp, int channel_
 
 static int tegra_nvavp_video_open(struct inode *inode, struct file *filp)
 {
-	pr_debug("tegra_nvavp_video_open NVAVP_VIDEO_CHANNEL\n");
+	pr_info("tegra_nvavp_video_open NVAVP_VIDEO_CHANNEL\n");
 	return tegra_nvavp_open(inode, filp, NVAVP_VIDEO_CHANNEL);
 }
 
 #if defined(CONFIG_TEGRA_NVAVP_AUDIO)
 static int tegra_nvavp_audio_open(struct inode *inode, struct file *filp)
 {
-	pr_debug("tegra_nvavp_audio_open NVAVP_AUDIO_CHANNEL\n");
+	pr_info("tegra_nvavp_audio_open NVAVP_AUDIO_CHANNEL\n");
 	return tegra_nvavp_open(inode, filp, NVAVP_AUDIO_CHANNEL);
 }
 #endif
