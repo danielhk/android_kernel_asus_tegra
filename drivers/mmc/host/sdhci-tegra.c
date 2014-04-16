@@ -810,8 +810,8 @@ static int tegra_sdhci_set_uhs_signaling(struct sdhci_host *host,
 		ctrl_2 |= SDHCI_CTRL_UHS_SDR25;
 		break;
 	case MMC_TIMING_UHS_SDR50:
-		ctrl_2 |= SDHCI_CTRL_UHS_SDR50;
-		break;
+		dev_info(mmc_dev(host->mmc),
+			"set SDHCI_CTRL_UHS_SDR104 for SDR50 mode\n");
 	case MMC_TIMING_UHS_SDR104:
 	case MMC_TIMING_MMC_HS200:
 		ctrl_2 |= SDHCI_CTRL_UHS_SDR104;
