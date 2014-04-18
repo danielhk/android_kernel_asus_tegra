@@ -109,6 +109,9 @@ Change log:
 #ifdef STA_WEXT
 #include        "moal_priv.h"
 #endif
+#ifdef DLOG_SUPPORT
+#include	"moal_dlog.h"
+#endif
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2, 6, 24)
 #define REFDATA __refdata
@@ -1300,15 +1303,15 @@ extern t_u32 drvdbg;
 #ifdef	DEBUG_LEVEL2
 #define	PRINTM_MINFO(level, msg...) do { \
 	woal_print(level, msg); \
-	if (drvdbg & MINFO) printk(KERN_DEBUG msg); \
+	if (drvdbg & MINFO) { printk(KERN_DEBUG msg); woal_dlog(msg); } \
 } while (0)
 #define	PRINTM_MWARN(level, msg...) do { \
 	woal_print(level, msg); \
-	if (drvdbg & MWARN) printk(KERN_DEBUG msg); \
+	if (drvdbg & MWARN) { printk(KERN_DEBUG msg); woal_dlog(msg); } \
 } while (0)
 #define	PRINTM_MENTRY(level, msg...) do { \
 	woal_print(level, msg); \
-	if (drvdbg & MENTRY) printk(KERN_DEBUG msg); \
+	if (drvdbg & MENTRY) { printk(KERN_DEBUG msg); woal_dlog(msg); } \
 } while (0)
 #else
 #define	PRINTM_MINFO(level, msg...)  do {} while (0)
@@ -1318,58 +1321,64 @@ extern t_u32 drvdbg;
 
 #define	PRINTM_MFW_D(level, msg...) do { \
 	woal_print(level, msg); \
-	if (drvdbg & MFW_D) printk(KERN_DEBUG msg); \
+	if (drvdbg & MFW_D) { printk(KERN_DEBUG msg); woal_dlog(msg); } \
 } while (0)
 #define	PRINTM_MCMD_D(level, msg...) do { \
 	woal_print(level, msg); \
-	if (drvdbg & MCMD_D) printk(KERN_DEBUG msg); \
+	if (drvdbg & MCMD_D) { printk(KERN_DEBUG msg); woal_dlog(msg); } \
 } while (0)
 #define	PRINTM_MDAT_D(level, msg...) do { \
 	woal_print(level, msg); \
-	if (drvdbg & MDAT_D) printk(KERN_DEBUG msg); \
+	if (drvdbg & MDAT_D) { printk(KERN_DEBUG msg); woal_dlog(msg); } \
 } while (0)
 #define	PRINTM_MIF_D(level, msg...) do { \
 	woal_print(level, msg); \
-	if (drvdbg & MIF_D) printk(KERN_DEBUG msg); \
+	if (drvdbg & MIF_D) { printk(KERN_DEBUG msg); woal_dlog(msg); } \
 } while (0)
 
 #define	PRINTM_MIOCTL(level, msg...) do { \
 	woal_print(level, msg); \
-	if (drvdbg & MIOCTL) printk(KERN_DEBUG msg); \
+	if (drvdbg & MIOCTL) { printk(KERN_DEBUG msg); woal_dlog(msg); } \
 } while (0)
 #define	PRINTM_MINTR(level, msg...) do { \
 	woal_print(level, msg); \
-	if (drvdbg & MINTR) printk(KERN_DEBUG msg); \
+	if (drvdbg & MINTR) { printk(KERN_DEBUG msg); woal_dlog(msg); } \
 } while (0)
 #define	PRINTM_MEVENT(level, msg...) do { \
 	woal_print(level, msg); \
-	if (drvdbg & MEVENT) printk(msg); \
+	if (drvdbg & MEVENT) { printk(msg); woal_dlog(msg); } \
 } while (0)
 #define	PRINTM_MCMND(level, msg...) do { \
 	woal_print(level, msg); \
-	if (drvdbg & MCMND) printk(KERN_DEBUG msg); \
+	if (drvdbg & MCMND) { printk(KERN_DEBUG msg); woal_dlog(msg); } \
 } while (0)
 #define	PRINTM_MDATA(level, msg...) do { \
 	woal_print(level, msg); \
-	if (drvdbg & MDATA) printk(KERN_DEBUG msg); \
+	if (drvdbg & MDATA) { printk(KERN_DEBUG msg); woal_dlog(msg); } \
 } while (0)
 #define	PRINTM_MERROR(level, msg...) do { \
 	woal_print(level, msg); \
-	if (drvdbg & MERROR) printk(KERN_ERR msg); \
+	if (drvdbg & MERROR) { printk(KERN_ERR msg); woal_dlog(msg); } \
 } while (0)
 #define	PRINTM_MFATAL(level, msg...) do { \
 	woal_print(level, msg); \
-	if (drvdbg & MFATAL) printk(KERN_ERR msg); \
+	if (drvdbg & MFATAL) { printk(KERN_ERR msg); woal_dlog(msg); } \
 } while (0)
 #define	PRINTM_MMSG(level, msg...) do { \
 	woal_print(level, msg); \
-	if (drvdbg & MMSG) printk(KERN_ALERT msg); \
+	if (drvdbg & MMSG) { printk(KERN_ALERT msg); woal_dlog(msg); } \
 } while (0)
 
 static inline void
 woal_print(t_u32 level, char *fmt, ...)
 {
 }
+
+#ifdef DLOG_SUPPORT
+extern void woal_dlog(const char *fmt, ...);
+#else
+static inline void woal_dlog(const char *fmt, ...) {}
+#endif
 
 #define	PRINTM(level, msg...) PRINTM_##level(level, msg)
 

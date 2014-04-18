@@ -1884,6 +1884,9 @@ moal_print(IN t_void * pmoal_handle, IN t_u32 level, IN char *pformat, IN ...)
 {
 #ifdef	DEBUG_LEVEL1
 	va_list args;
+#ifdef DLOG_SUPPORT
+	va_list args2;
+#endif
 
 	if (level & MHEX_DUMP) {
 		t_u8 *buf = NULL;
@@ -1916,7 +1919,14 @@ moal_print(IN t_void * pmoal_handle, IN t_u32 level, IN char *pformat, IN ...)
 	} else {
 		if (drvdbg & level) {
 			va_start(args, pformat);
+#ifdef DLOG_SUPPORT
+			va_copy(args2, args);
+			vprintk(pformat, args2);
+			va_end(args2);
+			woal_dlog_print(pformat, args);
+#else
 			vprintk(pformat, args);
+#endif
 			va_end(args);
 		}
 	}

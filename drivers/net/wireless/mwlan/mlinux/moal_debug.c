@@ -27,6 +27,8 @@ Change log:
 #include	"moal_main.h"
 #ifdef HISTOGRAM_SUPPORT
 #include	"../mlan/mlan_decl.h"
+#endif
+#if defined(HISTOGRAM_SUPPORT) || defined(DLOG_SUPPORT)
 #include	<linux/seq_file.h>
 #endif
 
@@ -861,6 +863,70 @@ woal_debug_proc_open(struct inode *inode, struct file *file)
 #endif
 }
 
+#ifdef DLOG_SUPPORT
+
+atomic_t woal_dlog_record_num = ATOMIC_INIT(0);
+struct woal_dlog_record *woal_dlog_record_data;
+
+static void
+woal_dlog_init(void)
+{
+	if (woal_dlog_record_data == NULL) {
+		woal_dlog_record_data =
+			kmalloc(sizeof(struct woal_dlog_record)
+				* DLOG_RECORD_MAX, GFP_KERNEL);
+		if (woal_dlog_record_data == NULL)
+			pr_err("%s: memory allocation failed\n",
+			       __func__);
+	}
+}
+
+void woal_dlog(const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	woal_dlog_print(fmt, ap);
+	va_end(ap);
+}
+
+static int
+woal_dlog_read(struct seq_file *sfp, void *data)
+{
+	unsigned int n;
+	int npr;
+	int i;
+	int j;
+
+	if (woal_dlog_record_data == NULL) {
+		pr_err("%s: no record found\n", __func__);
+		return 0;
+	}
+
+	n = atomic_read(&woal_dlog_record_num);
+	npr = n < DLOG_RECORD_MAX ? n : DLOG_RECORD_MAX;
+
+	for (i = 0, j = n - npr + 1; i < npr; i++, j++) {
+		struct woal_dlog_record *r =
+			&woal_dlog_record_data[j % DLOG_RECORD_MAX];
+		seq_printf(sfp, "[%5lu.%06lu] %s",
+			   (unsigned long)r->t, r->nanosec_rem / 1000, r->buf);
+	}
+
+	return 0;
+}
+
+static int
+woal_dlog_open(struct inode *inode, struct file *file)
+{
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0)
+	return single_open(file, woal_dlog_read, PDE_DATA(inode));
+#else
+	return single_open(file, woal_dlog_read, PDE(inode)->data);
+#endif
+}
+#endif /* DLOG_SUPPORT */
+
 static const struct file_operations debug_proc_fops = {
 	.owner = THIS_MODULE,
 	.open = woal_debug_proc_open,
@@ -881,6 +947,16 @@ static struct file_operations hgm_file_ops = {
 };
 #endif
 
+#ifdef DLOG_SUPPORT
+static struct file_operations dlog_file_ops = {
+	.owner = THIS_MODULE,
+	.open = woal_dlog_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+#endif
+
 /********************************************************
 		Global Functions
 ********************************************************/
@@ -897,6 +973,9 @@ woal_debug_entry(moal_private * priv)
 	struct proc_dir_entry *r;
 #ifdef HISTOGRAM_SUPPORT
 	struct proc_dir_entry *r2;
+#endif
+#ifdef DLOG_SUPPORT
+	struct proc_dir_entry *r3;
 #endif
 	int i;
 	int handle_items;
@@ -990,6 +1069,21 @@ woal_debug_entry(moal_private * priv)
 	mlan_hist_data_clear();
 #endif
 
+#ifdef DLOG_SUPPORT
+	woal_dlog_init();
+
+	r3 = create_proc_entry("dlog", 0664, priv->proc_entry);
+	if (r3 == NULL) {
+		LEAVE();
+		return;
+	}
+	r3->data = NULL;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,30)
+	r3->owner = THIS_MODULE;
+#endif
+	r3->proc_fops = &dlog_file_ops;
+#endif
+
 	LEAVE();
 }
 
@@ -1011,7 +1105,9 @@ woal_debug_remove(moal_private * priv)
 #ifdef HISTOGRAM_SUPPORT
 	remove_proc_entry("histogram", priv->proc_entry);
 #endif
-
+#ifdef DLOG_SUPPORT
+	remove_proc_entry("dlog", priv->proc_entry);
+#endif
 	LEAVE();
 }
 #endif

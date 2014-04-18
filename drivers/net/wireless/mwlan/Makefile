@@ -69,6 +69,9 @@ CONFIG_DFS_TESTING_SUPPORT=y
 # Histogram support
 CONFIG_HISTOGRAM_SUPPORT=y
 
+# debug log support
+CONFIG_DLOG_SUPPORT=y
+
 CONFIG_ANDROID_KERNEL=y
 
 #############################################################################
@@ -81,6 +84,10 @@ CONFIG_ANDROID_KERNEL=y
 
 ifeq ($(CONFIG_HISTOGRAM_SUPPORT),y)
 	EXTRA_CFLAGS += -DHISTOGRAM_SUPPORT
+endif
+
+ifeq ($(CONFIG_DLOG_SUPPORT),y)
+	EXTRA_CFLAGS += -DDLOG_SUPPORT
 endif
 
 ifeq ($(CONFIG_DEBUG),1)
