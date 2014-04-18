@@ -460,7 +460,7 @@ static struct platform_device *fixed_reg_devs_molly[] = {
 	ADD_FIXED_REG(avdd_hdmi_pll),
 };
 
-static struct wake_lock molly_evt2_wakelock;
+static struct wake_lock molly_wakelock;
 
 int __init molly_palmas_regulator_init(void)
 {
@@ -636,17 +636,24 @@ int __init molly_suspend_init(void)
 
 static __init int molly_suspend_late_init(void)
 {
+	/* disable LP0 for now as a temporary workaround for VPR
+	 * corruption causing DRM video to not work after LP0
+	 */
+#if 1
+	if (1) {
+#else
 	if (molly_hw_rev == MOLLY_REV_EVT2) {
+#endif
 		/* This is a workaround for a hardware bug on Molly EVT2.
 		 * On Molly EVT2, the 10K ohm pull up resistor on
 		 * ENET_RESET_N_3V3 pin is removed accidentally, which causes
 		 * SMSC LAN9730 would be reset every time when Molly EVT2
 		 * enters LP0.
 		 */
-		wake_lock_init(&molly_evt2_wakelock, WAKE_LOCK_SUSPEND,
-			"molly_evt2_not_support_lp0");
-		wake_lock(&molly_evt2_wakelock);
-		pr_info("%s: WAR: acquire a wakelock to prevent enter suspend\n",
+		wake_lock_init(&molly_wakelock, WAKE_LOCK_SUSPEND,
+			"molly_disable_lp0");
+		wake_lock(&molly_wakelock);
+		pr_info("%s: WAR: acquire a wakelock to prevent suspend\n",
 			__func__);
 	}
 	return 0;
