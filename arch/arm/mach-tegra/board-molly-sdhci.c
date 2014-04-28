@@ -63,7 +63,10 @@ static struct wifi_platform_data molly_wifi_control = {
 	.set_power	= molly_wifi_power,
 	.set_reset	= molly_wifi_reset,
 	.set_carddetect	= molly_wifi_set_carddetect,
-	.host_sleep_cond = 0x2, /* UNICAST only */
+	.host_sleep_cond = 0xa, /* UNICAST + MULTICAST */
+			        /* bit 0: broadcast, 1: unicast, 2: mac,
+			               3: multicast, 6: mgmt frame,
+				       31: don't wakeup on ipv6 */
 	.host_sleep_gpio = 16,  /* GPIO 16 */
 	.host_sleep_gap	= 0xff,  /* level trigger */
 };
