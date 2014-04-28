@@ -403,6 +403,7 @@ woal_sdio_suspend(struct device *dev)
 #endif
 		handle->hs_force_count++;
 		handle->is_suspended = MTRUE;
+		wifi_enable_hostwake_irq(MTRUE);
 		LEAVE();
 		return MLAN_STATUS_SUCCESS;
 	}
@@ -476,7 +477,6 @@ woal_sdio_resume(struct device *dev)
 
 	ENTER();
 	PRINTM(MCMND, "<--- Enter woal_sdio_resume --->\n");
-	wifi_enable_hostwake_irq(MFALSE);
 	pm_flags = sdio_get_host_pm_caps(func);
 	PRINTM(MCMND, "%s: resume: PM flags = 0x%x\n", sdio_func_id(func),
 	       pm_flags);
@@ -493,6 +493,7 @@ woal_sdio_resume(struct device *dev)
 		LEAVE();
 		return MLAN_STATUS_SUCCESS;
 	}
+	wifi_enable_hostwake_irq(MFALSE);
 	handle->is_suspended = MFALSE;
 	if (woal_check_driver_status(handle)) {
 		PRINTM(MERROR, "Resuem, device is in hang state\n");
