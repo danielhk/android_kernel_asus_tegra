@@ -1360,7 +1360,15 @@ wlan_interrupt(pmlan_adapter pmadapter)
 	    pmadapter->pm_wakeup_card_req && !pmadapter->pm_wakeup_fw_try) {
 		PRINTM(MINTR, "Recv INTR in hs_actived, Wake up card first\n");
 		wlan_pm_wakeup_card(pmadapter);
-		pmadapter->pm_wakeup_fw_try = MTRUE;
+		/*
+		 * TODO: workaround for a spurious interrupt
+		 *
+		 * We have a spurious sdio interrupt coming during suspend()
+		 * and it is causing a false FW hang detected during resume().
+		 * This change stops resume() to detect the false FW hang.
+		 *
+		 * pmadapter->pm_wakeup_fw_try = MTRUE;
+		 */
 	}
 	memset(pmadapter, &mbuf, 0, sizeof(mlan_buffer));
 	mbuf.pbuf = pmadapter->mp_regs;
