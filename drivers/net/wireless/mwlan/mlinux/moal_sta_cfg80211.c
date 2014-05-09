@@ -2379,14 +2379,15 @@ woal_cfg80211_disconnect(struct wiphy *wiphy, struct net_device *dev,
 	}
 
 	if (priv->media_connected == MFALSE) {
+		PRINTM(MMSG," Already disconnected\n");
 		LEAVE();
-		return -EINVAL;
+		return 0;
 	}
 
 	priv->cfg_disconnect = MTRUE;
 
-	if (woal_disconnect(priv, MOAL_IOCTL_WAIT, priv->cfg_bssid) !=
-	    MLAN_STATUS_SUCCESS) {
+	if (woal_disconnect(priv, MOAL_IOCTL_WAIT_TIMEOUT, priv->cfg_bssid) !=
+		MLAN_STATUS_SUCCESS) {
 		priv->cfg_disconnect = MFALSE;
 		LEAVE();
 		return -EFAULT;
