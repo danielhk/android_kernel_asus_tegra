@@ -92,6 +92,7 @@ Change log:
 #include        <linux/inetdevice.h>
 
 #include	<linux/firmware.h>
+#include	<linux/wakelock.h>
 
 #include        "../mlan/mlan.h"
 #include        "moal_shim.h"
@@ -1209,6 +1210,7 @@ struct _moal_handle {
 	/** Card specific driver version */
 	t_s8 driver_version[MLAN_MAX_VER_STR_LEN];
 
+	struct wake_lock wake_lock;
 };
 
 /**

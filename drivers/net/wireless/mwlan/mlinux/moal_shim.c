@@ -32,6 +32,8 @@ Change log:
 #ifdef STA_CFG80211
 #include "moal_cfg80211.h"
 #endif
+/** Wake lock timeout in msec */
+#define WAKE_LOCK_TIMEOUT 1000
 
 /********************************************************
 		Local Variables
@@ -863,6 +865,10 @@ moal_recv_packet(IN t_void * pmoal_handle, IN pmlan_buffer pmbuf)
 
 			priv->stats.rx_bytes += skb->len;
 			priv->stats.rx_packets++;
+
+			wake_lock_timeout(&handle->wake_lock,
+					  WAKE_LOCK_TIMEOUT);
+
 			if (in_interrupt())
 				netif_rx(skb);
 			else {

@@ -5998,7 +5998,7 @@ woal_add_card(void *card)
 		PRINTM(MFATAL, "Firmware Init Failed\n");
 		goto err_init_fw;
 	}
-
+	wake_lock_init(&handle->wake_lock, WAKE_LOCK_SUSPEND, "mwlan");
 	LEAVE();
 	return handle;
 
@@ -6142,6 +6142,7 @@ woal_remove_card(void *card)
 	/* Unregister device */
 	PRINTM(MINFO, "unregister device\n");
 	woal_unregister_dev(handle);
+	wake_lock_destroy(&handle->wake_lock);
 	/* Free adapter structure */
 	PRINTM(MINFO, "Free Adapter\n");
 	woal_free_moal_handle(handle);
