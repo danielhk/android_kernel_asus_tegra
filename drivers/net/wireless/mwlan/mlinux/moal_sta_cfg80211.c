@@ -2168,6 +2168,8 @@ woal_cfg80211_scan(struct wiphy *wiphy, struct net_device *dev,
 #endif
 #ifdef UAP_CFG80211
 #endif
+	if(woal_is_any_interface_active(priv->phandle))
+		scan_req.chan_list[i].scan_time = 20; // ms
 	}
 	if (priv->scan_request->ie && priv->scan_request->ie_len) {
 		if (MLAN_STATUS_SUCCESS !=
