@@ -31,7 +31,9 @@
 #include <linux/crc32.h>
 #include <linux/usb.h>
 #include <linux/usb/usbnet.h>
+#include <linux/wakelock.h>
 #include <linux/slab.h>
+
 #include "smsc95xx.h"
 
 #define SMSC_CHIPNAME			"smsc95xx"
@@ -63,11 +65,14 @@
 #define SUSPEND_ALLMODES		(SUSPEND_SUSPEND0 | SUSPEND_SUSPEND1 | \
 					 SUSPEND_SUSPEND2 | SUSPEND_SUSPEND3)
 
+#define WAKE_LOCK_TIMEOUT 1000 /* ms */
+
 struct smsc95xx_priv {
 	u32 mac_cr;
 	u32 hash_hi;
 	u32 hash_lo;
 	u32 wolopts;
+	struct wake_lock wake_lock;
 	spinlock_t mac_cr_lock;
 	u8 features;
 	u8 suspend_flags;
@@ -1235,6 +1240,10 @@ static int smsc95xx_bind(struct usbnet *dev, struct usb_interface *intf)
 	dev->net->flags |= IFF_MULTICAST;
 	dev->net->hard_header_len += SMSC95XX_TX_OVERHEAD_CSUM;
 	dev->hard_mtu = dev->net->mtu + dev->net->hard_header_len;
+
+	wake_lock_init(&pdata->wake_lock, WAKE_LOCK_SUSPEND,
+			"smsc95xx");
+
 	return 0;
 }
 
@@ -1242,6 +1251,8 @@ static void smsc95xx_unbind(struct usbnet *dev, struct usb_interface *intf)
 {
 	struct smsc95xx_priv *pdata = (struct smsc95xx_priv *)(dev->data[0]);
 	if (pdata) {
+		wake_lock_destroy(&pdata->wake_lock);
+
 		netif_dbg(dev, ifdown, dev->net, "free pdata\n");
 		kfree(pdata);
 		pdata = NULL;
@@ -1805,6 +1816,10 @@ static void smsc95xx_rx_csum_offload(struct sk_buff *skb)
 
 static int smsc95xx_rx_fixup(struct usbnet *dev, struct sk_buff *skb)
 {
+	struct smsc95xx_priv *pdata = (struct smsc95xx_priv *)(dev->data[0]);
+
+	wake_lock_timeout(&pdata->wake_lock, WAKE_LOCK_TIMEOUT);
+
 	while (skb->len > 0) {
 		u32 header, align_count;
 		struct sk_buff *ax_skb;
