@@ -2055,7 +2055,7 @@ woal_cfg80211_scan(struct wiphy *wiphy, struct net_device *dev,
 	wlan_user_scan_cfg scan_req;
 	mlan_bss_info bss_info;
 	struct ieee80211_channel *chan;
-	int ret = 0, i;
+	int ret = 0, i, ch_idx;
 	unsigned long flags;
 
 	ENTER();
@@ -2140,26 +2140,30 @@ woal_cfg80211_scan(struct wiphy *wiphy, struct net_device *dev,
 	}
 #endif
 #endif
-	for (i = 0;
+	for (i = 0, ch_idx = 0;
 	     i < MIN(WLAN_USER_SCAN_CHAN_MAX, priv->scan_request->n_channels);
 	     i++) {
 		chan = priv->scan_request->channels[i];
-		scan_req.chan_list[i].chan_number = chan->hw_value;
-		scan_req.chan_list[i].radio_type = chan->band;
 		if (chan->
 		    flags & (IEEE80211_CHAN_PASSIVE_SCAN |
-			     IEEE80211_CHAN_RADAR))
-			scan_req.chan_list[i].scan_type =
+			     IEEE80211_CHAN_RADAR)) {
+			if(woal_is_any_interface_active(priv->phandle))
+				continue;
+			scan_req.chan_list[ch_idx].scan_type =
 				MLAN_SCAN_TYPE_PASSIVE;
-		else
-			scan_req.chan_list[i].scan_type = MLAN_SCAN_TYPE_ACTIVE;
-		scan_req.chan_list[i].scan_time = 0;
+		} else {
+			scan_req.chan_list[ch_idx].scan_type =
+				MLAN_SCAN_TYPE_ACTIVE;
+		}
+		scan_req.chan_list[ch_idx].chan_number = chan->hw_value;
+		scan_req.chan_list[ch_idx].radio_type = chan->band;
+		scan_req.chan_list[ch_idx].scan_time = 0;
 #if defined(WIFI_DIRECT_SUPPORT)
 #if LINUX_VERSION_CODE >= WIFI_DIRECT_KERNEL_VERSION
 		if (priv->bss_type == MLAN_BSS_TYPE_WIFIDIRECT &&
 		    priv->scan_request->n_ssids) {
 			if (!memcmp(scan_req.ssid_list[0].ssid, "DIRECT-", 7))
-				scan_req.chan_list[i].scan_time =
+				scan_req.chan_list[ch_idx].scan_time =
 					MIN_SPECIFIC_SCAN_CHAN_TIME;
 		}
 #endif
@@ -2168,8 +2172,9 @@ woal_cfg80211_scan(struct wiphy *wiphy, struct net_device *dev,
 #endif
 #ifdef UAP_CFG80211
 #endif
-	if(woal_is_any_interface_active(priv->phandle))
-		scan_req.chan_list[i].scan_time = 20; // ms
+		if(woal_is_any_interface_active(priv->phandle))
+			scan_req.chan_list[ch_idx].scan_time = 20; // ms
+		++ch_idx;
 	}
 	if (priv->scan_request->ie && priv->scan_request->ie_len) {
 		if (MLAN_STATUS_SUCCESS !=
