@@ -834,7 +834,6 @@ process_start:
 				break;
 
 			if (pmadapter->data_sent
-			    || pmadapter->scan_processing
 			    || wlan_is_tdls_link_chan_switching(pmadapter->
 								tdls_status)
 			    || (wlan_bypass_tx_list_empty(pmadapter) &&
@@ -903,7 +902,6 @@ process_start:
 		}
 
 		if (!pmadapter->data_sent &&
-		    !pmadapter->scan_processing &&
 		    !wlan_11h_radar_detected_tx_blocked(pmadapter) &&
 		    !wlan_is_tdls_link_chan_switching(pmadapter->tdls_status) &&
 		    !wlan_bypass_tx_list_empty(pmadapter)) {
@@ -919,7 +917,6 @@ process_start:
 		}
 
 		if (!pmadapter->data_sent
-		    && !pmadapter->scan_processing
 		    && !wlan_wmm_lists_empty(pmadapter)
 		    && !wlan_11h_radar_detected_tx_blocked(pmadapter)
 		    && !wlan_is_tdls_link_chan_switching(pmadapter->tdls_status)

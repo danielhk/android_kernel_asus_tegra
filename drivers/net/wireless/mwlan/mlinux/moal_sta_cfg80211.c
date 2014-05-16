@@ -2119,8 +2119,11 @@ woal_cfg80211_scan(struct wiphy *wiphy, struct net_device *dev,
 	spin_unlock_irqrestore(&priv->scan_req_lock, flags);
 	memset(&scan_req, 0x00, sizeof(scan_req));
 
-#ifdef WIFI_DIRECT_SUPPORT
-#endif
+	if(woal_is_any_interface_active(priv->phandle))
+		scan_req.scan_chan_gap = DEF_SCAN_CHAN_GAP;
+	else
+		scan_req.scan_chan_gap = 0;
+
 	for (i = 0; i < priv->scan_request->n_ssids; i++) {
 		memcpy(scan_req.ssid_list[i].ssid,
 		       priv->scan_request->ssids[i].ssid,
@@ -2168,12 +2171,9 @@ woal_cfg80211_scan(struct wiphy *wiphy, struct net_device *dev,
 		}
 #endif
 #endif
-#ifdef WIFI_DIRECT_SUPPORT
-#endif
-#ifdef UAP_CFG80211
-#endif
 		if(woal_is_any_interface_active(priv->phandle))
-			scan_req.chan_list[ch_idx].scan_time = 20; // ms
+			scan_req.chan_list[ch_idx].scan_time =
+				DEF_MIRACAST_SCAN_TIME;
 		++ch_idx;
 	}
 	if (priv->scan_request->ie && priv->scan_request->ie_len) {

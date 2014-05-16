@@ -1285,6 +1285,9 @@ typedef MLAN_PACK_START struct {
      *  Variable number (fixed maximum) of channels to scan up
      */
 	wlan_user_scan_chan chan_list[WLAN_USER_SCAN_CHAN_MAX];
+
+    /** scan channel gap */
+	t_u16  scan_chan_gap;
 } MLAN_PACK_END wlan_user_scan_cfg;
 
 /** Default scan interval in millisecond*/

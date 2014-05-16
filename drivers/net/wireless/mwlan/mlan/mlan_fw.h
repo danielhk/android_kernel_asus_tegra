@@ -743,6 +743,10 @@ typedef enum _WLAN_802_11_WEP_STATUS {
 #define TLV_TYPE_IEEE_ACTION_FRAME   (PROPRIETARY_TLV_BASE_ID + 0x8c)	/* 0x018c
 									 */
 
+/** TLV type : SCAN channel gap */
+#define TLV_TYPE_SCAN_CHANNEL_GAP    (PROPRIETARY_TLV_BASE_ID + 0xc5)  /* 0x01c5
+									*/
+
 /** Firmware Host Command ID Constants */
 /** Host Command ID : Get hardware specifications */
 #define HostCmd_CMD_GET_HW_SPEC               0x0003
@@ -1894,6 +1898,17 @@ typedef MLAN_PACK_START struct _MrvlIEtypes_AuthType_t {
     /** Authentication type */
 	t_u16 auth_type;
 } MLAN_PACK_END MrvlIEtypes_AuthType_t;
+
+
+/** MrvlIEtypes_ScanChanGap_t */
+typedef MLAN_PACK_START struct  _MrvlIEtypes_ScanChanGap_t {
+    /** Header */
+	MrvlIEtypesHeader_t header;
+    /** Time gap in units to TUs to be used between
+        two consecutive channels scan */
+	t_u16 gap;
+} MLAN_PACK_END MrvlIEtypes_ScanChanGap_t;
+
 
 /** MrvlIETypes_ActionFrame_t */
 typedef MLAN_PACK_START struct {
