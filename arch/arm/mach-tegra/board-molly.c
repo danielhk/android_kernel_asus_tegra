@@ -208,7 +208,7 @@ static struct aah_io_platform_data aah_io_data = {
 #else
 	.key_gpio = TEGRA_GPIO_PR2, /* dalmore's volume+ button for now */
 #endif
-	.key_code = KEY_MUTE,/* TBD, easiest to test as mute for now */
+	.key_code = KEY_CONNECT, /* hardware pairing button */
 };
 
 static struct i2c_board_info __initdata aah_io_i2c_board_info[] = {
