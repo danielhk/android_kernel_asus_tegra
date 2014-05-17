@@ -665,6 +665,12 @@ config HID_ZYDACRON
 	---help---
 	Support for Zydacron remote control.
 
+config HID_ANDROIDTV_REMOTE
+	tristate "AndroidTV remote control support"
+	depends on USB_HID
+	---help---
+	Support for AndroidTV remote control.
+
 endmenu
 
 endif # HID_SUPPORT
