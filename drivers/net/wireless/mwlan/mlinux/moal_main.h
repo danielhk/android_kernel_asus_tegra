@@ -657,7 +657,7 @@ out:
 /** default scan channel gap  */
 #define DEF_SCAN_CHAN_GAP   50
 /** default scan time per channel in miracast mode */
-#define DEF_MIRACAST_SCAN_TIME   20
+#define DEF_MIRACAST_SCAN_TIME   10
 
 /** Macro to extract the TOS field from a skb */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 22)
