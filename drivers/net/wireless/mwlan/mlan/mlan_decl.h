@@ -148,9 +148,9 @@ typedef t_s32 t_sval;
 
 #ifdef STA_SUPPORT
 /** Default Win size attached during ADDBA request */
-#define MLAN_STA_AMPDU_DEF_TXWINSIZE       16
+#define MLAN_STA_AMPDU_DEF_TXWINSIZE       32
 /** Default Win size attached during ADDBA response */
-#define MLAN_STA_AMPDU_DEF_RXWINSIZE       32
+#define MLAN_STA_AMPDU_DEF_RXWINSIZE       64
 /** RX winsize for COEX */
 #define MLAN_STA_COEX_AMPDU_DEF_RXWINSIZE  16
 #endif /* STA_SUPPORT */
@@ -158,14 +158,14 @@ typedef t_s32 t_sval;
 /** Default Win size attached during ADDBA request */
 #define MLAN_UAP_AMPDU_DEF_TXWINSIZE       32
 /** Default Win size attached during ADDBA response */
-#define MLAN_UAP_AMPDU_DEF_RXWINSIZE       16
+#define MLAN_UAP_AMPDU_DEF_RXWINSIZE       32
 /** RX winsize for COEX */
 #define MLAN_UAP_COEX_AMPDU_DEF_RXWINSIZE  16
 #endif /* UAP_SUPPORT */
 
 #ifdef WIFI_DIRECT_SUPPORT
 /** WFD use the same window size for tx/rx */
-#define MLAN_WFD_AMPDU_DEF_TXRXWINSIZE     16
+#define MLAN_WFD_AMPDU_DEF_TXRXWINSIZE     32
 /** RX winsize for COEX */
 #define MLAN_WFD_COEX_AMPDU_DEF_RXWINSIZE  16
 #endif
