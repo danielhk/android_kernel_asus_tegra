@@ -72,6 +72,9 @@ CONFIG_HISTOGRAM_SUPPORT=y
 # debug log support
 CONFIG_DLOG_SUPPORT=y
 
+# disble ieee psmode
+CONFIG_DISABLE_PSMODE=y
+
 CONFIG_ANDROID_KERNEL=y
 
 #############################################################################
@@ -88,6 +91,10 @@ endif
 
 ifeq ($(CONFIG_DLOG_SUPPORT),y)
 	EXTRA_CFLAGS += -DDLOG_SUPPORT
+endif
+
+ifeq ($(CONFIG_DISABLE_PSMODE),y)
+	EXTRA_CFLAGS += -DDISABLE_PSMODE
 endif
 
 ifeq ($(CONFIG_DEBUG),1)

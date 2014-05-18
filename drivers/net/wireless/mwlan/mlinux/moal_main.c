@@ -100,7 +100,11 @@ extern char *reg_alpha2;
 int auto_ds;
 
 /** IEEE PS mode */
+#ifdef DISABLE_PSMODE
+int ps_mode = 2; /* disable */
+#else
 int ps_mode;
+#endif
 
 /** Max Tx buffer size */
 int max_tx_buf;

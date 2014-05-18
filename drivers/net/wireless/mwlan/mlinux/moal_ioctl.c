@@ -1207,6 +1207,14 @@ woal_set_get_power_mgmt(moal_private * priv,
 
 	ENTER();
 
+#ifdef DISABLE_PSMODE
+	if (action == MLAN_ACT_SET) {
+		PRINTM(MMSG, "wlan: set psmode ignored\n");
+		ret = MLAN_STATUS_FAILURE;
+		goto done;
+	}
+#endif
+
 	req = woal_alloc_mlan_ioctl_req(sizeof(mlan_ds_pm_cfg));
 	if (req == NULL) {
 		ret = MLAN_STATUS_FAILURE;
