@@ -9085,6 +9085,12 @@ woal_android_priv_cmd(struct net_device *dev, struct ifreq *req)
 
 	PRINTM(MIOCTL, "Android priv cmd: [%s] on [%s]\n", buf, req->ifr_name);
 
+	if (strncmp(buf, CMD_MARVELL, strlen(CMD_MARVELL)) &&
+			woal_check_driver_status(priv->phandle)) {
+		PRINTM(MERROR, "%s fail when driver hang\n", buf);
+		ret = -EFAULT;
+		goto done;
+	}
 	if (strncmp(buf, CMD_MARVELL, strlen(CMD_MARVELL)) == 0) {
 		/* This command has come from mlanutl app */
 
@@ -10059,14 +10065,7 @@ woal_android_priv_cmd(struct net_device *dev, struct ifreq *req)
 	} else if (strncmp(buf, "SETSUSPENDMODE", strlen("SETSUSPENDMODE")) ==
 		   0) {
 		/* it will be done by GUI */
-		if (woal_check_driver_status(priv->phandle)) {
-			PRINTM(MERROR,
-			       "SETSUSPENDMODE Fail when driver hang\n");
-			ret = -EFAULT;
-			goto done;
-		} else {
-			len = sprintf(buf, "OK\n") + 1;
-		}
+		len = sprintf(buf, "OK\n") + 1;
 	} else if (strncmp(buf, "BTCOEXMODE", strlen("BTCOEXMODE")) == 0) {
 		len = sprintf(buf, "OK\n") + 1;
 	} else if (strncmp(buf, "BTCOEXSCAN-START", strlen("BTCOEXSCAN-START"))
