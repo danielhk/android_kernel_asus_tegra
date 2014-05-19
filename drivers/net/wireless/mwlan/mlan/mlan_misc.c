@@ -450,7 +450,7 @@ wlan_get_info_debug_info(IN pmlan_adapter pmadapter,
 		debug_info->num_cmd_assoc_failure =
 			pmadapter->dbg.num_cmd_assoc_failure;
 		debug_info->num_tx_timeout = pmadapter->dbg.num_tx_timeout;
-		debug_info->num_cmd_timeout = pmadapter->dbg.num_cmd_timeout;
+		debug_info->num_cmd_timeout = pmadapter->num_cmd_timeout;
 		debug_info->timeout_cmd_id = pmadapter->dbg.timeout_cmd_id;
 		debug_info->timeout_cmd_act = pmadapter->dbg.timeout_cmd_act;
 		memcpy(pmadapter, debug_info->last_cmd_id,
