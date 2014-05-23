@@ -61,10 +61,7 @@ struct platform_device * __init molly_host1x_init(void)
 
 static struct regulator *molly_hdmi_reg;
 static struct regulator *molly_hdmi_pll;
-
-#if MOLLY_ON_DALMORE == 1
 static struct regulator *molly_hdmi_vddio;
-#endif
 
 static struct resource molly_disp_resources[] = {
 	{
@@ -96,12 +93,6 @@ static struct resource molly_disp_resources[] = {
 static int molly_hdmi_enable(struct device *dev)
 {
 	int ret;
-
-#if MOLLY_ON_DALMORE == 0
-	/* Enable HDMI level shifters */
-	gpio_set_value(MOLLY_HDMI_LS_EN, 1);
-#endif
-
 	if (!molly_hdmi_reg) {
 		molly_hdmi_reg = regulator_get(dev, "avdd_hdmi");
 		if (IS_ERR_OR_NULL(molly_hdmi_reg)) {
@@ -151,17 +142,11 @@ static int molly_hdmi_disable(void)
 
 static int molly_hdmi_postsuspend(void)
 {
-#if MOLLY_ON_DALMORE == 1
 	if (molly_hdmi_vddio) {
 		regulator_disable(molly_hdmi_vddio);
 		regulator_put(molly_hdmi_vddio);
 		molly_hdmi_vddio = NULL;
 	}
-#else
-	/* Disable HDMI level shifters when Molly goes into suspend */
-	gpio_set_value(MOLLY_HDMI_LS_EN, 0);
-#endif
-
 	return 0;
 }
 
@@ -179,10 +164,9 @@ static int molly_hdmi_hotplug_init(struct device *dev)
 		}
 	}
 #else
-	/* NOTE:  Do NOT enable HDMI level shifters here.  When DC wakes up, it
-	 * checks HPD even though we don't intend to turn on the display.  For
-	 * Molly, we want 5V to be quiet during suspend.  Level shifters will be
-	 * turned on inside of hdmi_enable()
+	/* no regulator needed to power the level shifter for
+	 * HDMI on molly.  there is a HDMI_EN control GPIO
+	 * we need to set to enable the level shifter though.
 	 */
 #endif
 
@@ -493,9 +477,9 @@ int __init molly_panel_init(void)
 	err = gpio_request(MOLLY_HDMI_LS_EN, "hdmi_ls_en");
 	pr_info("%s: gpio_request(hdmi_ls_en) returned %d\n",
 		__func__, err);
-	/* Turn on HDMI level shifter at init to enable
-	 * HPD hotplug detection.  HPD hotplug comes through
-	 * the level shifter.
+	/* keep level shifter always enabled, otherwise
+	 * HPD hotplug detection fails because it's also
+	 * coming through the level shifter.
 	 */
 	err = gpio_direction_output(MOLLY_HDMI_LS_EN, 1);
 	pr_info("%s: gpio_direction_output(hdmi_ls_en, 1) returned %d\n",
