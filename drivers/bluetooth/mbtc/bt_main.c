@@ -2493,6 +2493,9 @@ bt_remove_card(void *card)
 		free_m_dev(m_dev);
 	}
 	PRINTM(INFO, "Free Adapter\n");
+#ifdef CONFIG_ATHOME_BT_REMOTE
+	aahbt_reset();
+#endif
 	bt_free_adapter(priv);
 	bt_priv_put(priv);
 

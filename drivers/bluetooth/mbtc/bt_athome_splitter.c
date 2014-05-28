@@ -196,9 +196,13 @@ static void aahbt_filter_ftr_page_0(uint8_t *features)
 	}
 }
 
-static void aahbt_reset(void)
+void aahbt_reset(void)
 {
 	aahlog("resetting\n");
+
+	smp_rmb();
+	drv_priv = NULL;
+	smp_wmb();
 
 	aahbt_stack_shutdown();
 

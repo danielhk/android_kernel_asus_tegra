@@ -50,6 +50,11 @@ void aahbt_stack_prepare(void);
 void aahbt_stack_start(void);
 
 /*
+ * Handles unexpected chip or bluedroid resets.  Calls aahbt_stack_shutdown().
+ */
+void aahbt_reset(void);
+
+/*
  * Cleanup state in prep for future restart of LE stack
  */
 void aahbt_stack_shutdown(void);
