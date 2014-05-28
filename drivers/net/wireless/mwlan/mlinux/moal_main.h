@@ -1995,6 +1995,7 @@ int wlan_get_scan_table_ret_entry(BSSDescriptor_t * pbss_desc, t_u8 ** ppbuffer,
 BOOLEAN woal_ssid_valid(mlan_802_11_ssid * pssid);
 int woal_is_connected(moal_private * priv, mlan_ssid_bssid * ssid_bssid);
 void wifi_enable_hostwake_irq(int flag);
+void woal_process_hang(moal_handle *handle);
 int woal_priv_hostcmd(moal_private * priv, t_u8 * respbuf, t_u32 respbuflen);
 void woal_tcp_ack_tx_indication(moal_private * priv, mlan_buffer * pmbuf);
 mlan_status woal_request_country_power_table(moal_private * priv, char *region);

@@ -171,6 +171,11 @@ static struct resource *wifi_irqres;
 static int irq_registered;
 static void wifi_register_hostwake_irq(void *handle);
 
+/** Hang workqueue */
+static struct workqueue_struct *hang_workqueue;
+/** Hang work */
+static struct work_struct hang_work;
+
 #if defined(STA_WEXT) || defined(UAP_WEXT)
 /** CFG80211 and WEXT mode */
 int cfg80211_wext = STA_WEXT_MASK | UAP_WEXT_MASK;
@@ -2784,6 +2789,19 @@ static struct platform_driver wifi_device = {
 		   }
 };
 
+static void
+woal_hang_work_queue(struct work_struct *work)
+{
+	ENTER();
+	PRINTM(MMSG, "Power down chip\n");
+	wifi_set_power(0, 0);
+	wifi_set_carddetect(0);
+	PRINTM(MMSG, "Power up chip\n");
+	wifi_set_power(1, 0);
+	wifi_set_carddetect(1);
+	LEAVE();
+}
+
 /**
  *  @brief Adds an wifi device
  *  @return  0 --success, otherwise fail
@@ -2797,6 +2815,21 @@ wifi_add_dev(void)
 
 	if (minicard_pwrup)
 		ret = platform_driver_register(&wifi_device);
+
+	/* Create workqueue for hang process */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 14)
+	/* For kernel less than 2.6.14 name can not be greater than 10
+	   characters */
+	hang_workqueue = create_workqueue("MOAL_HANG_WORKQ");
+#else
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
+	hang_workqueue = alloc_workqueue("MOAL_HANG_WORK_QUEUE",
+		WQ_HIGHPRI | WQ_MEM_RECLAIM | WQ_UNBOUND, 1);
+#else
+	hang_workqueue = create_workqueue("MOAL_HANG_WORK_QUEUE");
+#endif
+#endif
+	MLAN_INIT_WORK(&hang_work, woal_hang_work_queue);
 
 	LEAVE();
 	return ret;
@@ -2814,6 +2847,12 @@ wifi_del_dev(void)
 
 	if (minicard_pwrup)
 		platform_driver_unregister(&wifi_device);
+
+	if (hang_workqueue) {
+		flush_workqueue(hang_workqueue);
+		destroy_workqueue(hang_workqueue);
+		hang_workqueue = NULL;
+	}
 
 	LEAVE();
 }
@@ -3191,6 +3230,21 @@ woal_mlan_debug_info(moal_private * priv)
 }
 
 /**
+ *  @brief This function process FW hang
+ *
+ *  @param handle       Pointer to structure moal_handle
+ *
+ *  @return        N/A
+ */
+void woal_process_hang(moal_handle *handle)
+{
+	ENTER();
+	PRINTM(MMSG, "Process hang\n");
+	queue_work(hang_workqueue, &hang_work);
+	LEAVE();
+}
+
+/**
  *  @brief This function handles the timeout of packet
  *          transmission
  *
@@ -3213,6 +3267,7 @@ woal_tx_timeout(struct net_device *dev)
 	if (priv->num_tx_timeout == NUM_TX_TIMEOUT_THRESHOLD) {
 		woal_mlan_debug_info(priv);
 		woal_moal_debug_info(priv, NULL, MFALSE);
+		woal_process_hang(priv->phandle);
 	}
 
 	LEAVE();

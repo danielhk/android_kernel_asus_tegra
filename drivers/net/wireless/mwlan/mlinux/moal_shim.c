@@ -1353,6 +1353,7 @@ moal_recv_event(IN t_void * pmoal_handle, IN pmlan_event pmevent)
 	case MLAN_EVENT_ID_DRV_DBG_DUMP:
 		priv->phandle->driver_state = MTRUE;
 		woal_moal_debug_info(priv, NULL, MFALSE);
+		woal_process_hang(priv->phandle);
 		break;
 	case MLAN_EVENT_ID_FW_BG_SCAN:
 		if (priv->media_connected == MTRUE)
