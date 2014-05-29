@@ -1783,7 +1783,6 @@ wlan_misc_ioctl_tdls_oper(IN pmlan_adapter pmadapter,
 			       MAC2STR(ptdls_oper->peer_mac));
 			sta_ptr->status = TDLS_SETUP_COMPLETE;
 			pmadapter->tdls_status = TDLS_IN_BASE_CHANNEL;
-			wlan_coex_ampdu_rxwinsize(pmadapter);
 			if (sta_ptr->HTcap.ieee_hdr.element_id == HT_CAPABILITY) {
 				sta_ptr->is_11n_enabled = MTRUE;
 				if (GETHT_MAXAMSDU
@@ -1892,7 +1891,6 @@ wlan_misc_ioctl_tdls_oper(IN pmlan_adapter pmadapter,
 			pmadapter->tdls_status = TDLS_NOT_SETUP;
 		else
 			pmadapter->tdls_status = TDLS_IN_BASE_CHANNEL;
-		wlan_coex_ampdu_rxwinsize(pmadapter);
 		/* Send command to firmware to delete tdls link */
 		ret = wlan_prepare_cmd(pmpriv,
 				       HostCmd_CMD_TDLS_OPERATION,

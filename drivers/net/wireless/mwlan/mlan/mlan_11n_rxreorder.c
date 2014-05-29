@@ -1434,9 +1434,6 @@ wlan_coex_ampdu_rxwinsize(pmlan_adapter pmadapter)
 			    MLAN_BSS_ROLE_STA) {
 				if (priv->media_connected == MTRUE) {
 					count++;
-					if (pmadapter->tdls_status !=
-					    TDLS_NOT_SETUP)
-						count++;
 				}
 			}
 #endif
