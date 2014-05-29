@@ -2369,6 +2369,45 @@ err_kmalloc:
 }
 
 /**
+ *  @brief This function send hardware remove event
+ *
+ *  @param priv    A pointer to bt_private
+ *  @return        N/A
+ */
+void
+bt_send_hw_remove_event(bt_private * priv)
+{
+	struct sk_buff *skb = NULL;
+	struct mbt_dev *mbt_dev = NULL;
+	struct m_dev *mdev_bt = &(priv->bt_dev.m_dev[BT_SEQ]);
+
+	ENTER();
+
+	mbt_dev = (struct mbt_dev *) priv->bt_dev.m_dev[BT_SEQ].dev_pointer;
+	if (!mbt_dev) {
+		LEAVE();
+		return;
+	}
+
+#define HCI_HARDWARE_ERROR_EVT  0x10
+#define HCI_HARDWARE_ERROR_EVT_LEN 3
+#define HCI_HARDWARE_REMOVE     0x24
+	skb = bt_skb_alloc(HCI_HARDWARE_ERROR_EVT_LEN, GFP_ATOMIC);
+	skb->data[0] = HCI_HARDWARE_ERROR_EVT;
+	skb->data[1] = 1; /* One byte payload */
+	skb->data[2] = HCI_HARDWARE_REMOVE;
+	bt_cb(skb)->pkt_type = HCI_EVENT_PKT;
+	skb_put(skb, HCI_HARDWARE_ERROR_EVT_LEN);
+	skb->dev = (void *) mdev_bt;
+	PRINTM(MSG, "Send HW ERROR event\n");
+	mdev_recv_frame(skb);
+
+	os_sched_timeout(5);
+
+	LEAVE();
+}
+
+/**
  *  @brief This function removes the card.
  *
  *  @param card    A pointer to card
@@ -2394,6 +2433,7 @@ bt_remove_card(void *card)
 		sd_disable_host_int(priv);
 		priv->adapter->SurpriseRemoved = TRUE;
 	}
+	bt_send_hw_remove_event(priv);
 	wake_up_interruptible(&priv->adapter->cmd_wait_q);
 	priv->adapter->SurpriseRemoved = TRUE;
 	wake_up_interruptible(&priv->MainThread.waitQ);
