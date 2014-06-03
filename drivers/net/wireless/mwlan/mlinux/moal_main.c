@@ -2789,16 +2789,33 @@ static struct platform_driver wifi_device = {
 		   }
 };
 
+static moal_handle *reset_handle;
+
 static void
 woal_hang_work_queue(struct work_struct *work)
 {
+	int i;
 	ENTER();
+	if (!reset_handle) {
+		LEAVE();
+		return;
+	}
+	for (i = 0; i < reset_handle->priv_num; i++) {
+		if (reset_handle->priv[i] && reset_handle->priv[i]->netdev) {
+			PRINTM(MMSG, "Close netdev %s before power cycle\n",
+				reset_handle->priv[i]->netdev->name);
+			rtnl_lock();
+			dev_close(reset_handle->priv[i]->netdev);
+			rtnl_unlock();
+		}
+	}
 	PRINTM(MMSG, "Power down chip\n");
 	wifi_set_power(0, 0);
 	wifi_set_carddetect(0);
 	PRINTM(MMSG, "Power up chip\n");
 	wifi_set_power(1, 0);
 	wifi_set_carddetect(1);
+	reset_handle = NULL;
 	LEAVE();
 }
 
@@ -3239,8 +3256,11 @@ woal_mlan_debug_info(moal_private * priv)
 void woal_process_hang(moal_handle *handle)
 {
 	ENTER();
-	PRINTM(MMSG, "Process hang\n");
-	queue_work(hang_workqueue, &hang_work);
+	if (reset_handle == NULL) {
+		PRINTM(MMSG, "Process hang\n");
+		reset_handle = handle;
+		queue_work(hang_workqueue, &hang_work);
+	}
 	LEAVE();
 }
 
