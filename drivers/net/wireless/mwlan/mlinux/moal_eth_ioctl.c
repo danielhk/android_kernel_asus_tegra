@@ -9085,12 +9085,6 @@ woal_android_priv_cmd(struct net_device *dev, struct ifreq *req)
 
 	PRINTM(MIOCTL, "Android priv cmd: [%s] on [%s]\n", buf, req->ifr_name);
 
-	if (strncmp(buf, CMD_MARVELL, strlen(CMD_MARVELL)) &&
-			woal_check_driver_status(priv->phandle)) {
-		PRINTM(MERROR, "%s fail when driver hang\n", buf);
-		ret = -EFAULT;
-		goto done;
-	}
 	if (strncmp(buf, CMD_MARVELL, strlen(CMD_MARVELL)) == 0) {
 		/* This command has come from mlanutl app */
 
