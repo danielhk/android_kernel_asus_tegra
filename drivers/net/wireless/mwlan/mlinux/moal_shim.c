@@ -867,7 +867,7 @@ moal_recv_packet(IN t_void * pmoal_handle, IN pmlan_buffer pmbuf)
 			priv->stats.rx_packets++;
 
 			wake_lock_timeout(&handle->wake_lock,
-					  WAKE_LOCK_TIMEOUT);
+					  msecs_to_jiffies(WAKE_LOCK_TIMEOUT));
 
 			if (in_interrupt())
 				netif_rx(skb);
