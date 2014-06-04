@@ -797,6 +797,21 @@ static int smsc95xx_ethtool_set_wol(struct net_device *net,
 	return ret;
 }
 
+static int smsc95xx_ethtool_clear_wol(struct net_device *net)
+{
+	struct usbnet *dev = netdev_priv(net);
+	struct smsc95xx_priv *pdata = (struct smsc95xx_priv *)(dev->data[0]);
+	int ret;
+
+	pdata->wolopts = 0;
+
+	ret = device_set_wakeup_enable(&dev->udev->dev, 0);
+	if (ret < 0)
+		netdev_warn(dev->net, "device_set_wakeup_enable error %d\n", ret);
+
+	return ret;
+}
+
 static const struct ethtool_ops smsc95xx_ethtool_ops = {
 	.get_link	= usbnet_get_link,
 	.nway_reset	= usbnet_nway_reset,
@@ -1807,6 +1822,23 @@ static int smsc95xx_resume(struct usb_interface *intf)
 	return ret;
 }
 
+static int smsc95xx_reset_resume(struct usb_interface *intf)
+{
+	struct usbnet *dev = usb_get_intfdata(intf);
+
+	BUG_ON(!dev);
+
+	netdev_warn(dev->net, "A USB bus reset has occurred, mark the "
+			"interface for rebinding");
+
+	/* Mark the interface for rebinding.  This will cause the
+	 * SMSC95xx device to be reinitialized.
+	 */
+	intf->needs_binding = 1;
+
+	return 0;
+}
+
 static void smsc95xx_rx_csum_offload(struct sk_buff *skb)
 {
 	skb->csum = *(u16 *)(skb_tail_pointer(skb) - 2);
@@ -2021,6 +2053,25 @@ static int smsc95xx_probe(struct usb_interface *udev,
 	return 0;
 }
 
+static void smsc95xx_disconnect(struct usb_interface *intf)
+{
+	struct usb_device *usb_dev = interface_to_usbdev(intf);
+
+	if (boot_wol_config && usb_dev->actconfig->desc.bmAttributes &
+				USB_CONFIG_ATT_WAKEUP) {
+		struct usbnet *dev = usb_get_intfdata(intf);
+		int ret;
+
+		ret = smsc95xx_ethtool_clear_wol(dev->net);
+		if (ret < 0)
+			netdev_warn(dev->net, "unable to clear wol "
+				"config %x error %d\n", boot_wol_config,
+				ret);
+	}
+
+	usbnet_disconnect(intf);
+}
+
 static const struct usb_device_id products[] = {
 	{
 		/* SMSC9500 USB Ethernet Device */
@@ -2122,8 +2173,8 @@ static struct usb_driver smsc95xx_driver = {
 	.probe		= smsc95xx_probe,
 	.suspend	= smsc95xx_suspend,
 	.resume		= smsc95xx_resume,
-	.reset_resume	= smsc95xx_resume,
-	.disconnect	= usbnet_disconnect,
+	.reset_resume	= smsc95xx_reset_resume,
+	.disconnect	= smsc95xx_disconnect,
 	.supports_autosuspend = 1,
 };
 
