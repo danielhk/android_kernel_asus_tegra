@@ -2054,9 +2054,11 @@ static void aahbt_set_listening_l(bool should_listen)
 
 void aahbt_set_listening(bool should_listen)
 {
+#if 0 /* disable scanning for now.  will disable driver completely soon */
 	mutex_lock(&state_lock);
 	aahbt_set_listening_l(should_listen);
 	mutex_unlock(&state_lock);
+#endif
 }
 
 int aahbt_start_connecting(const bdaddr_t *macP, uint32_t timeout_msec)
