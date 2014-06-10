@@ -174,38 +174,6 @@ static int molly_hdmi_hotplug_init(struct device *dev)
 }
 
 static struct tegra_dc_mode hdmi_panel_modes[] = {
-	/* 3840x2160p@29.97Hz/30Hz */
-	{
-		.pclk = 297000000,
-		.h_ref_to_sync = 1,
-		.v_ref_to_sync = 1,
-		.h_sync_width = 88,   /* hsync_len */
-		.v_sync_width = 10,   /* vsync_len */
-		.h_back_porch = 296,  /* left_margin */
-		.v_back_porch = 72,   /* upper_margin */
-		.h_active = 3840,     /* xres */
-		.v_active = 2160,     /* yres */
-		.h_front_porch = 176, /* right_margin */
-		.v_front_porch = 8,   /* lower_margin */
-		.avi_m = TEGRA_DC_MODE_AVI_M_16_9,
-		.avi_q = TEGRA_DC_MODE_AVI_Q_LIMITED,
-	},
-	/* 3840x2160p@23.98Hz/24Hz */
-	{
-		.pclk = 297000000,
-		.h_ref_to_sync = 1,
-		.v_ref_to_sync = 1,
-		.h_sync_width = 88,   /* hsync_len */
-		.v_sync_width = 10,   /* vsync_len */
-		.h_back_porch = 296,  /* left_margin */
-		.v_back_porch = 72,   /* upper_margin */
-		.h_active = 3840,     /* xres */
-		.v_active = 2160,     /* yres */
-		.h_front_porch = 1276, /* right_margin */
-		.v_front_porch = 8,   /* lower_margin */
-		.avi_m = TEGRA_DC_MODE_AVI_M_16_9,
-		.avi_q = TEGRA_DC_MODE_AVI_Q_LIMITED,
-	},
 	/* 1920x1080p@59.94Hz/60Hz CEA mode 16 */
 	{
 		.pclk = 148500000,
