@@ -271,6 +271,108 @@ config TEGRA_EMC_SCALING_ENABLE
 	depends on TEGRA_SILICON_PLATFORM
 	default n
 
+config VOLTAGE_CONTROL
+	bool "Enable user voltage control on Tegra CPU"
+	depends on TEGRA_SILICON_PLATFORM
+	default n
+	help
+	User custom voltage control interface
+
+config CUSTOM_BRIGHTNESS
+	bool "Custom Brightness Levels"
+	depends on TEGRA_SILICON_PLATFORM
+	default n
+	help
+	Allow custom min and max brightness
+
+config DEFAULT_DUAL_CORE
+	bool "Default to Dual-Core"
+	depends on TEGRA_SILICON_PLATFORM
+	default n
+	help
+	Set the default maximum number of cores to 2 instead of 4.
+
+config GPU_OVERCLOCK
+	bool "Enable GPU overclock for Tegra3"
+	depends on TEGRA_SILICON_PLATFORM
+	default n
+	help
+	Choose y to overclock the GPU.
+	If Off, clock speed is 416MHz.
+	If On, GPU clock speed can be selected.
+
+choice
+
+	depends on GPU_OVERCLOCK
+	prompt "Maximum GPU Rate"
+	default GPU_OC_484
+	---help---
+	  Select the desired GPU overclock rate.
+
+	  If you are not sure what you are doing, leave this
+	  option alone!
+	config GPU_OC_332
+		bool "332 MHz"
+	config GPU_OC_446
+		bool "446 MHz"
+	config GPU_OC_484
+		bool "484 MHz"
+	config GPU_OC_520
+		bool "520 MHz"
+	config GPU_OC_600
+		bool "600 MHz"
+	config GPU_OC_666
+		bool "666 MHz"
+	config GPU_OC_700
+		bool "700 MHz"
+
+endchoice
+
+config LP_OVERCLOCK
+	bool "Enable LP overclock for Tegra3"
+	depends on TEGRA_SILICON_PLATFORM
+	default n
+	---help---
+	  Choose y to overclock the LP core.
+	  If Off, maximum clock speed is 475MHz.
+	  If On, LP clock speed can be selected.
+
+choice
+
+	depends on LP_OVERCLOCK
+	prompt "Maximum LP Rate"
+	default LP_OC_666
+	---help---
+	  Select the desired LP overclock rate.
+
+	  If you are not sure what you are doing, leave this
+	  option alone!
+	config LP_OC_555
+		bool "555 MHz"
+	config LP_OC_620
+		bool "620 MHz"
+	config LP_OC_666
+		bool "666 MHz"
+	config LP_OC_700
+		bool "700 MHz"
+	config LP_OC_740
+		bool "740 MHz"
+
+endchoice
+
+config LP_ONLY
+	bool "Only use the Low-Power companion core"
+	depends on TEGRA_SILICON_PLATFORM
+	default n
+
+config AUDIO_MIN_PERFLOCK
+	bool "Minimum Audio Playback performance lock"
+	depends on SND_SOC_TEGRA_RT5640
+	default n
+	help
+	  Tegra3 minimum Audio Performance Lock to prevent audio playback
+	  underruns
+
 config TEGRA_CPU_DVFS
 	bool "Enable voltage scaling on Tegra CPU"
 	depends on TEGRA_SILICON_PLATFORM
