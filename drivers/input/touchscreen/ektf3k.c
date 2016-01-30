@@ -189,6 +189,8 @@ static int debug = DEBUG_INFO;
 			printk("[ektf3k]:" __VA_ARGS__); \
 	} while (0)
 
+#define ELAN_I2C_RETRY 10
+
 /* dt2wake */
 extern void dt2wake_setdev(struct input_dev * input_device);
 static struct input_dev *dt2wake_pwrdev;
@@ -661,12 +663,12 @@ static int elan_ktf3k_ts_get_data(struct i2c_client *client, uint8_t *cmd,
 }
 
 static int elan_ktf3k_ts_read_command(struct i2c_client *client,
-			   u8* cmd, u16 cmd_length, u8 *value, u16 value_length){
-       struct i2c_adapter *adapter = client->adapter;
- 	struct i2c_msg msg[2];
-	__le16 le_addr;
- 	struct elan_ktf3k_ts_data *ts;
-	int length = 0;
+			u8* cmd, u16 cmd_length, u8 *value, u16 value_length)
+{
+	struct i2c_adapter *adapter = client->adapter;
+	struct i2c_msg msg[2];
+	struct elan_ktf3k_ts_data *ts;
+	int retry = 0;
 
 	ts = i2c_get_clientdata(client);
 
@@ -675,23 +677,25 @@ static int elan_ktf3k_ts_read_command(struct i2c_client *client,
 	msg[0].len = cmd_length;
 	msg[0].buf = cmd;
 
-	down(&pSem);
-	length = i2c_transfer(adapter, msg, 1);
-	up(&pSem);
-	
-	if (length == 1) // only send on packet
-		return value_length;
-	else
-		return -EIO;
+	while (retry <= ELAN_I2C_RETRY) {
+		down(&pSem);
+		up(&pSem);
+		if (i2c_transfer(adapter, msg, 1) == 1) { // only send on packet
+			return value_length;
+		}
+		msleep(10);
+		retry++;
+	}
+	return -EIO;
 }
 
 static int elan_ktf3k_i2c_read_packet(struct i2c_client *client, 
-	u8 *value, u16 value_length){
-       struct i2c_adapter *adapter = client->adapter;
+					u8 *value, u16 value_length)
+{
+	struct i2c_adapter *adapter = client->adapter;
 	struct i2c_msg msg[1];
-	__le16 le_addr;
- 	struct elan_ktf3k_ts_data *ts;
-	int length = 0;
+	struct elan_ktf3k_ts_data *ts;
+	int retry = 0;
 
 	ts = i2c_get_clientdata(client);
 
@@ -699,14 +703,17 @@ static int elan_ktf3k_i2c_read_packet(struct i2c_client *client,
 	msg[0].flags = I2C_M_RD;
 	msg[0].len = value_length;
 	msg[0].buf = (u8 *) value;
-	down(&pSem);
-	length = i2c_transfer(adapter, msg, 1);
-	up(&pSem);
-	
-	if (length == 1) // only send on packet
-		return value_length;
-	else
-		return -EIO;
+
+	while (retry <= ELAN_I2C_RETRY) {
+		down(&pSem);
+		up(&pSem);
+		if (i2c_transfer(adapter, msg, 1) == 1) { // only send on packet
+			return value_length;
+		}
+		msleep(10);
+		retry++;
+	}
+	return -EIO;
 }
 
 static int __hello_packet_handler(struct i2c_client *client)
@@ -998,23 +1005,23 @@ void touch_callback(unsigned cable_status)
 
 static int elan_ktf3k_ts_recv_data(struct i2c_client *client, uint8_t *buf, int size)
 {
-
-	int rc, bytes_to_recv = size;
+	int retry = 0, bytes_to_recv = size;
 
 	if (buf == NULL)
 		return -EINVAL;
 
 	memset(buf, 0, bytes_to_recv);
-	rc = i2c_master_recv(client, buf, bytes_to_recv);
- 
-	if (rc != bytes_to_recv) {
-		dev_err(&client->dev,
-			"[elan] %s: i2c_master_recv error?! \n", __func__);
-		rc = i2c_master_recv(client, buf, bytes_to_recv);
-		return -EINVAL;
-	}
 
-	return rc;
+	while (retry <= ELAN_I2C_RETRY) {
+		if (i2c_master_recv(client, buf, bytes_to_recv) == bytes_to_recv)
+			return bytes_to_recv;
+		msleep(10);
+		retry++;
+	}
+	dev_err(&client->dev,
+		"[elan] %s: i2c_master_recv error?! \n", __func__);
+	i2c_master_recv(client, buf, bytes_to_recv);
+	return -EINVAL;
 }
 
 static void elan_ktf3k_ts_report_data(struct i2c_client *client, uint8_t *buf)
