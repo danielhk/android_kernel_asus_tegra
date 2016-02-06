@@ -1914,14 +1914,8 @@ static int elan_ktf3k_ts_suspend(struct i2c_client *client, pm_message_t mesg)
 
 	scr_suspended = true;
 	rc = cancel_work_sync(&ts->work);
-	if (rc) {
-		if (dt2w_switch) {
-			disable_irq_wake(client->irq);
-		} else {
-			enable_irq(client->irq);
-		}
-		scr_suspended = false;
-	}
+	if (rc && !dt2w_switch)
+		enable_irq(client->irq);
 
 	if((work_lock == 0) && !dt2w_switch)
 		rc = elan_ktf3k_ts_set_power_state(client, PWR_STATE_DEEP_SLEEP);
