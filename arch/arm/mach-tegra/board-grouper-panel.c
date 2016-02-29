@@ -39,9 +39,17 @@
 #include "gpio-names.h"
 #include <mach/board-grouper-misc.h>
 
+#include <linux/module.h>
+static bool otf_scaling = 0;
+module_param(otf_scaling, bool, 0644);
+static unsigned int min_backlight = 10;
+module_param(min_backlight, uint, 0644);
+static unsigned int max_backlight = 160;
+module_param(max_backlight, uint, 0644);
+
 /* grouper default display board pins */
 #define grouper_lvds_avdd_en		TEGRA_GPIO_PH6
-#define grouper_lvds_rst			TEGRA_GPIO_PG7
+#define grouper_lvds_rst		TEGRA_GPIO_PG7
 #define grouper_lvds_shutdown		TEGRA_GPIO_PN6
 #define grouper_lvds_rs			TEGRA_GPIO_PV6
 #define grouper_lvds_lr			TEGRA_GPIO_PG1
@@ -50,9 +58,9 @@
 #define grouper_lvds_rs_a00		TEGRA_GPIO_PH1
 
 /* common pins( backlight ) for all display boards */
-//#define grouper_bl_enb			TEGRA_GPIO_PH3
+//#define grouper_bl_enb		TEGRA_GPIO_PH3
 #define grouper_bl_pwm			TEGRA_GPIO_PH0
-#define grouper_hdmi_hpd			TEGRA_GPIO_PN7
+#define grouper_hdmi_hpd		TEGRA_GPIO_PN7
 
 #ifdef CONFIG_TEGRA_DC
 static struct regulator *grouper_hdmi_reg;
@@ -66,7 +74,7 @@ static struct regulator *grouper_lvds_reg;
 static struct regulator *grouper_lvds_vdd_panel;
 
 static tegra_dc_bl_output grouper_bl_output_measured = {
-	0, 13, 13, 13, 13, 13, 13, 13,
+	0, 2, 4, 6, 8, 10, 12, 13,
 	13, 13, 13, 13, 13, 13, 14, 15,
 	16, 17, 18, 19, 20, 21, 22, 23,
 	24, 25, 26, 27, 28, 29, 30, 31,
@@ -151,11 +159,39 @@ static int grouper_backlight_notify(struct device *unused, int brightness)
 	brightness = (brightness * cur_sd_brightness) / 255;
 
 	/* Apply any backlight response curve */
-	if (brightness > 255)
+	if (brightness > 255) {
 		pr_info("Error: Brightness > 255!\n");
-	else
-		brightness = bl_output[brightness];
-
+	} else {
+#ifdef CONFIG_CUSTOM_BRIGHTNESS
+		if ((min_backlight == 0) || (max_backlight == 0)) {
+#endif
+			brightness = bl_output[brightness];
+#ifdef CONFIG_CUSTOM_BRIGHTNESS
+		} else {
+			if (otf_scaling == 0) {
+				int min_bl_adj = min_backlight;
+				/* Ensure that min backlight goes up to at least 10 to prevent auto-min != slider-min */
+				if (min_backlight < 10)
+					min_bl_adj = 10;
+				if ((brightness > 0) && (brightness < min_bl_adj)) {
+					brightness = min_backlight;
+				} else if (brightness > max_backlight) {
+					brightness = max_backlight;
+				} else {
+					brightness = bl_output[brightness];
+				}
+			} else {
+				if (brightness == 0) {
+					brightness = 0;
+				} else {
+					brightness = min_backlight +
+						DIV_ROUND_CLOSEST(((max_backlight - min_backlight) *
+						max((brightness - 10),0)),245);
+				}
+			}
+		}
+#endif
+	}
 	return brightness;
 }
 
