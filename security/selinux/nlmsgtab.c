@@ -18,6 +18,7 @@
 #include <linux/inet_diag.h>
 #include <linux/xfrm.h>
 #include <linux/audit.h>
+#include <linux/sock_diag.h>
 
 #include "flask.h"
 #include "av_permissions.h"
