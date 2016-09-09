@@ -205,7 +205,7 @@ static unsigned int dt2w_y[2] = {0, 0};
 static unsigned int last_x = 0;
 static unsigned int last_y = 0;
 static unsigned int dt_delta_limit = 30;
-static unsigned int dt_timeout = 50;
+static unsigned int dt_timeout = 80;
 #define DT2W_TIMEOUT_MAX 200
 #define DT2W_TIMEOUT_MIN 10
 #define DT2W_DELTA_MAX 100
@@ -1929,7 +1929,7 @@ static int elan_ktf3k_ts_resume(struct i2c_client *client)
 	int rc = 0, retry = 5;
 
 	touch_debug(DEBUG_INFO, "[elan] %s: enter\n", __func__);
-	if(work_lock == 0){
+	if ((work_lock == 0) && !dt2w_switch) {
 	    do {
 		rc = elan_ktf3k_ts_set_power_state(client, PWR_STATE_NORMAL);
 		rc = elan_ktf3k_ts_get_power_state(client);
