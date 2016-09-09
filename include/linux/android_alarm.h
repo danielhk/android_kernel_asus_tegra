@@ -39,41 +39,41 @@ enum android_alarm_type {
 #include <linux/rbtree.h>
 
 /*
- * The alarm interface is similar to the hrtimer interface but adds support
+ * The android_alarm interface is similar to the hrtimer interface but adds support
  * for wakeup from suspend. It also adds an elapsed realtime clock that can
  * be used for periodic timers that need to keep runing while the system is
  * suspended and not be disrupted when the wall time is set.
  */
 
 /**
- * struct alarm - the basic alarm structure
+ * struct android_alarm - the basic alarm structure
  * @node:	red black tree node for time ordered insertion
  * @type:	alarm type. rtc/elapsed-realtime/systemtime, wakeup/non-wakeup.
  * @softexpires: the absolute earliest expiry time of the alarm.
  * @expires:	the absolute expiry time.
  * @function:	alarm expiry callback function
  *
- * The alarm structure must be initialized by alarm_init()
+ * The android_alarm structure must be initialized by android_alarm_init()
  *
  */
 
-struct alarm {
+struct android_alarm {
 	struct rb_node 		node;
 	enum android_alarm_type type;
 	ktime_t			softexpires;
 	ktime_t			expires;
-	void			(*function)(struct alarm *);
+	void			(*function)(struct android_alarm *);
 };
 
-void alarm_init(struct alarm *alarm,
-	enum android_alarm_type type, void (*function)(struct alarm *));
-void alarm_start_range(struct alarm *alarm, ktime_t start, ktime_t end);
-int alarm_try_to_cancel(struct alarm *alarm);
-int alarm_cancel(struct alarm *alarm);
-ktime_t alarm_get_elapsed_realtime(void);
+void android_alarm_init(struct android_alarm *alarm,
+	enum android_alarm_type type, void (*function)(struct android_alarm *));
+void android_alarm_start_range(struct android_alarm *alarm, ktime_t start, ktime_t end);
+int android_alarm_try_to_cancel(struct android_alarm *alarm);
+int android_alarm_cancel(struct android_alarm *alarm);
+ktime_t android_alarm_get_elapsed_realtime(void);
 
 /* set rtc while preserving elapsed realtime */
-int alarm_set_rtc(const struct timespec ts);
+int android_alarm_set_rtc(const struct timespec ts);
 
 #endif
 
