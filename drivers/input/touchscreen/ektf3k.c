@@ -204,8 +204,8 @@ static unsigned int dt2w_x[2] = {0, 0};
 static unsigned int dt2w_y[2] = {0, 0};
 static unsigned int last_x = 0;
 static unsigned int last_y = 0;
-static unsigned int dt_delta_limit = 30;
-static unsigned int dt_timeout = 80;
+static unsigned int dt_delta_limit = 50;
+static unsigned int dt_timeout = 100;
 #define DT2W_TIMEOUT_MAX 200
 #define DT2W_TIMEOUT_MIN 10
 #define DT2W_DELTA_MAX 100
