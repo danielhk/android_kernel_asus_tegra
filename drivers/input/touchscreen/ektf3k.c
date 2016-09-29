@@ -38,33 +38,33 @@
 #include <linux/wakelock.h>
 
 #define PACKET_SIZE		40
-#define NEW_PACKET_SIZE 55
+#define NEW_PACKET_SIZE		55
 #define FINGER_NUM		10
 
 #define PWR_STATE_DEEP_SLEEP	0
-#define PWR_STATE_NORMAL		1
-#define PWR_NORMAL_STATE 8
-#define PWR_IDLE_STATE 1
-#define PWR_STATE_MASK			BIT(3)
+#define PWR_STATE_NORMAL	1
+#define PWR_NORMAL_STATE	8
+#define PWR_IDLE_STATE		1
+#define PWR_STATE_MASK		BIT(3)
 
-#define CMD_S_PKT			0x52
-#define CMD_R_PKT			0x53
-#define CMD_W_PKT			0x54
+#define CMD_S_PKT		0x52
+#define CMD_R_PKT		0x53
+#define CMD_W_PKT		0x54
 
-#define HELLO_PKT			0x55
-#define NORMAL_PKT			0x63
-#define NEW_NOMARL_PKT      0x66
-#define TEN_FINGERS_PKT			0x62
+#define HELLO_PKT		0x55
+#define NORMAL_PKT		0x63
+#define NEW_NOMARL_PKT		0x66
+#define TEN_FINGERS_PKT		0x62
 
 #define RPT_LOCK_PKT		0x56
 #define RPT_UNLOCK_PKT		0xA6
 
-#define RESET_PKT			0x77
-#define CALIB_PKT			0xA8
+#define RESET_PKT		0x77
+#define CALIB_PKT		0xA8
 
-#define IDX_FINGER			3
-#define MAX_FINGER_SIZE          31
-#define MAX_FINGER_PRESSURE  255
+#define IDX_FINGER		3
+#define MAX_FINGER_SIZE         31
+#define MAX_FINGER_PRESSURE	255
 
 #define ABS_MT_POSITION         0x2a    /* Group a set of X and Y */
 #define ABS_MT_AMPLITUDE        0x2b    /* Group a set of Z and W */
@@ -176,7 +176,7 @@ static int mTouchStatus[FINGER_NUM] = {0};
 
 /* Debug levels */
 #define NO_DEBUG       0
-#define DEBUG_ERROR  1
+#define DEBUG_ERROR    1
 #define DEBUG_INFO     2
 #define DEBUG_MESSAGES 5
 #define DEBUG_TRACE   10
@@ -1173,6 +1173,7 @@ static void elan_ktf3k_ts_report_data2(struct i2c_client *client, uint8_t *buf)
 	uint8_t i, num;
 	uint16_t active=0;
 	uint8_t idx=IDX_FINGER;
+	bool tapped = false;
 
 	num = buf[2] & 0xf;
 	for (i=0; i<34;i++)
@@ -1199,8 +1200,10 @@ static void elan_ktf3k_ts_report_data2(struct i2c_client *client, uint8_t *buf)
 			input_report_abs(idev, ABS_MT_POSITION_Y, x);
 			if(unlikely(gPrint_point)) touch_debug(DEBUG_INFO, "[elan] finger id=%d X=%d y=%d size=%d pressure=%d\n",
 								i, x, y, touch_size, pressure_size);
-			if (dt2w_switch && scr_suspended)
+			if (dt2w_switch && scr_suspended) {
 			    doubletap_wake_func(x, y);
+			    tapped = true;
+			}
 		    }
 		}
 		mTouchStatus[i] = active;
@@ -1214,10 +1217,8 @@ static void elan_ktf3k_ts_report_data2(struct i2c_client *client, uint8_t *buf)
 	    touch_debug(DEBUG_ERROR, "[elan] Checksum Error %d byte[2]=%X\n", checksum_err, buf[2]);
 	}
 
-	if (checksum == 99) {
-		if (dt2w_switch && scr_suspended)
-			doubletap_wake_func(-1, -1);
-	}
+	if (tapped && dt2w_switch && scr_suspended)
+	    doubletap_wake_func(-1, -1);
 
 	return;
 }
