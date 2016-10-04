@@ -1930,7 +1930,7 @@ static int elan_ktf3k_ts_resume(struct i2c_client *client)
 	int rc = 0, retry = 5;
 
 	touch_debug(DEBUG_INFO, "[elan] %s: enter\n", __func__);
-	if ((work_lock == 0) && !dt2w_switch) {
+	if (work_lock == 0) {
 	    do {
 		rc = elan_ktf3k_ts_set_power_state(client, PWR_STATE_NORMAL);
 		rc = elan_ktf3k_ts_get_power_state(client);
