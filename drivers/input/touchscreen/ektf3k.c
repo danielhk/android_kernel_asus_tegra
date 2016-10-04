@@ -1217,7 +1217,7 @@ static void elan_ktf3k_ts_report_data2(struct i2c_client *client, uint8_t *buf)
 	    touch_debug(DEBUG_ERROR, "[elan] Checksum Error %d byte[2]=%X\n", checksum_err, buf[2]);
 	}
 
-	if (tapped && dt2w_switch && scr_suspended)
+	if (tapped)
 	    doubletap_wake_func(-1, -1);
 
 	return;
